@@ -35,7 +35,7 @@ data:
 actor:
   group_name: "ActorGroup"
   training_backend: "fsdp"
-  micro_batch_size: 16
+  micro_batch_size: 2
   global_batch_size: 64
   seed: 42
 
@@ -106,7 +106,7 @@ actor:
     strategy: "fsdp"
     sharding_strategy: "no_shard"
     use_orig_params: True
-    gradient_checkpointing: False
+    gradient_checkpointing: True
     wrappers:
       rlt_features:
         module_names: [rlt_module]
