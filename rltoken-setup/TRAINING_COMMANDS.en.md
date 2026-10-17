@@ -9,22 +9,23 @@ source ~/RLinf/rltoken-setup/activate.sh
 DATA="$HOME/.cache/huggingface/lerobot/scylearning/insert_black_rack_into_blue_slot_20260916_v01"
 OUT="$PWD/rltoken-setup/outputs/ur5e_insert_black_rack_state19"
 python toolkits/lerobot/calculate_norm_stats.py \
-  --config-name pi05_ur_state --repo-id "$DATA" --output-dir "$OUT"
+  --config-name pi05_ur_state --repo-id "$DATA" \
+  --obs-indices 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 --output-dir "$OUT"
 ```
 
 The statistics script chooses its reader by storage format: v3 defaults to numeric parquet; v2 defaults to the existing LeRobot loader. Use `--data-backend parquet` to select the shared numeric reader explicitly. This reader follows the configured field mapping and action sequence keys, independently of robot type.
 
 This reads all 200 episodes and 67,740 frames and writes `norm_stats.json` and `norm_metadata.json` under `$OUT`, preserving the source dataset. The numeric parquet reader supports this dataset's v3.0 format and includes partial batches. Action statistics use 20-step windows with terminal action repetition, matching OpenPI. The seven recorded delta-pose/gripper actions are padded to 32 dimensions without an additional delta transform.
 
-To select pose and gripper only, run:
+When using the environment variable, explicitly select all dimensions 1–19 for this dataset:
 
 ```bash
-OBS_INDICES=1,2,3,4,5,6,19 python toolkits/lerobot/calculate_norm_stats.py \
+OBS_INDICES=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 python toolkits/lerobot/calculate_norm_stats.py \
   --config-name pi05_ur_state --repo-id "$DATA" \
-  --output-dir "$PWD/rltoken-setup/outputs/ur5e_insert_black_rack_state7"
+  --output-dir "$PWD/rltoken-setup/outputs/ur5e_insert_black_rack_state19"
 ```
 
-Indices are **one-based**, matching `~/openpi`. `--obs-indices 1,2,3,4,5,6,19` overrides the environment variable. Without either, the default is dimensions 1–19. Reordering is supported; empty, duplicate, nonpositive, out-of-range indices and selections larger than 32 dimensions are rejected.
+Indices are **one-based**, matching `~/openpi`. `--obs-indices 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19` overrides the environment variable. Without either, the default is dimensions 1–19. Reordering is supported; empty, duplicate, nonpositive, out-of-range indices and selections larger than 32 dimensions are rejected.
 
 ## Stage1 SFT
 
