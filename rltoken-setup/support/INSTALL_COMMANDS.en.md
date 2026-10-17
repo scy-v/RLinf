@@ -1,5 +1,7 @@
 # UR Environment Installation
 
+Auxiliary scripts, environment records, and verification tools live in this `support/` directory. [Chinese instructions](../安装命令.md).
+
 ## Install From the Current Checkout
 
 Install the UR dependencies with the OpenPI model stack:
@@ -8,6 +10,12 @@ Install the UR dependencies with the OpenPI model stack:
 cd ~/RLinf
 bash requirements/install.sh embodied --model openpi --env ur \
   --venv .venv --no-root --install-rlinf
+```
+
+Alternatively, run the wrapper to install dependencies and repair OpenCV display support:
+
+```bash
+bash rltoken-setup/support/install.sh
 ```
 
 ## Clone the Fork

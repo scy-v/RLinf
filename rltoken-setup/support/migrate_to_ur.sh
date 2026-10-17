@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Add UR dependencies to the existing OpenPI venv without resyncing the model stack.
 set -euo pipefail
-SETUP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SETUP_DIR="$(dirname "$SCRIPT_DIR")"
 REPO_DIR="$(dirname "$SETUP_DIR")"
 source "$SETUP_DIR/activate.sh"
 mkdir -p "$SETUP_DIR/logs/ur-migration"

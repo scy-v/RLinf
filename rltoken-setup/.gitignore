@@ -1,10 +1,10 @@
 /uv-cache/
 /logs/
-/audit-*/
 /outputs/
-/__pycache__/
-/versions.json
-/system-packages.json
-/ur-install.patch
-/verify*.py
-/verify.sh
+/support/__pycache__/
+/support/audit-*/
+/support/versions.json
+/support/system-packages.json
+/support/ur-install.patch
+/support/verify*.py
+/support/verify.sh

@@ -1,5 +1,7 @@
 # UR5e RLToken Training Preparation
 
+[Chinese instructions](../训练命令.md).
+
 Select the raw state dimensions with `obs_indices`, then use the same selection for normalization, SFT, and Stage2. The default is the first 19 dimensions: TCP pose (6), velocity (6), force/torque (6), and `gripper_raw_position` (1).
 
 ## Data and Normalization
