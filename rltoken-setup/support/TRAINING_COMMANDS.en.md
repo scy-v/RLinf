@@ -75,7 +75,7 @@ The configuration uses GPU 0 for 20000 steps and saves a checkpoint every 2000 s
 
 The current SFT configuration trains all parameters: `actor.model.is_lora: False`. The VLM, action expert, and additional RLToken modules are trainable. A single-GPU microbatch of 2 and global batch of 64 require 32 gradient accumulation steps. RLinf assigns training workers through `cluster.component_placement.actor`; setting `CUDA_VISIBLE_DEVICES` alone does not expand a single-GPU configuration to multiple GPUs.
 
-Four GPUs with a microbatch of 16 per GPU and a global batch of 64 correspond to the following configuration, without gradient accumulation. `full_shard` shards parameters, gradients, and optimizer states across the four GPUs, while gradient checkpointing remains enabled. This four-GPU configuration has not been tested:
+Four GPUs with a microbatch of 16 per GPU and a global batch of 64 correspond to the following configuration, without gradient accumulation. `no_shard` matches the original Franka and ManiSkill Stage1 configurations: each GPU keeps complete parameters, gradients, and optimizer states, with gradient synchronization for data parallelism. This corresponds to OpenPI's `fsdp_devices=1`. Gradient checkpointing remains enabled. This four-GPU configuration has not been tested:
 
 ```yaml
 cluster:
@@ -85,7 +85,7 @@ actor:
   micro_batch_size: 16
   global_batch_size: 64
   fsdp_config:
-    sharding_strategy: full_shard
+    sharding_strategy: no_shard
     gradient_checkpointing: True
 ```
 
