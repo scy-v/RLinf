@@ -12,6 +12,7 @@ build
 docs/build
 dist
 logs/*
+/logs
 logs_baseline/*
 outputs/*
 *.so

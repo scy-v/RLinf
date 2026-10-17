@@ -71,7 +71,25 @@ The original microbatch of 16 ran out of memory on one A800 80GB. The current co
 bash examples/sft/run_vla_sft.sh ur_rlt_stage1_sft_openpi_pi05
 ```
 
-The configuration uses GPU 0 for 20000 steps and saves a checkpoint every 2000 steps. About 106GB of disk space remains, which cannot hold all checkpoints from the full run. Transfer older checkpoints as training proceeds, or place logs and checkpoints on a disk with enough capacity. The preflight did not test checkpoint saving or restoration, and the full training run has not been executed.
+The configuration uses GPU 0 for 20000 steps and saves a checkpoint every 2000 steps. On this machine, `~/RLinf/logs` is symlinked to `/data/suchenyu/RLinf/logs`; the destination disk had about 16TB free when configured. The launch script creates a timestamped log directory. Checkpoints are stored at `/data/suchenyu/RLinf/logs/<timestamp>-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_<step>/actor/`. The preflight did not test checkpoint saving or restoration, and the full training run has not been executed.
+
+The current SFT configuration trains all parameters: `actor.model.is_lora: False`. The VLM, action expert, and additional RLToken modules are trainable. A single-GPU microbatch of 2 and global batch of 64 require 32 gradient accumulation steps. RLinf assigns training workers through `cluster.component_placement.actor`; setting `CUDA_VISIBLE_DEVICES` alone does not expand a single-GPU configuration to multiple GPUs.
+
+Four GPUs with a microbatch of 16 per GPU and a global batch of 64 correspond to the following configuration, without gradient accumulation. `full_shard` shards parameters, gradients, and optimizer states across the four GPUs, while gradient checkpointing remains enabled. This four-GPU configuration has not been tested:
+
+```yaml
+cluster:
+  component_placement:
+    actor: 0-3
+actor:
+  micro_batch_size: 16
+  global_batch_size: 64
+  fsdp_config:
+    sharding_strategy: full_shard
+    gradient_checkpointing: True
+```
+
+The current OpenPI model cannot switch directly to working LoRA training with `is_lora: True`: the generic PEFT defaults target an unsupported `ModuleList`, and attention LoRA in the native `*_lora` Gemma variants is not implemented. The VLM, action expert, and RLToken training scopes need explicit adaptation and validation first. The current command uses the tested full-parameter mode.
 
 ## Stage2
 
