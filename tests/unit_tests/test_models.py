@@ -1566,7 +1566,7 @@ def test_ur_state_selection_matches_sft_and_rollout(indices, tmp_path):
             "observation.images.exterior_image": image,
             "observation.images.wrist_image": image,
             "action": actions,
-            "prompt": "insert",
+            "task": "insert",
         }
     )
     rollout = compose(data.data_transforms.inputs)(
@@ -1592,6 +1592,8 @@ def test_ur_state_selection_matches_sft_and_rollout(indices, tmp_path):
     np.testing.assert_array_equal(sft["actions"][..., :7], actions)
     np.testing.assert_array_equal(sft["actions"][..., 7:], 0)
     assert sft["image_mask"]["left_wrist_0_rgb"]
+    assert sft["prompt"] == "insert"
+    assert not data.prompt_from_task
 
 
 @pytest.mark.parametrize("indices", [(), (0,), (-1,), (1, 1), (True,), (1.5,), (49,)])

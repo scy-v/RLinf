@@ -100,7 +100,7 @@ class LeRobotURDataConfig(DataConfigFactory):
                             "observation/wrist_image": "observation.images.wrist_image",
                             "observation/state": "observation.state",
                             "actions": "action",
-                            "prompt": "prompt",
+                            "prompt": "task",
                         }
                     )
                 ]

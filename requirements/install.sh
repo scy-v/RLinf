@@ -2540,8 +2540,8 @@ install_openpi_model() {
         ur)
             create_and_sync_venv
             install_common_embodied_deps
-            install_ur_env
             uv pip install "rlinf-openpi==0.1.1"
+            install_ur_env
             install_flash_attn
             ;;
         polaris)
@@ -3662,8 +3662,10 @@ install_franka_franky_env() {
 }
 
 install_ur_env() {
-    # Hardware dependencies only; the RLinf UR robot/task adapter is separate.
-    install_lerobot -r "$SCRIPT_DIR/embodied/envs/ur.txt"
+    local LEROBOT_COMMIT="d6ea3bbce0fc8c75138f02639ac4ceaf12a67829"
+    uv pip install -r "$SCRIPT_DIR/embodied/envs/ur.txt"
+    # Use LeRobot's v3 reader with RLinf's shared Torch/Datasets stack.
+    install_lerobot --no-deps
     use_opencv_gui_wheel
 }
 

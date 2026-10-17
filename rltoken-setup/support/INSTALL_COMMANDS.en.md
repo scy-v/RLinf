@@ -51,4 +51,6 @@ Activate the environment:
 source ~/RLinf/.venv/bin/activate
 ```
 
+The UR LeRobot reader is pinned to `d6ea3bbce0fc8c75138f02639ac4ceaf12a67829`, matching your OpenPI environment and supporting this v3.0 dataset. The installer reuses RLinf's existing Torch/Datasets stack.
+
 UR dependencies are listed in `requirements/embodied/envs/ur.txt`, including RTDE, the DH gripper, and the space mouse.

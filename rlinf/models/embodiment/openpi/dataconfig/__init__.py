@@ -87,7 +87,7 @@ _CONFIGS = [
         ),
         data=LeRobotURDataConfig(
             repo_id="scylearning/insert_black_rack_into_blue_slot_20260916_v01",
-            base_config=DataConfig(prompt_from_task=True),
+            base_config=DataConfig(prompt_from_task=False),
         ),
         batch_size=16,
         num_workers=8,

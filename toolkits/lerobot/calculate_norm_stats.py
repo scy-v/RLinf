@@ -192,6 +192,7 @@ def create_parquet_batches(
                 sample[key] = arrays[key][window]
             sample.update(images)
             sample.setdefault("prompt", "")
+            sample.setdefault("task", "")
             samples.append(transform(sample))
         yield {
             key: np.stack([sample[key] for sample in samples])

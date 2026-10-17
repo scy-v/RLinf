@@ -12,3 +12,6 @@ pyrealsense2; sys_platform == 'linux' and platform_machine == 'x86_64'
 imageio[ffmpeg]
 evdev; sys_platform == 'linux'
 pyspacemouse>=2.0.0
+
+# Video decoding for the pinned LeRobot v3 reader.
+av>=15,<19

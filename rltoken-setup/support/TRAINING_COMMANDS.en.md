@@ -31,7 +31,20 @@ Indices are **one-based**, matching `~/openpi`. `--obs-indices 1,2,3,4,5,6,7,8,9
 
 ## Stage1 SFT
 
-Use `examples/sft/config/ur_rlt_stage1_sft_openpi_pi05.yaml`. Set `actor.model.model_path` to a directory containing an RLinf OpenPI `model.safetensors`. Dataset, default statistics paths, and two camera inputs are already configured for this machine.
+Use `examples/sft/config/ur_rlt_stage1_sft_openpi_pi05.yaml`. The cached OpenPI JAX `pi05_base` has been converted to RLinf's PyTorch layout. `actor.model.model_path` points to `/home/suchenyu/RLinf/rltoken-setup/outputs/pi05_base_openpi`, containing `model.safetensors` and `config.json`. Dataset paths, statistics for dimensions 1–19, and two camera inputs are configured for this machine.
+
+On another machine, prepare the normalization results above and the cached OpenPI weights, then convert with the same 20-step horizon as training:
+
+```bash
+JAX_PLATFORMS=cpu python -m rlinf.utils.ckpt_convertor.openpi.convert --mode jax_to_openpi \
+  --input-model "$HOME/.cache/openpi/openpi-assets/checkpoints/pi05_base" \
+  --input-norm-stats "$OUT/norm_stats.json" \
+  --output-model "$PWD/rltoken-setup/outputs/pi05_base_openpi" \
+  --output-norm-stats "$PWD/rltoken-setup/outputs/pi05_base_openpi/scylearning/insert_black_rack_into_blue_slot_20260916_v01/norm_stats.json" \
+  --action-dim 32 --action-horizon 20 --max-token-len 200
+```
+
+This converts the existing weights and copies normalization statistics. It does not download or train a model. Weights remain in a local ignored directory.
 
 Store the selection in YAML so Ray workers receive the same settings:
 
@@ -48,7 +61,9 @@ actor:
 
 Normalization, SFT, and rollout share `SelectState` before robot-specific transforms. The UR adapter owns field mapping, two camera inputs, and action representation. Franka configurations can enable the same selection with `openpi_data.obs_indices`; without it, their original behavior is preserved. The exterior camera maps to `base_0_rgb`; the wrist camera maps to `left_wrist_0_rgb`. Recompute statistics and update the path whenever the selection or order changes. Keep `norm_metadata.json` beside the statistics to validate the order on load.
 
-The current `.venv` LeRobot loader supports v2.1, while this dataset uses v3.0. Before full SFT, adapt the dataset loader or create a separate compatible dataset copy. Only numeric normalization and input transforms have been verified. After resolving format compatibility and setting the model path, use:
+The UR installation target pins LeRobot to `d6ea3bbce0fc8c75138f02639ac4ceaf12a67829`, matching your `~/openpi` environment (package version 0.3.4, dataset format v3.0). OpenPI's compatibility import uses `lerobot.datasets.lerobot_dataset`. The UR adapter maps each sample's native `task` text to the prompt, using `meta/tasks.parquet`; the dataset task is `Insert the black rack into the blue slot`.
+
+The full converted model was loaded on CPU, and the official OpenPI loader successfully produced a real v3 SFT batch, including video decoding, normalization, selection of dimensions 1–19, and prompt tokenization. Full GPU training has not been run. Once GPU scheduling is available, use:
 
 ```bash
 bash examples/sft/run_vla_sft.sh ur_rlt_stage1_sft_openpi_pi05
