@@ -13,7 +13,7 @@ hydra:
 cluster:
   num_nodes: 1
   component_placement:
-    actor: 0-0
+    actor: 0-3
 
 runner:
   task_type: sft
@@ -35,7 +35,7 @@ data:
 actor:
   group_name: "ActorGroup"
   training_backend: "fsdp"
-  micro_batch_size: 2
+  micro_batch_size: 16
   global_batch_size: 64
   seed: 42
 
