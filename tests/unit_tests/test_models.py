@@ -1540,3 +1540,152 @@ def test_cosmos3_sglang_response_keeps_every_env_in_input_order():
     assert actions.shape == (2, 16, 7)
     assert torch.all(actions[0, :, 6] == -0.5)
     assert torch.all(actions[1, :, 6] == 0.5)
+
+
+@pytest.mark.parametrize("indices", [(1, 2, 19), (19, 3, 1), tuple(range(1, 20))])
+def test_ur_state_selection_matches_sft_and_rollout(indices, tmp_path):
+    pytest.importorskip("openpi")
+    from openpi.transforms import compose
+
+    from rlinf.models.embodiment.openpi.dataconfig import get_openpi_config
+    from rlinf.models.embodiment.openpi.transforms.env import repack_env_obs
+    from rlinf.models.embodiment.openpi.transforms.state import SelectState
+
+    config = get_openpi_config(
+        "pi05_ur_state",
+        model_path=str(tmp_path),
+        data_kwargs={"obs_indices": list(indices)},
+    )
+    data = config.data.create(config.assets_dirs, config.model)
+    state = np.arange(48, dtype=np.float32)
+    image = np.zeros((8, 8, 3), dtype=np.uint8)
+    actions = np.ones((20, 7), dtype=np.float32)
+    sft = compose([*data.repack_transforms.inputs, *data.data_transforms.inputs])(
+        {
+            "observation.state": state,
+            "observation.images.exterior_image": image,
+            "observation.images.wrist_image": image,
+            "action": actions,
+            "prompt": "insert",
+        }
+    )
+    rollout = compose(data.data_transforms.inputs)(
+        repack_env_obs(
+            "pi05_ur_state",
+            {
+                "states": state,
+                "main_images": image,
+                "wrist_images": image,
+                "task_descriptions": "insert",
+            },
+            select_state=lambda x: x,
+        )
+    )
+    expected = state[np.asarray(indices) - 1]
+    np.testing.assert_array_equal(sft["state"], expected)
+    np.testing.assert_array_equal(rollout["state"], expected)
+    torch.testing.assert_close(
+        SelectState(indices).select(torch.from_numpy(state)[None]),
+        torch.from_numpy(expected)[None],
+    )
+    assert sft["actions"].shape == (20, 32)
+    np.testing.assert_array_equal(sft["actions"][..., :7], actions)
+    np.testing.assert_array_equal(sft["actions"][..., 7:], 0)
+    assert sft["image_mask"]["left_wrist_0_rgb"]
+
+
+@pytest.mark.parametrize("indices", [(), (0,), (-1,), (1, 1), (True,), (1.5,), (49,)])
+def test_openpi_rejects_invalid_raw_state_selection(indices):
+    pytest.importorskip("openpi")
+    from rlinf.models.embodiment.openpi.transforms.state import SelectState
+
+    with pytest.raises(ValueError):
+        SelectState(indices).select(np.zeros(48))
+
+
+@pytest.mark.parametrize("config_name", ["pi05_ur_state", "pi05_franka_state"])
+def test_openpi_norm_stats_reject_different_selection_order(tmp_path, config_name):
+    pytest.importorskip("openpi")
+    import json
+
+    from rlinf.models.embodiment.openpi.dataconfig import get_openpi_config
+
+    (tmp_path / "norm_metadata.json").write_text(json.dumps({"obs_indices": [1, 2, 3]}))
+    config = get_openpi_config(
+        config_name,
+        data_kwargs={
+            "norm_stats_path": str(tmp_path),
+            "obs_indices": [3, 2, 1],
+        },
+    )
+    with pytest.raises(ValueError, match="recompute stats"):
+        config.data.create(config.assets_dirs, config.model)
+
+
+@pytest.mark.parametrize(
+    "config_name", ["pi05_ur_state", "pi05_franka_state", "pi05_franka"]
+)
+def test_openpi_selection_is_shared_with_stage2_proprio(config_name, tmp_path):
+    pytest.importorskip("openpi")
+    from openpi.transforms import compose
+
+    from rlinf.models.embodiment.openpi.dataconfig import get_openpi_config
+    from rlinf.models.embodiment.openpi.env_io import EnvIO
+
+    indices = [19, 3, 1]
+    config = get_openpi_config(
+        config_name, model_path=str(tmp_path), data_kwargs={"obs_indices": indices}
+    )
+    data = config.data.create(config.assets_dirs, config.model)
+    io = EnvIO()
+    io.state_indices = None
+    io.setup_transforms(data.data_transforms.inputs, data.data_transforms.outputs)
+    state = np.arange(48, dtype=np.float32)
+    batch = torch.from_numpy(state)[None]
+    expected = state[np.asarray(indices) - 1]
+    # The same raw state independently enters the VLA transform and the MLP proprio path.
+    sample = {
+        "observation/state": state,
+        "observation/image": np.zeros((8, 8, 3), np.uint8),
+        "observation/wrist_image": np.zeros((8, 8, 3), np.uint8),
+    }
+    vla = compose(data.data_transforms.inputs)(sample)
+    np.testing.assert_array_equal(np.asarray(vla["state"])[:3], expected)
+    torch.testing.assert_close(
+        io._select_proprio(batch), torch.from_numpy(expected)[None]
+    )
+
+
+def test_openpi_state_selection_reorders_full_length_and_rejects_double_selection():
+    pytest.importorskip("openpi")
+    from rlinf.models.embodiment.openpi.env_io import EnvIO
+    from rlinf.models.embodiment.openpi.transforms.state import SelectState
+
+    selector = SelectState((3, 1, 2))
+    np.testing.assert_array_equal(selector.select(np.array([10, 20, 30])), [30, 10, 20])
+    io = EnvIO()
+    io.state_indices = [0, 1]
+    with pytest.raises(ValueError, match="not both"):
+        io.setup_transforms([selector], [])
+
+
+def test_openpi_ur_default_is_one_through_nineteen_and_franka_is_unchanged(tmp_path):
+    pytest.importorskip("openpi")
+    from rlinf.models.embodiment.openpi.dataconfig import get_openpi_config
+    from rlinf.models.embodiment.openpi.transforms.state import SelectState
+
+    ur = get_openpi_config("pi05_ur_state", model_path=str(tmp_path))
+    assert ur.data.obs_indices == tuple(range(1, 20))
+    data = ur.data.create(ur.assets_dirs, ur.model)
+    assert data.action_sequence_keys == ("action",)
+    assert data.data_transforms.inputs[0].indices == tuple(range(1, 20))
+    franka = get_openpi_config("pi05_franka_state", model_path=str(tmp_path))
+    data = franka.data.create(franka.assets_dirs, franka.model)
+    assert not any(isinstance(t, SelectState) for t in data.data_transforms.inputs)
+    io_state = torch.arange(48, dtype=torch.float32)[None]
+    from rlinf.models.embodiment.openpi.env_io import EnvIO
+
+    io = EnvIO()
+    io.state_indices = None
+    io.setup_transforms(data.data_transforms.inputs, data.data_transforms.outputs)
+    assert io._select_proprio(io_state) is io_state

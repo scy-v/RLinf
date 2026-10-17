@@ -1,0 +1,14 @@
+# UR RTDE + DH PGE gripper; versions match the local UR collection environment.
+ur-rtde==1.6.3
+pydhgripper==1.0.2
+pyserial==3.5
+crcmod==1.7
+numpy<2
+scipy
+pyyaml
+gymnasium==0.29.1
+opencv-python
+pyrealsense2; sys_platform == 'linux' and platform_machine == 'x86_64'
+imageio[ffmpeg]
+evdev; sys_platform == 'linux'
+pyspacemouse>=2.0.0

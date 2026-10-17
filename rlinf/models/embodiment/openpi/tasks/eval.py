@@ -144,7 +144,7 @@ class Pi0Eval(EnvIO, Pi0):
             {"actions": model_actions, "state": observation.state}
         )["actions"]
 
-        raw_proprio = self._select_configured_state(env_obs["states"])
+        raw_proprio = self._select_proprio(env_obs["states"])
         if "maniskill" in self.config_name.lower():
             state_dim = (
                 raw_proprio.shape[-1]

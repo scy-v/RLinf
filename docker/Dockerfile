@@ -85,6 +85,7 @@ FROM base-image-platform-${PLATFORM} AS base-image-embodied-roboverse
 FROM base-image-platform-${PLATFORM} AS base-image-embodied-polaris
 FROM base-image-platform-${PLATFORM} AS base-image-embodied-genesis
 FROM base-image-platform-${PLATFORM} AS base-image-embodied-franka
+FROM base-image-platform-${PLATFORM} AS base-image-embodied-ur
 
 
 ##################################################################################################
@@ -398,6 +399,16 @@ RUN bash requirements/install.sh ${INSTALL_MIRROR_OPTION} --platform ${RLINF_PLA
     bash requirements/install.sh ${INSTALL_MIRROR_OPTION} --platform ${RLINF_PLATFORM} embodied --venv gr00t --model gr00t --env franka
 
 RUN echo "source ${UV_PATH}/franky/bin/activate" >> ~/.bashrc
+
+
+##################################################################################################
+# Embodied: UR hardware dependencies + OpenPI (robot/task adapter required)
+##################################################################################################
+FROM embodied-common-image AS embodied-ur-image
+
+RUN bash requirements/install.sh ${INSTALL_MIRROR_OPTION} --platform ${RLINF_PLATFORM} embodied --venv openpi --model openpi --env ur
+
+RUN echo "source ${UV_PATH}/openpi/bin/activate" >> ~/.bashrc
 
 
 ##################################################################################################

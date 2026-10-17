@@ -3299,3 +3299,106 @@ def test_vlm_collate_still_rejects_unknown_mm_keys():
 
     with pytest.raises(ValueError, match="Unsupported multi_modal_input key"):
         collate_fn([sample])
+
+
+@pytest.mark.parametrize(
+    "config_name", ["pi05_ur_state", "pi05_franka_state", "pi05_franka"]
+)
+@pytest.mark.parametrize("version", ["v2.1", "v3.0"])
+def test_openpi_normalization_env_selection_and_terminal_windows(
+    tmp_path, monkeypatch, config_name, version
+):
+    pytest.importorskip("openpi")
+    import json
+
+    import numpy as np
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from toolkits.lerobot.calculate_norm_stats import main
+
+    is_ur = config_name == "pi05_ur_state"
+    state_key, action_key = (
+        ("observation.state", "action") if is_ur else ("state", "actions")
+    )
+    dataset = tmp_path / "dataset"
+    (dataset / "meta").mkdir(parents=True)
+    (dataset / "data").mkdir()
+    states = np.arange(5 * 48, dtype=np.float64).reshape(5, 48)
+    actions = np.repeat(np.array([1, 2, 3, 10, 20])[:, None], 7, axis=1)
+    pq.write_table(
+        pa.table(
+            {
+                state_key: states.tolist(),
+                action_key: actions.tolist(),
+                "episode_index": [0, 0, 0, 1, 1],
+                "frame_index": [0, 1, 2, 0, 1],
+            }
+        ),
+        dataset / "data/frames.parquet",
+    )
+    (dataset / "meta/info.json").write_text(
+        json.dumps(
+            {
+                "robot_type": "ur5e" if is_ur else "franka",
+                "codebase_version": version,
+                "total_frames": 5,
+                "total_episodes": 2,
+                "features": {
+                    state_key: {"names": [str(i) for i in range(1, 49)]},
+                    action_key: {"names": [str(i) for i in range(7)]},
+                    **(
+                        {
+                            "observation.images.exterior_image": {"dtype": "video"},
+                            "observation.images.wrist_image": {"dtype": "video"},
+                        }
+                        if is_ur
+                        else {"image": {"dtype": "video"}}
+                    ),
+                },
+            }
+        )
+    )
+    monkeypatch.setenv("OBS_INDICES", "19,1")
+    for cli_indices, expected in [(None, [19, 1]), ("3,2,1", [3, 2, 1])]:
+        output = tmp_path / f"stats{len(expected)}"
+        main(
+            config_name,
+            str(dataset),
+            obs_indices=cli_indices,
+            output_dir=str(output),
+            data_backend="auto" if version == "v3.0" else "parquet",
+        )
+        stats = json.loads((output / "norm_stats.json").read_text())["norm_stats"]
+        metadata = json.loads((output / "norm_metadata.json").read_text())
+        assert metadata["obs_indices"] == expected
+        np.testing.assert_allclose(
+            stats["state"]["mean"][: len(expected)],
+            states[:, np.array(expected) - 1].mean(0),
+        )
+        horizon = metadata["action_horizon"]
+        windows = np.array(
+            [
+                [1, 2] + [3] * (horizon - 2),
+                [2] + [3] * (horizon - 1),
+                [3] * horizon,
+                [10] + [20] * (horizon - 1),
+                [20] * horizon,
+            ]
+        )
+        np.testing.assert_allclose(stats["actions"]["mean"][:7], windows.mean())
+        np.testing.assert_allclose(stats["actions"]["std"][:7], windows.std())
+        assert len(stats["actions"]["mean"]) == 32
+        assert metadata["total_frames"] == 5
+
+        # Reloading the produced stats must accept both raw and padded state layouts.
+        from rlinf.models.embodiment.openpi.dataconfig import get_openpi_config
+
+        loaded = get_openpi_config(
+            config_name,
+            data_kwargs={
+                "obs_indices": expected,
+                "norm_stats_path": str(output),
+            },
+        )
+        loaded.data.create(loaded.assets_dirs, loaded.model)

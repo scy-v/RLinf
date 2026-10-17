@@ -166,6 +166,9 @@ class _RLInfOpenPITransforms:
         self._config_name = config_name
         state_indices = openpi_cfg.get("state_indices", None)
         self._state_indices = list(state_indices) if state_indices else None
+        from rlinf.models.embodiment.openpi.transforms.state import get_state_selection
+
+        get_state_selection(data_config.data_transforms.inputs, self._state_indices)
 
     def _select_state(self, states: Any) -> Any:
         if not self._state_indices:

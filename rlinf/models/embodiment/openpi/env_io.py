@@ -36,6 +36,7 @@ class EnvIO:
     reaches the network constructor.
     """
 
+    _state_selection = None
     _input_transform_fn = None
     _output_transform_fn = None
 
@@ -47,6 +48,9 @@ class EnvIO:
         """Install the openpi.transforms input/output pipelines."""
         from openpi.transforms import compose
 
+        from rlinf.models.embodiment.openpi.transforms.state import get_state_selection
+
+        self._state_selection = get_state_selection(transforms, self.state_indices)
         self._input_transform_fn = compose(transforms)
         self._output_transform_fn = compose(output_transforms)
 
@@ -79,6 +83,13 @@ class EnvIO:
             index_tensor = torch.as_tensor(indices, device=states.device)
             return states.index_select(-1, index_tensor)
         return np.asarray(states)[..., indices]
+
+    def _select_proprio(self, states):
+        """Use the input pipeline's selection for raw Stage2 proprio."""
+        states = self._select_configured_state(states)
+        if self._state_selection is not None:
+            return self._state_selection.select(states)
+        return states
 
     def input_transform(self, obs: dict, transpose: bool = False) -> dict:
         self._ensure_transforms()
