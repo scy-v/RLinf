@@ -28,6 +28,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch import Tensor
 
 from rlinf.envs.real.venv import NoAutoResetSyncVectorEnv
+from rlinf.envs.real.wrappers import KEYBOARD_MODES
 from rlinf.envs.utils import to_tensor
 from rlinf.robotics.discovery import RobotInfo
 from rlinf.scheduler import WorkerInfo
@@ -82,6 +83,11 @@ class RealWorldEnv(gym.Env):
         self.main_image_key = cfg.main_image_key
         self.manual_episode_control_only = bool(
             self.override_cfg.get("manual_episode_control_only", False)
+            or getattr(
+                KEYBOARD_MODES.get(cfg.get("keyboard_reward_wrapper")),
+                "MANUAL_EPISODE_CONTROL_ONLY",
+                False,
+            )
         )
 
         self._init_env()
@@ -287,7 +293,16 @@ class RealWorldEnv(gym.Env):
         obs = {}
 
         state = raw_obs["state"]
-        full_states = np.concatenate([state[k] for k in sorted(state)], axis=-1)
+        cfg = getattr(self, "cfg", {})
+        state_keys = cfg.get("state_keys", None)
+        if state_keys is None:
+            state_keys = sorted(state)
+        elif len(state_keys) != len(set(state_keys)) or set(state_keys) != set(state):
+            raise ValueError(
+                f"Expected state_keys to list each observation field once: {sorted(state)}; "
+                f"got {list(state_keys)}."
+            )
+        full_states = np.concatenate([state[k] for k in state_keys], axis=-1)
         obs["states"] = full_states
 
         frames = raw_obs["frames"]
@@ -296,6 +311,9 @@ class RealWorldEnv(gym.Env):
                 f"main_image_key {self.main_image_key!r} not in {list(frames)}"
             )
         obs["main_images"] = frames[self.main_image_key]
+        wrist_image_key = cfg.get("wrist_image_key", None)
+        if wrist_image_key is not None:
+            obs["wrist_images"] = frames[wrist_image_key]
         raw_images = OrderedDict(sorted(frames.items()))
         raw_images.pop(self.main_image_key)
 

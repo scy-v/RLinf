@@ -38,7 +38,7 @@ import sys
 import types
 from typing import Any, Iterator
 
-from . import arms, cameras, grippers, sdks, teleop
+from . import arms, cameras, grippers, sdks, teleop, ur5e
 from ._fakes import Recorder, module
 
 __all__ = ["Recorder", "mocked_sdks", "module", "sdk_modules"]
@@ -107,6 +107,7 @@ def sdk_modules() -> dict[str, types.ModuleType]:
     made.update(grippers.modules())
     made.update(sdks.modules())
     made.update(teleop.modules())
+    made.update(ur5e.modules())
     return made
 
 

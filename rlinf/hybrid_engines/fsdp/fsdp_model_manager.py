@@ -411,6 +411,7 @@ class FSDPModelManager:
             save_full_model_weights=self._cfg.fsdp_config.get(
                 "save_full_model_weights", True
             ),
+            save_training_state=self._cfg.fsdp_config.get("save_training_state", True),
         )
 
         if restore_weight_offload:

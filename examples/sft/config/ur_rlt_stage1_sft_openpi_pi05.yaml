@@ -22,11 +22,14 @@ runner:
     project_name: rlinf-rlt
     experiment_name: "ur_rlt_stage1_sft_openpi_pi05"
     logger_backends: ["tensorboard"]
+  resume_dir: "/data/suchenyu/RLinf/logs/20261017-22:41:05-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_5000"
 
   max_epochs: -1
-  max_steps: 20000
+  max_steps: 30000
   val_check_interval: -1
-  save_interval: 2000
+  save_interval: 5000
+  # Terminal refresh interval; TensorBoard still records every step.
+  log_interval: 10
 
 data:
   # Local LeRobot dataset root. It should directly contain data/ and meta/.
@@ -35,8 +38,8 @@ data:
 actor:
   group_name: "ActorGroup"
   training_backend: "fsdp"
-  micro_batch_size: 16
-  global_batch_size: 64
+  micro_batch_size: 2
+  global_batch_size: 32
   seed: 42
 
   model:
@@ -105,8 +108,11 @@ actor:
   fsdp_config:
     strategy: "fsdp"
     sharding_strategy: "no_shard"
+    # Export weights only; these new checkpoints do not support full resume.
+    save_training_state: False
+    save_full_model_weights: True
     use_orig_params: True
-    gradient_checkpointing: True
+    gradient_checkpointing: False
     wrappers:
       rlt_features:
         module_names: [rlt_module]

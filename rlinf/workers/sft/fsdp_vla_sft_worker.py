@@ -107,6 +107,9 @@ class FSDPVlaSftWorker(FSDPSftWorker):
     def save_checkpoint(self, save_path: str, step: int = 0) -> None:
         super().save_checkpoint(save_path, step)
 
+        if not self._cfg.fsdp_config.get("save_training_state", True):
+            return
+
         if isinstance(self.data_loader, StatefulDataLoader):
             state = self.data_loader.state_dict()
 

@@ -41,6 +41,15 @@ class SFTRunner:
     ) -> None:
         self.cfg = cfg
         self.actor = actor
+        self.log_interval = cfg.runner.get("log_interval", 10)
+        if (
+            isinstance(self.log_interval, bool)
+            or not isinstance(self.log_interval, int)
+            or self.log_interval < 1
+        ):
+            raise ValueError(
+                f"runner.log_interval must be a positive integer, got {self.log_interval!r}"
+            )
 
         # this timer checks if we should stop training
         self.run_timer = run_timer
@@ -82,6 +91,8 @@ class SFTRunner:
             total=self.max_steps,
             desc="Global Step",
             ncols=800,
+            mininterval=0,
+            miniters=1,
         )
         for _step in range(start_step, self.max_steps):
             if hasattr(self.actor, "set_global_step"):
@@ -143,11 +154,17 @@ class SFTRunner:
                 logging_metrics.update(evaluate_metrics)
                 self.metric_logger.log(evaluate_metrics, _step)
 
-            global_pbar.set_postfix(logging_metrics, refresh=False)
-            global_pbar.update(1)
+            if (
+                self.global_step % self.log_interval == 0
+                or self.global_step == self.max_steps
+                or should_stop
+            ):
+                global_pbar.set_postfix(logging_metrics, refresh=False)
+                global_pbar.update(self.global_step - global_pbar.n)
             if should_stop:
                 break
 
+        global_pbar.close()
         if self.early_stop is not None and self.early_stop.best_val_acc > 0:
             logger.info(
                 f"Early stopping triggered! Best val_acc: {self.early_stop.best_val_acc:.4f}"

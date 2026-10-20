@@ -14,8 +14,8 @@
 
 import errno
 import os
+import select
 import threading
-import time
 from collections import deque
 from typing import Any
 
@@ -45,7 +45,8 @@ class KeyboardListener:
         self.state_lock = threading.Lock()
         self.latest_data = {"key": None}
         # Queue press edges so short taps are not lost between polls.
-        self._press_events: deque[str] = deque()
+        self._press_events: deque[tuple[str, float]] = deque()
+        self._closed = threading.Event()
         self.device = self._open_keyboard_device()
 
         self.listener = threading.Thread(
@@ -152,9 +153,12 @@ class KeyboardListener:
     def _listen_loop(self) -> None:
         # Retain the path so the listener can recover after USB disconnects.
         device_path = self.device.path
-        while True:
+        while not self._closed.is_set():
             try:
-                for event in self.device.read_loop():
+                readable, _, _ = select.select([self.device], [], [], 0.1)
+                if not readable:
+                    continue
+                for event in self.device.read():
                     if event.type != self._ecodes.EV_KEY:
                         continue
 
@@ -166,7 +170,7 @@ class KeyboardListener:
                         # Enqueue the initial press only, not key-repeat events.
                         with self.state_lock:
                             self.latest_data["key"] = key
-                            self._press_events.append(key)
+                            self._press_events.append((key, event.timestamp()))
                     elif event.value == 2:
                         with self.state_lock:
                             self.latest_data["key"] = key
@@ -174,13 +178,12 @@ class KeyboardListener:
                         with self.state_lock:
                             if self.latest_data["key"] == key:
                                 self.latest_data["key"] = None
-            except OSError as exc:
-                if exc.errno != errno.ENODEV:
+            except (OSError, ValueError) as exc:
+                if self._closed.is_set():
+                    return
+                if not isinstance(exc, OSError) or exc.errno != errno.ENODEV:
                     _logger.error(
-                        "Keyboard device %s read failed (errno=%s): %s",
-                        device_path,
-                        exc.errno,
-                        exc,
+                        "Keyboard device %s read failed: %s", device_path, exc
                     )
                     raise
                 _logger.warning(
@@ -195,13 +198,14 @@ class KeyboardListener:
                 except Exception:
                     pass
                 # Keep retrying until the device returns or the process exits.
-                while True:
-                    time.sleep(0.5)
+                while not self._closed.wait(0.5):
                     try:
                         self.device = self._input_device_cls(device_path)
                         break
                     except (FileNotFoundError, OSError):
                         continue
+                if self._closed.is_set():
+                    return
                 _logger.info("Keyboard device %s reopened.", device_path)
 
     def _event_to_key(self, key_code: int) -> str | None:
@@ -233,9 +237,19 @@ class KeyboardListener:
         Key-repeat events are omitted. The operation is thread-safe and
         non-blocking.
         """
+        return [key for key, _ in self.pop_pressed_events()]
+
+    def pop_pressed_events(self) -> list[tuple[str, float]]:
+        """Return and clear press edges with their kernel event timestamps."""
         with self.state_lock:
-            if not self._press_events:
-                return []
             pressed = list(self._press_events)
             self._press_events.clear()
             return pressed
+
+    def close(self) -> None:
+        """Stop capturing input and release the keyboard device."""
+        if self._closed.is_set():
+            return
+        self._closed.set()
+        self.listener.join()
+        self.device.close()

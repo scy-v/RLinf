@@ -1,0 +1,57 @@
+env_type: real
+total_num_envs: 1
+rollout_epoch: 1
+auto_reset: True
+ignore_terminations: False
+reward_mode: raw
+wrap_obs_mode: simple
+seed: 0
+group_size: 1
+use_fixed_reset_state_ids: False
+# Total evaluation budget; double Enter resets episodes within this run.
+max_steps_per_rollout_epoch: 30000
+max_episode_steps: null
+teleop: none
+keyboard_reward_wrapper: double_enter_reset
+keyboard_wrapper_kwargs:
+  double_press_interval: 0.5
+  wait_for_start: True
+no_gripper: False
+main_image_key: exterior_image
+wrist_image_key: wrist_image
+# Dataset dimensions 1..19: pose, speed, force/torque, measured gripper opening.
+state_keys: [tcp_pose, tcp_vel, tcp_force, tcp_torque, gripper_position]
+# Retain RLinf's existing TCP-relative action/observation transform.
+use_relative_frame: True
+video_cfg:
+  save_video: True
+  info_on_video: True
+  video_base_dir: ${runner.logger.log_path}/video/eval
+init_params:
+  id: UR5eEnv-v1
+  num_envs: null
+override_cfg:
+  is_dummy: False
+  enable_camera_player: False
+  task_description: "insert the black rack into the blue slot"
+  camera_names:
+    "348522072391": exterior_image
+    "944622073455": wrist_image
+  # VLA-Precision UR init_tcp_pose: base-frame XYZ + Euler XYZ, metres/radians.
+  reset_ee_pose: [0.392232, 0.104898, 0.335162, -3.14, 0.0, -1.57]
+  # Orientation anchor for safety clipping; keyboard control ignores target success.
+  target_ee_pose: [0.392232, 0.104898, 0.335162, -3.14, 0.0, -1.57]
+  # Base-frame XYZ in metres; Euler XYZ absolute bounds in radians.
+  # Angular offsets around the nominal pose: +/-30, +/-30, +/-90 degrees.
+  # Keep the continuous Euler interval across -pi; do not wrap these bounds.
+  ee_pose_limit_min: [0.0, -0.45, 0.0, -3.663598775598, -0.523598775598, -3.140796326795]
+  ee_pose_limit_max: [0.9, 0.45, 0.6, -2.616401224402, 0.523598775598, 0.000796326795]
+  step_frequency: 100.0
+  enable_random_reset: True
+  # XYZ offsets in metres; Euler XYZ offsets in degrees, matching VLA-Precision.
+  reset_pose_range: [0.03, 0.03, 0.03, 0.0, 0.0, 0.0]
+  max_num_steps: 200
+  enable_gripper_penalty: False
+  reward_threshold: [0.01, 0.01, 0.01, 0.2, 0.2, 0.2]
+  action_scale: [1.0, 1.0, 1.0]
+  compliance_param: {}

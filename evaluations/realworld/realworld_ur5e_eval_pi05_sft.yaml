@@ -1,0 +1,138 @@
+defaults:
+  - env/realworld_ur5e_sft_env@env.eval
+  - model/pi0_5@rollout.model
+  - override hydra/job_logging: stdout
+  - _self_
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  searchpath:
+    - file://${oc.env:EMBODIED_PATH}/config/
+cluster:
+  num_nodes: 1
+  component_placement:
+    rollout: 0
+    env:
+      node_group: ur5e
+      placement: 0
+  node_groups:
+  - label: ur5e
+    node_ranks: 0
+    hardware:
+      type: UR5e
+      configs:
+      - node_rank: 0
+        # VLA-Precision's single-UR deployment.
+        robot_ip: 192.168.201.11
+        gripper_connection: /dev/ur5e_left_gripper
+        end_effector_type: pgi
+        end_effector_config:
+          min_position: 80
+          max_position: 1000
+          force: 80
+          speed: 100
+        camera_type: realsense
+        # Exterior camera, then wrist camera; capture defaults are 640x480 at 15 FPS.
+        camera_serials: ["348522072391", "944622073455"]
+        speed: 0.2
+        acceleration: 0.2
+        impedance:
+          frequency: 100.0
+          kp: 1200.0
+          kd: 600.0
+          kp_rotation: 2000.0
+          kd_rotation: 400.0
+          position_error_clip: 0.048
+          velocity_error_clip: 4.0
+          rotation_error_clip_degrees: 20.0
+          control_frame_euler_deg: [0.0, 0.0, 0.0]
+          selection_vector: [1, 1, 1, 1, 1, 1]
+          force_type: 2
+          force_limits: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+          force_gain_scale: 1.5
+          payload_mass: 1.601
+          payload_cog: [0.011, -0.002, 0.052]
+runner:
+  task_type: embodied_eval
+  rtc:
+    enabled: false
+    inject_delay_ms: 0
+    min_exec_horizon: 2
+    initial_delay_steps: 1
+    delay_buffer_size: 8
+  only_eval: true
+  max_epochs: 1
+  max_steps: 1
+  val_check_interval: -1
+  ckpt_path: /data/suchenyu/RLinf/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor/model_state_dict/full_weights.pt
+  logger:
+    log_path: ../results
+    project_name: rlinf-rlt
+    experiment_name: ur5e-stage1-eval
+    logger_backends:
+    - tensorboard
+env:
+  group_name: EnvGroup
+  enable_offload: false
+rollout:
+  group_name: RolloutGroup
+  rollout_backend: huggingface
+  recompute_logprobs: false
+  enable_offload: false
+  pipeline_stage_num: 1
+  collect_transitions: false
+  collect_prev_infos: false
+  model:
+    model_type: openpi
+    model_path: /home/suchenyu/RLinf/rltoken-setup/outputs/pi05_base_openpi
+    precision: fp32
+    is_lora: false
+    num_action_chunks: 3
+    action_dim: 7
+    add_value_head: false
+    num_steps: 10
+    openpi_data:
+      repo_id: scylearning/insert_black_rack_into_blue_slot_20260916_v01
+      norm_stats_path: /home/suchenyu/RLinf/rltoken-setup/outputs/ur5e_insert_black_rack_state19/norm_stats.json
+      obs_indices:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+      - 19
+    openpi:
+      task: eval
+      rtc_enabled: ${runner.rtc.enabled}
+      rtc_guidance_mode: approx
+      rtc_guidance_clip: 5.0
+      config_name: pi05_ur_state
+      embed_dtype: bf16
+      num_images_in_input: 2
+      train_expert_only: false
+      action_horizon: 20
+      action_chunk: 3
+      action_env_dim: 7
+      model_action_dim: 32
+      max_token_len: 200
+      use_rlt: true
+      rlt_prefix_seq_len: 1024
+      rlt_image_only: false
+      rlt_use_mask: true
+actor:
+  model:
+    model_type: openpi

@@ -402,7 +402,7 @@ RUN echo "source ${UV_PATH}/franky/bin/activate" >> ~/.bashrc
 
 
 ##################################################################################################
-# Embodied: UR hardware dependencies + OpenPI (robot/task adapter required)
+# Embodied: UR5e RTDE + PGI + RealSense with OpenPI
 ##################################################################################################
 FROM embodied-common-image AS embodied-ur-image
 

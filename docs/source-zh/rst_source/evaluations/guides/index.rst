@@ -38,6 +38,7 @@ Benchmark 指南
    :maxdepth: 1
 
    realworld
+   ur5e
    behavior
    libero
    maniskill_ood

@@ -22,13 +22,15 @@ import cv2
 import gymnasium as gym
 import numpy as np
 
+from rlinf.envs.real.cartesian import (
+    _CAMERA_REOPEN_ATTEMPTS,
+    _CAMERA_REOPEN_WAIT_S,
+)
 from rlinf.robotics.discovery import RobotInfo
 from rlinf.robotics.robots import FrankaConfig
 from rlinf.scheduler import WorkerInfo
 
 from .base import (
-    _CAMERA_REOPEN_ATTEMPTS,
-    _CAMERA_REOPEN_WAIT_S,
     FrankaEnv,
     FrankaEnvConfig,
     compliance,

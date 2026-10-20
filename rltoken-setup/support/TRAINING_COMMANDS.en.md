@@ -1,117 +1,81 @@
-# UR5e RLToken Training Preparation
+# UR5e RLToken Training and Inference Commands
 
-[Chinese instructions](../训练命令.md).
+## View TensorBoard
 
-Select the raw state dimensions with `obs_indices`, then use the same selection for normalization, SFT, and Stage2. The default is the first 19 dimensions: TCP pose (6), velocity (6), force/torque (6), and `gripper_raw_position` (1).
+Run in a separate terminal on the server to view curves during training:
 
-## Data and Normalization
+```bash
+cd ~/RLinf
+.venv/bin/tensorboard --logdir logs --host 127.0.0.1 --port 6006
+```
+
+Forward port `6006` through the VS Code **Ports** panel, open http://localhost:6006 in your browser, and select training runs under **Runs** to view or compare them. Keep this terminal running.
+
+## 1. Activate the Environment
 
 ```bash
 source ~/RLinf/rltoken-setup/activate.sh
-DATA="$HOME/.cache/huggingface/lerobot/scylearning/insert_black_rack_into_blue_slot_20260916_v01"
-OUT="$PWD/rltoken-setup/outputs/ur5e_insert_black_rack_state19"
-python toolkits/lerobot/calculate_norm_stats.py \
-  --config-name pi05_ur_state --repo-id "$DATA" \
-  --obs-indices 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 --output-dir "$OUT"
 ```
 
-The statistics script chooses its reader by storage format: v3 defaults to numeric parquet; v2 defaults to the existing LeRobot loader. Use `--data-backend parquet` to select the shared numeric reader explicitly. This reader follows the configured field mapping and action sequence keys, independently of robot type.
+## 2. Compute Normalization Statistics
 
-This reads all 200 episodes and 67,740 frames and writes `norm_stats.json` and `norm_metadata.json` under `$OUT`, preserving the source dataset. The numeric parquet reader supports this dataset's v3.0 format and includes partial batches. Action statistics use 20-step windows with terminal action repetition, matching OpenPI. The seven recorded delta-pose/gripper actions are padded to 32 dimensions without an additional delta transform.
-
-When using the environment variable, explicitly select all dimensions 1–19 for this dataset:
+Run before the first training session or after changing data or input dimensions. Skip this step if matching statistics already exist. Use the same `obs_indices` in the training configuration:
 
 ```bash
-OBS_INDICES=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 python toolkits/lerobot/calculate_norm_stats.py \
-  --config-name pi05_ur_state --repo-id "$DATA" \
+python toolkits/lerobot/calculate_norm_stats.py \
+  --config-name pi05_ur_state \
+  --repo-id "$HOME/.cache/huggingface/lerobot/scylearning/insert_black_rack_into_blue_slot_20260916_v01" \
+  --obs-indices 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 \
   --output-dir "$PWD/rltoken-setup/outputs/ur5e_insert_black_rack_state19"
 ```
 
-Indices are **one-based**, matching `~/openpi`. `--obs-indices 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19` overrides the environment variable. Without either, the default is dimensions 1–19. Reordering is supported; empty, duplicate, nonpositive, out-of-range indices and selections larger than 32 dimensions are rejected.
+This writes `norm_stats.json` and `norm_metadata.json`. If you change the output directory, update `actor.model.openpi_data.norm_stats_path` in the training configuration.
 
-## Stage1 SFT
+## 3. Start Stage1 SFT
 
-Use `examples/sft/config/ur_rlt_stage1_sft_openpi_pi05.yaml`. The cached OpenPI JAX `pi05_base` has been converted to RLinf's PyTorch layout. `actor.model.model_path` points to `/home/suchenyu/RLinf/rltoken-setup/outputs/pi05_base_openpi`, containing `model.safetensors` and `config.json`. Dataset paths, statistics for dimensions 1–19, and two camera inputs are configured for this machine.
-
-On another machine, prepare the normalization results above and the cached OpenPI weights, then convert with the same 20-step horizon as training:
-
-```bash
-JAX_PLATFORMS=cpu python -m rlinf.utils.ckpt_convertor.openpi.convert --mode jax_to_openpi \
-  --input-model "$HOME/.cache/openpi/openpi-assets/checkpoints/pi05_base" \
-  --input-norm-stats "$OUT/norm_stats.json" \
-  --output-model "$PWD/rltoken-setup/outputs/pi05_base_openpi" \
-  --output-norm-stats "$PWD/rltoken-setup/outputs/pi05_base_openpi/scylearning/insert_black_rack_into_blue_slot_20260916_v01/norm_stats.json" \
-  --action-dim 32 --action-horizon 20 --max-token-len 200
-```
-
-This converts the existing weights and copies normalization statistics. It does not download or train a model. Weights remain in a local ignored directory.
-
-Store the selection in YAML so Ray workers receive the same settings:
-
-```yaml
-actor:
-  model:
-    openpi_data:
-      obs_indices: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-      norm_stats_path: /home/suchenyu/RLinf/rltoken-setup/outputs/ur5e_insert_black_rack_state19/norm_stats.json
-    openpi:
-      config_name: pi05_ur_state
-      num_images_in_input: 2
-```
-
-Normalization, SFT, and rollout share `SelectState` before robot-specific transforms. The UR adapter owns field mapping, two camera inputs, and action representation. Franka configurations can enable the same selection with `openpi_data.obs_indices`; without it, their original behavior is preserved. The exterior camera maps to `base_0_rgb`; the wrist camera maps to `left_wrist_0_rgb`. Recompute statistics and update the path whenever the selection or order changes. Keep `norm_metadata.json` beside the statistics to validate the order on load.
-
-The UR installation target pins LeRobot to `d6ea3bbce0fc8c75138f02639ac4ceaf12a67829`, matching your `~/openpi` environment (package version 0.3.4, dataset format v3.0). OpenPI's compatibility import uses `lerobot.datasets.lerobot_dataset`. The UR adapter maps each sample's native `task` text to the prompt, using `meta/tasks.parquet`; the dataset task is `Insert the black rack into the blue slot`.
-
-The conversion was checked tensor by tensor: after mapping the local OpenPI converter's output to RLinf's parameter layout, all 667 base weight tensors match exactly. The additional RLToken modules are initialized from scratch.
-
-The current default uses four A800 GPUs, a microbatch of 16 per GPU, a global batch of 64, and gradient checkpointing. The earlier single-GPU preflight completed two training steps with a microbatch of 2 and global batch of 64. The current four-GPU configuration has not had a training preflight. `activate.sh` uses a separate Hugging Face Arrow cache under `outputs/hf-datasets-cache` to avoid reading caches generated by another `datasets` version in the OpenPI environment. The original LeRobot dataset location is unchanged. Start training with:
+Start with the dataset, normalization statistics, and weights already prepared on this machine:
 
 ```bash
 bash examples/sft/run_vla_sft.sh ur_rlt_stage1_sft_openpi_pi05
 ```
 
-The configuration uses GPUs 0–3 for 20000 steps and saves a checkpoint every 2000 steps. On this machine, `~/RLinf/logs` is symlinked to `/data/suchenyu/RLinf/logs`; the destination disk had about 16TB free when configured. The launch script creates a timestamped log directory. Checkpoints are stored at `/data/suchenyu/RLinf/logs/<timestamp>-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_<step>/actor/`. The preflight did not test checkpoint saving or restoration, and the full training run has not been executed.
+Edit [ur_rlt_stage1_sft_openpi_pi05.yaml](../../examples/sft/config/ur_rlt_stage1_sft_openpi_pi05.yaml) to change the settings.
 
-The current SFT configuration trains all parameters: `actor.model.is_lora: False`. The VLM, action expert, and additional RLToken modules are trainable. Four GPUs with a microbatch of 16 per GPU and global batch of 64 process 64 samples per optimizer update, without extra gradient accumulation. RLinf assigns training workers through `cluster.component_placement.actor`; setting `CUDA_VISIBLE_DEVICES` alone does not expand a single-GPU configuration to multiple GPUs.
+| Setting | Current value |
+|---|---|
+| GPU / batch | GPUs 0–3, micro 2 per GPU, global 32 |
+| Training mode | Full parameters, `no_shard`; upstream SFT forward disables gradient checkpointing |
+| `runner.max_steps` | 30000 optimizer updates |
+| `runner.save_interval` | Save every 5000 optimizer updates |
+| `actor.model.openpi_data.obs_indices` | One-based dimensions 1–19 |
 
-The current default configuration is shown below. `no_shard` matches the original Franka and ManiSkill Stage1 configurations: each GPU keeps complete parameters, gradients, and optimizer states, with gradient synchronization for data parallelism. This corresponds to OpenPI's `fsdp_devices=1`. Gradient checkpointing remains enabled. This four-GPU configuration has not been tested:
+Checkpoints are saved under:
 
-```yaml
-cluster:
-  component_placement:
-    actor: 0-3
-actor:
-  micro_batch_size: 16
-  global_batch_size: 64
-  fsdp_config:
-    sharding_strategy: no_shard
-    gradient_checkpointing: True
+```text
+/data/suchenyu/RLinf/logs/<timestamp>-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_<step>/actor/
 ```
 
-The current OpenPI model cannot switch directly to working LoRA training with `is_lora: True`: the generic PEFT defaults target an unsupported `ModuleList`, and attention LoRA in the native `*_lora` Gemma variants is not implemented. The VLM, action expert, and RLToken training scopes need explicit adaptation and validation first. The current command uses full-parameter training.
+## 4. Run UR5e Inference Locally
 
-## Stage2
+Run on the local machine connected to the arm, gripper and cameras. Prepare a separate environment once:
 
-After adapting the UR driver, task, and deployment, use the same data selection for the feature model and set the actor's `proprio_dim` to its length:
-
-```yaml
-rollout:
-  rlt_feature_model:
-    model_path: /第一阶段checkpoint/actor
-    openpi_data:
-      repo_id: scylearning/insert_black_rack_into_blue_slot_20260916_v01
-      obs_indices: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-      norm_stats_path: /home/suchenyu/RLinf/rltoken-setup/outputs/ur5e_insert_black_rack_state19/norm_stats.json
-    openpi:
-      config_name: pi05_ur_state
-      num_images_in_input: 2
-      state_indices: []
-actor:
-  model:
-    proprio_dim: 19
+```bash
+cd ~/RLinf
+bash requirements/install.sh embodied --model openpi --env ur --venv .ur-eval-venv
 ```
 
-The VLA input and raw MLP proprio use the same selection. Keep the existing zero-based `openpi.state_indices` empty when using `openpi_data.obs_indices`; both backends reject simultaneous selection settings. The environment must provide the full raw 48-dimensional state in dataset order.
+Check the workspace bounds in the [environment config](../../examples/embodiment/config/env/realworld_ur5e_sft_env.yaml). Check the hardware, local model and normalization paths in the [inference config](../../evaluations/realworld/realworld_ur5e_eval_pi05_sft.yaml), then run:
 
-The hardware and task in `realworld_rlt_stage2_ac_mlp.yaml` still target Franka. This fragment documents UR model settings; it does not provide a UR deployment. No hardware control or full training was run.
+```bash
+cd ~/RLinf
+source .ur-eval-venv/bin/activate
+bash evaluations/run_eval.sh realworld_ur5e_eval_pi05_sft
+```
+
+The inference YAML sets `runner.ckpt_path` to the step-30000 checkpoint from the `20261018-22:40:04` training run. RTC defaults to off; set `runner.rtc.enabled: true` in that YAML to enable it. Update the checkpoint, base-model and normalization paths in YAML if local deployment uses different paths.
+
+UR resets to a TCP pose with independent uniform ±3 cm offsets along XYZ and fixed orientation, without periodic joint resets.
+
+**Startup moves the robot to its initial pose; after the first reset and every later reset, press Enter once to start policy execution.** During execution, press Enter twice within 0.5 seconds on the local physical keyboard to end the episode, reset and wait for another single Enter press. This does not count as task success. The environment YAML enables the start wait with `keyboard_wrapper_kwargs.wait_for_start: True`. Evaluation has a total budget of 30000 environment steps; use `Ctrl+C` to end the process.
+
+See [technical notes](TRAINING_NOTES.en.md) for weight conversion, data handling, Stage2 adaptation, and verification records. [中文](../训练命令.md).

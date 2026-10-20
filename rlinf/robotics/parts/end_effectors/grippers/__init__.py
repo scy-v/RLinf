@@ -15,6 +15,7 @@
 from .base import BaseGripper
 from .franka import FrankaGripper
 from .franky import FrankyGripper
+from .pgi import PGIGripper
 from .robotiq import RobotiqGripper
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "FrankaGripper",
     "FrankyGripper",
     "RobotiqGripper",
+    "PGIGripper",
 ]

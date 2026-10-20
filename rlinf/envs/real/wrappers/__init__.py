@@ -22,6 +22,7 @@ import gymnasium as gym
 
 from rlinf.envs.real.wrappers.episode import (
     KeyboardEvalControlWrapper,
+    KeyboardResetWrapper,
     KeyboardRewardDoneMultiStageWrapper,
     KeyboardRewardDoneWrapper,
     KeyboardRLTPolicySwitchWrapper,
@@ -49,6 +50,7 @@ KEYBOARD_MODES: dict[str, type] = {
     "single_stage": KeyboardRewardDoneWrapper,
     "start_end": KeyboardStartEndWrapper,
     "eval_control": KeyboardEvalControlWrapper,
+    "double_enter_reset": KeyboardResetWrapper,
     "rlt_policy_switch": KeyboardRLTPolicySwitchWrapper,
 }
 
@@ -117,8 +119,13 @@ class WrapperStack:
     def _apply_keyboard_reward(self) -> None:
         """Let an operator score the episode from the keyboard."""
         mode = self.cfg.get("keyboard_reward_wrapper", None)
-        if mode and not getattr(self.inner.config, "is_dummy", False):
-            self.env = KEYBOARD_MODES[mode](self.env)
+        if mode and (
+            not getattr(self.inner.config, "is_dummy", False)
+            or getattr(KEYBOARD_MODES[mode], "ENABLE_IN_DUMMY", False)
+        ):
+            self.env = KEYBOARD_MODES[mode](
+                self.env, **self.cfg.get("keyboard_wrapper_kwargs", {})
+            )
 
     def _apply_episode(self) -> None:
         """Apply environment-specific episode-control wrappers."""

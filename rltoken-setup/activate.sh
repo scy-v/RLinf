@@ -4,7 +4,7 @@ source /home/suchenyu/RLinf/.venv/bin/activate
 export PYTHONPATH=/home/suchenyu/RLinf
 export PYTHONNOUSERSITE=1
 # Keep Arrow caches separate from OpenPI's different datasets version.
-export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-/home/suchenyu/RLinf/rltoken-setup/outputs/hf-datasets-cache}"
+export HF_DATASETS_CACHE=/home/suchenyu/RLinf/rltoken-setup/outputs/hf-datasets-cache
 export CUDA_HOME=/usr/local/cuda-12.8
 export PATH="$CUDA_HOME/bin:$PATH"
 # OpenPI uses JAX for data transforms; keep its GPU memory preallocation off.

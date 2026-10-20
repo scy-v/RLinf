@@ -188,9 +188,10 @@ class FSDPStrategyBase(ABC):
         save_path: str,
         save_full_model_weights: bool = True,
         checkpoint_format: str = "dcp",
+        save_training_state: bool = True,
     ) -> None:
         """
-        Save the training state checkpoint.
+        Save the requested model weights and training state.
 
         Assumes:
         cls must have get_fsdp_version method,
@@ -205,46 +206,55 @@ class FSDPStrategyBase(ABC):
             save_path (str): The path to save the checkpoint.
             save_full_model_weights (bool): Whether to save full model weights.
             checkpoint_format (str): "dcp" or "local_shard".
+            save_training_state (bool): Whether to save state for exact resume.
         """
+        if not save_training_state and not save_full_model_weights:
+            raise ValueError(
+                "Expected at least one checkpoint output: enable "
+                "save_training_state or save_full_model_weights."
+            )
         clear_memory()
         torch.distributed.barrier()
-        opts = StateDictOptions(full_state_dict=False, cpu_offload=True)
-        try:
-            training_state = Checkpoint(
-                model,
-                optimizers,
-                lr_schedulers,
-                opts,
-                fsdp_version=cls.get_fsdp_version(),
-                checkpoint_format=checkpoint_format,
-            )
-            if checkpoint_format == "local_shard":
-                local_shard_save_path = os.path.join(
-                    save_path, "local_shard_checkpoint"
+        if save_training_state:
+            opts = StateDictOptions(full_state_dict=False, cpu_offload=True)
+            try:
+                training_state = Checkpoint(
+                    model,
+                    optimizers,
+                    lr_schedulers,
+                    opts,
+                    fsdp_version=cls.get_fsdp_version(),
+                    checkpoint_format=checkpoint_format,
                 )
-                rank = torch.distributed.get_rank()
-                os.makedirs(local_shard_save_path, exist_ok=True)
-                torch.save(
-                    training_state.state_dict(),
-                    os.path.join(local_shard_save_path, f"checkpoint_rank_{rank}.pt"),
-                )
-            else:
-                from torch.distributed import checkpoint as dcp
+                if checkpoint_format == "local_shard":
+                    local_shard_save_path = os.path.join(
+                        save_path, "local_shard_checkpoint"
+                    )
+                    rank = torch.distributed.get_rank()
+                    os.makedirs(local_shard_save_path, exist_ok=True)
+                    torch.save(
+                        training_state.state_dict(),
+                        os.path.join(
+                            local_shard_save_path, f"checkpoint_rank_{rank}.pt"
+                        ),
+                    )
+                else:
+                    from torch.distributed import checkpoint as dcp
 
-                dcp_save_path = os.path.join(save_path, "dcp_checkpoint")
-                dcp.save(
-                    {"fsdp_checkpoint": training_state},
-                    checkpoint_id=dcp_save_path,
-                )
+                    dcp_save_path = os.path.join(save_path, "dcp_checkpoint")
+                    dcp.save(
+                        {"fsdp_checkpoint": training_state},
+                        checkpoint_id=dcp_save_path,
+                    )
 
-        except BaseException as e:
-            import traceback
+            except BaseException as e:
+                import traceback
 
-            if hasattr(cls, "logger") and cls.logger is not None:
-                cls.logger.error(f"Failed to save checkpoint to {save_path}: {e}")
-            traceback.print_exc()
-            raise e
-        torch.distributed.barrier()
+                if hasattr(cls, "logger") and cls.logger is not None:
+                    cls.logger.error(f"Failed to save checkpoint to {save_path}: {e}")
+                traceback.print_exc()
+                raise e
+            torch.distributed.barrier()
 
         if save_full_model_weights:
             opts = StateDictOptions(full_state_dict=True, cpu_offload=True)

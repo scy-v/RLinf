@@ -339,6 +339,41 @@ class RTCEnvWorker(EnvWorker):
                         time.sleep(remaining)
 
                 if episode_done:
+                    if (
+                        self.cfg.env.eval.auto_reset
+                        and getattr(
+                            self.eval_env_list[stage_id],
+                            "manual_episode_control_only",
+                            False,
+                        )
+                        and episode_step < max_eval_steps
+                    ):
+                        # The env already reset; discard the old replan before bootstrap.
+                        if pending_rtc_response is not None:
+                            pending_rtc_response.wait()
+                            pending_rtc_response = None
+                        delay_buffer = deque(
+                            [initial_delay_steps], maxlen=delay_buffer_size
+                        )
+                        chunk_id += 1
+                        self.send_rtc_request(
+                            rollout_channel,
+                            RTCRequest(
+                                obs=self._copy_rtc_obs(env_output.to_dict()["obs"]),
+                                request_type="bootstrap",
+                                executed_horizon=0,
+                                predicted_delay_steps=initial_delay_steps,
+                                chunk_id=chunk_id,
+                            ),
+                            mode="eval",
+                        )
+                        rtc_response = self.recv_rtc_response(
+                            input_channel, mode="eval", async_op=False
+                        )
+                        current_chunk_actions = self._prepare_rtc_actions(rtc_response)
+                        current_chunk_len = current_chunk_actions.shape[1]
+                        current_chunk_index = 0
+                        continue
                     break
 
             if pending_rtc_response is not None:

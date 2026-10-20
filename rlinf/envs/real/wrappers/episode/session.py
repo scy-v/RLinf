@@ -74,3 +74,10 @@ class KeyboardSession(gym.Wrapper):
         logger = getattr(self.base_env(), "_logger", None)
         if logger is not None:
             logger.info(message, *args)
+
+    def close(self) -> None:
+        """Release keyboard input and the wrapped environment."""
+        try:
+            self.listener.close()
+        finally:
+            self.env.close()

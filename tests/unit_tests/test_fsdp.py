@@ -1050,3 +1050,58 @@ def test_openpi_factory_separates_parameter_and_activation_dtypes(
     assert model.embed_dtype == model.llm.embed_dtype == model.img.dtype_mm == expected
     assert {param.dtype for param in model.parameters()} == {torch.float32}
     torch.testing.assert_close(model.img.stem.weight, source.img.stem.weight)
+
+
+@pytest.mark.parametrize("save_training_state", [False, True])
+def test_checkpoint_weights_and_optional_training_state(
+    tmp_path, single_rank_env, monkeypatch, save_training_state
+):
+    """Weights remain loadable when optimizer checkpointing is disabled."""
+    from types import SimpleNamespace
+
+    from rlinf.hybrid_engines.fsdp.strategy.fsdp import FSDPStrategy
+
+    monkeypatch.setattr(
+        Worker,
+        "torch_platform",
+        SimpleNamespace(
+            synchronize=lambda: None,
+            ipc_collect=lambda: None,
+            empty_cache=lambda: None,
+            is_available=lambda: False,
+        ),
+    )
+    dist.init_process_group("gloo")
+    model = nn.Linear(3, 2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1)
+    model(torch.ones(2, 3)).sum().backward()
+    optimizer.step()
+    scheduler.step()
+    expected = {
+        key: value.detach().clone() for key, value in model.state_dict().items()
+    }
+
+    FSDPStrategy.save_checkpoint(
+        model,
+        optimizer,
+        scheduler,
+        str(tmp_path),
+        **({} if save_training_state else {"save_training_state": False}),
+    )
+
+    weights = torch.load(
+        tmp_path / "model_state_dict/full_weights.pt", weights_only=True
+    )
+    restored = nn.Linear(3, 2)
+    restored.load_state_dict(weights, strict=True)
+    for key, value in restored.state_dict().items():
+        torch.testing.assert_close(value, expected[key])
+    assert (tmp_path / "dcp_checkpoint/.metadata").exists() == save_training_state
+    if save_training_state:
+        with torch.no_grad():
+            model.weight.zero_()
+        FSDPStrategy.load_checkpoint(model, optimizer, scheduler, str(tmp_path))
+        torch.testing.assert_close(model.weight, expected["weight"])
+    else:
+        assert sorted(path.name for path in tmp_path.iterdir()) == ["model_state_dict"]

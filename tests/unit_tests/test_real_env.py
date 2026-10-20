@@ -1147,10 +1147,11 @@ def test_shipped_configs_use_the_new_key():
 _REAL = _ROOT / "rlinf" / "envs" / "real"
 
 
-_ROBOTS = ("franka", "dosw1", "gim_arm", "xsquare")
+_ROBOTS = ("franka", "dosw1", "gim_arm", "xsquare", "ur5e")
 
 
 EXPECTED_IDS = {
+    "UR5eEnv-v1",
     "FrankaEnv-v1",
     "PegInsertionEnv-v1",
     "FrankaBinRelocationEnv-v1",
@@ -1203,9 +1204,11 @@ def test_every_entry_point_resolves():
 
 
 def test_task_tables_cover_the_wrapped_robots():
-    from rlinf.envs.real import dosw1, franka, xsquare
+    from rlinf.envs.real import dosw1, franka, ur5e, xsquare
 
-    declared = set(franka.TASKS) | set(dosw1.TASKS) | set(xsquare.TASKS)
+    declared = (
+        set(franka.TASKS) | set(dosw1.TASKS) | set(xsquare.TASKS) | set(ur5e.TASKS)
+    )
 
     # GimArm registers its environment class without a wrapper factory.
     assert declared == EXPECTED_IDS - {"GimArmPegInsertionEnv-v1"}
@@ -1269,7 +1272,7 @@ def test_wrappers_are_split_by_what_they_change():
     loose = sorted(
         path.stem for path in real.glob("*.py") if path.name != "__init__.py"
     )
-    assert loose == ["env", "registry", "venv"], loose
+    assert loose == ["cartesian", "env", "registry", "venv"], loose
 
 
 def test_no_teleop_wrapper_is_left_outside_teleop():
@@ -4645,3 +4648,358 @@ def test_robotwin_eval_success_seed_order_is_controlled_by_base_seed():
 
     assert selected_seed_0 == selected_seed_0_again
     assert selected_seed_0 != selected_seed_1
+
+
+def test_ur5e_reuses_cartesian_delta_and_normalized_gripper():
+    from robot_mocks import mocked_sdks
+    from scipy.spatial.transform import Rotation as R
+
+    from rlinf.envs.real.ur5e import UR5eEnv
+    from rlinf.envs.real.utils.video import VideoPlayer
+    from rlinf.robotics import RobotInfo, UR5eConfig, UR5eRobot
+    from rlinf.robotics.parts.arms.ur5e import UR5eArm
+    from rlinf.robotics.parts.end_effectors.grippers.pgi import PGIGripper
+
+    info = RobotInfo(
+        type="UR5e",
+        model="UR5e",
+        config=UR5eConfig(node_rank=0, camera_serials=["dummy"]),
+    )
+    with mocked_sdks() as sdks:
+        arm = UR5eArm("192.0.2.6")
+        gripper = PGIGripper("/tmp/ur5e-env-gripper")
+        robot = UR5eRobot(arm=arm, end_effector=gripper)
+        robot.connect()
+        env = UR5eEnv(
+            {
+                "is_dummy": True,
+                "enable_camera_player": False,
+                "target_ee_pose": [0] * 6,
+                "ee_pose_limit_min": [-1] * 6,
+                "ee_pose_limit_max": [1] * 6,
+                "reset_ee_pose": [0.4, 0.0, 0.3, 0.0, 0.0, 0.0],
+                "enable_random_reset": True,
+                "joint_reset_cycle": 1,
+            },
+            robot_info=info,
+        )
+        env.config.is_dummy = False
+        env.robot = robot
+        env._arm = arm
+        env._end_effector = gripper
+        env._cameras = {}
+        env.camera_player = VideoPlayer(False)
+        env._robot_state = arm.get_state()
+        current = env._robot_state.tcp_pose.copy()
+        action = np.array([0.01, 0.02, -0.01, 0.03, 0.02, 0.01, 0.5])
+        try:
+            obs, _, _, _, _ = env.step(action)
+            force = sdks["rtde_control"].states["192.0.2.6"]["forces"][-1][2]
+            np.testing.assert_allclose(force[:3], 1200 * action[:3], atol=1e-5)
+            expected = R.from_euler("xyz", action[3:6]) * R.from_quat(current[3:])
+            rotation_error = (expected * R.from_quat(current[3:]).inv()).as_rotvec()
+            np.testing.assert_allclose(force[3:], 20 * rotation_error, atol=1e-5)
+            np.testing.assert_allclose(obs["state"]["gripper_position"], [0.5])
+            assert not isinstance(env, FrankaEnv)
+            assert UR5eEnv.step is FrankaEnv.step
+            env.reset(seed=123)
+            state = sdks["rtde_control"].states["192.0.2.6"]
+            offset = np.random.default_rng(123).uniform(-0.03, 0.03, 3)
+            np.testing.assert_allclose(
+                state["forces"][-1][2][:3], 1200 * offset, atol=1e-4
+            )
+            assert not state["moves"], "TCP reset must not issue moveJ or moveL"
+        finally:
+            env.close()
+
+
+def test_real_observation_config_preserves_ur_training_order():
+
+    from omegaconf import OmegaConf
+
+    from rlinf.envs.real.env import RealWorldEnv
+
+    env = RealWorldEnv.__new__(RealWorldEnv)
+    keys = ["tcp_pose", "tcp_vel", "tcp_force", "tcp_torque", "gripper_position"]
+    env.cfg = OmegaConf.create({"state_keys": keys, "wrist_image_key": "wrist_image"})
+    env.main_image_key = "exterior_image"
+    env.task_descriptions = ["insert"]
+    state = {
+        key: np.full((1, dim), i, dtype=np.float32)
+        for i, (key, dim) in enumerate(zip(keys, [6, 6, 3, 3, 1]))
+    }
+    raw = {
+        "state": state,
+        "frames": {
+            "exterior_image": np.zeros((1, 128, 128, 3), dtype=np.uint8),
+            "wrist_image": np.ones((1, 128, 128, 3), dtype=np.uint8),
+        },
+    }
+    obs = env._wrap_obs(raw)
+    np.testing.assert_array_equal(
+        obs["states"].numpy(), np.concatenate(list(state.values()), axis=-1)
+    )
+    assert obs["states"].shape == (1, 19)
+    assert obs["wrist_images"].shape == (1, 128, 128, 3)
+    env.cfg.state_keys = ["tcp_pose"]
+    with pytest.raises(ValueError, match="state_keys"):
+        env._wrap_obs(raw)
+
+
+@pytest.mark.parametrize("rtc_enabled", [False, True])
+def test_ur5e_eval_config_compose(monkeypatch, rtc_enabled):
+    from hydra import compose, initialize_config_dir
+
+    root = Path(__file__).resolve().parents[2]
+    monkeypatch.setenv("EMBODIED_PATH", str(root / "examples/embodiment"))
+    with initialize_config_dir(
+        config_dir=str(root / "evaluations/realworld"), version_base="1.3"
+    ):
+        cfg = compose(
+            config_name="realworld_ur5e_eval_pi05_sft",
+            overrides=[f"runner.rtc.enabled={str(rtc_enabled).lower()}"],
+        )
+    assert cfg.env.eval.init_params.id == "UR5eEnv-v1"
+    assert cfg.rollout.model.model_type == "openpi"
+    assert cfg.rollout.model.pi05
+    assert cfg.rollout.model.openpi.task == "eval"
+    assert cfg.rollout.model.openpi.rtc_enabled == rtc_enabled
+    assert cfg.actor.model.model_type == "openpi"
+    assert list(cfg.env.eval.state_keys) == [
+        "tcp_pose",
+        "tcp_vel",
+        "tcp_force",
+        "tcp_torque",
+        "gripper_position",
+    ]
+    assert cfg.env.eval.use_relative_frame
+
+
+@pytest.fixture
+def keyboard_reset_env(monkeypatch):
+    from hydra import compose, initialize_config_dir
+    from robot_mocks.teleop import keyboard
+
+    from rlinf.envs.real.env import RealWorldEnv
+    from rlinf.robotics import RobotInfo, UR5eConfig
+    from rlinf.scheduler import AcceleratorType, WorkerInfo
+    from rlinf.scheduler.manager.worker_manager import WorkerAddress
+
+    sdk = keyboard()
+    monkeypatch.setitem(sys.modules, "evdev", sdk)
+    monkeypatch.setenv("RLINF_KEYBOARD_DEVICE", "/dev/input/event-fake")
+    monkeypatch.delenv("RLINF_FAKE_KEYS", raising=False)
+    root = Path(__file__).resolve().parents[2]
+    monkeypatch.setenv("EMBODIED_PATH", str(root / "examples/embodiment"))
+    envs = []
+
+    def build(robot_type="ur5e", interval=0.5, wait_for_start=False, reset=True):
+        with initialize_config_dir(
+            config_dir=str(root / "evaluations/realworld"), version_base="1.3"
+        ):
+            cfg = compose(config_name="realworld_ur5e_eval_pi05_sft")
+        cfg.env.eval.override_cfg.is_dummy = True
+        cfg.env.eval.override_cfg.ee_pose_limit_min = [-1] * 6
+        cfg.env.eval.override_cfg.ee_pose_limit_max = [1] * 6
+        cfg.env.eval.override_cfg.max_num_steps = 1
+        cfg.env.eval.video_cfg.save_video = False
+        cfg.env.eval.max_episode_steps = 1
+        cfg.env.eval.keyboard_wrapper_kwargs.double_press_interval = interval
+        cfg.env.eval.keyboard_wrapper_kwargs.wait_for_start = wait_for_start
+        serials = ["348522072391", "944622073455"]
+        if robot_type == "franka":
+            del cfg.env.eval.override_cfg.reset_pose_range
+            cfg.env.eval.override_cfg.enable_random_reset = False
+            cfg.env.eval.init_params.id = "FrankaEnv-v1"
+            hardware = RobotInfo(
+                type="Franka",
+                model="Franka",
+                config=FrankaConfig(node_rank=0, camera_serials=serials),
+            )
+        else:
+            hardware = RobotInfo(
+                type="UR5e",
+                model="UR5e",
+                config=UR5eConfig(node_rank=0, camera_serials=serials),
+            )
+        info = WorkerInfo(
+            address=WorkerAddress("KeyboardTest", 0),
+            rank=0,
+            group_world_size=1,
+            cluster_node_rank=0,
+            accelerator_type=AcceleratorType.NO_ACCEL,
+            accelerator_model="",
+            accelerator_rank=0,
+            node_ip="127.0.0.1",
+            node_port=0,
+            available_accelerators=[],
+            hardware_infos=[hardware],
+        )
+        env = RealWorldEnv(cfg.env.eval, 1, 0, 1, info)
+        envs.append(env)
+        if reset:
+            env.reset()
+        return env, sdk.devices[-1]
+
+    yield build
+    for env in envs:
+        env.close()
+    assert all(device.closed for device in sdk.devices)
+
+
+def _press_keys(device, *keys):
+    edges = [edge for key in keys for edge in [(key, 1), (key, 0)]]
+    assert device.emit(*edges).wait(2), "keyboard listener did not consume the edges"
+
+
+@pytest.mark.parametrize("robot_type", ["ur5e", "franka"])
+def test_double_enter_resets_each_robot_without_marking_success(
+    keyboard_reset_env, robot_type
+):
+    env, device = keyboard_reset_env(robot_type)
+    actions = np.zeros((1, 7), dtype=np.float32)
+    _, reward, terminated, truncated, _ = env.step(actions)
+    assert not terminated.any() and not truncated.any()
+    assert not reward.any()
+    assert env.elapsed_steps[0] == 1
+    before = env.env.envs[0].unwrapped.num_steps
+    _press_keys(device, "enter", "enter")
+    _, reward, terminated, truncated, info = env.step(actions)
+    assert truncated.all() and not terminated.any()
+    assert env.elapsed_steps[0] == 0
+    assert env.env.envs[0].unwrapped.num_steps == before
+    assert not reward.any() and not info["final_info"]["episode"]["success_once"].any()
+    # The next action belongs to the new episode, with no stale reset request.
+    _, _, terminated, truncated, _ = env.step(actions)
+    assert not terminated.any() and not truncated.any()
+    assert env.env.envs[0].unwrapped.num_steps == before + 1
+
+
+def test_keyboard_reset_discards_the_rest_of_an_action_chunk(keyboard_reset_env):
+    env, device = keyboard_reset_env()
+    _press_keys(device, "enter", "enter")
+    before = env.env.envs[0].unwrapped.num_steps
+    _, rewards, terminations, truncations, infos = env.chunk_step(
+        np.zeros((1, 3, 7), dtype=np.float32)
+    )
+    assert env.env.envs[0].unwrapped.num_steps == before
+    assert not rewards.any() and not terminations.any()
+    assert truncations[0, -1]
+    assert "final_observation" in infos[-1]
+    assert env.elapsed_steps[0] == 0
+
+
+def test_slow_enters_and_key_repeat_do_not_reset(keyboard_reset_env):
+    env, device = keyboard_reset_env(interval=0.05)
+    actions = np.zeros((1, 7), dtype=np.float32)
+    _press_keys(device, "enter")
+    time.sleep(0.08)
+    _press_keys(device, "enter")
+    _, _, _, truncated, _ = env.step(actions)
+    assert not truncated.any()
+    time.sleep(0.08)
+    assert device.emit(("enter", 1), ("enter", 2), ("enter", 2), ("enter", 0)).wait(2)
+    _, _, _, truncated, _ = env.step(actions)
+    assert not truncated.any()
+
+
+def test_reset_uses_capture_times_even_when_inference_delays_polling(
+    keyboard_reset_env,
+):
+    env, device = keyboard_reset_env(interval=0.05)
+    _press_keys(device, "kpenter", "kpenter")
+    time.sleep(0.08)
+    _, _, _, truncated, _ = env.step(np.zeros((1, 7), dtype=np.float32))
+    assert truncated.all()
+
+
+def test_keys_from_before_reset_do_not_reset_the_next_episode(keyboard_reset_env):
+    env, device = keyboard_reset_env()
+    _press_keys(device, "enter", "enter")
+    env.reset()
+    _, _, terminated, truncated, _ = env.step(np.zeros((1, 7), dtype=np.float32))
+    assert not terminated.any() and not truncated.any()
+
+
+def _wait_for_keyboard_start(env):
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        if env.env.envs[0].get_wrapper_attr("waiting_for_start"):
+            return
+        time.sleep(0.005)
+    pytest.fail("reset did not reach the operator start wait")
+
+
+@pytest.mark.parametrize("robot_type", ["ur5e", "franka"])
+def test_single_enter_starts_after_initial_and_manual_reset(
+    keyboard_reset_env, robot_type
+):
+    env, device = keyboard_reset_env(robot_type, wait_for_start=True, reset=False)
+    actions = np.zeros((1, 7), dtype=np.float32)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        initial = executor.submit(env.reset)
+        try:
+            _wait_for_keyboard_start(env)
+            assert not initial.done()
+            assert env.env.envs[0].unwrapped.num_steps == 0
+            _press_keys(device, "enter")
+            initial.result(timeout=2)
+            # Starting with Enter must not become the first half of a reset double press.
+            _press_keys(device, "enter")
+            _, _, _, truncated, _ = env.step(actions)
+            assert not truncated.any()
+            before = env.env.envs[0].unwrapped.num_steps
+            time.sleep(0.55)
+            _press_keys(device, "enter", "enter")
+            reset = executor.submit(env.step, actions)
+            _wait_for_keyboard_start(env)
+            assert not reset.done()
+            assert env.env.envs[0].unwrapped.num_steps == before
+            _press_keys(device, "kpenter")
+            _, _, terminated, truncated, _ = reset.result(timeout=2)
+            assert truncated.all() and not terminated.any()
+            assert env.elapsed_steps[0] == 0
+            _, _, _, truncated, _ = env.step(actions)
+            assert not truncated.any()
+            assert env.env.envs[0].unwrapped.num_steps == before + 1
+        finally:
+            env.close()
+
+
+def test_closing_keyboard_control_interrupts_the_start_wait(keyboard_reset_env):
+    env, _ = keyboard_reset_env(wait_for_start=True, reset=False)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        waiting = executor.submit(env.reset)
+        try:
+            _wait_for_keyboard_start(env)
+            env.close()
+            with pytest.raises(RuntimeError, match="closed while waiting for Enter"):
+                waiting.result(timeout=2)
+        finally:
+            env.close()
+
+
+def test_ur_tcp_reset_range_and_seed_match_the_config(keyboard_reset_env):
+    from scipy.spatial.transform import Rotation
+
+    env, _ = keyboard_reset_env()
+    robot = env.env.envs[0].unwrapped
+    nominal = np.asarray(robot.config.reset_ee_pose)
+    bounds = np.asarray(robot.config.reset_pose_range)
+    env.reset(seed=123)
+    sampled = robot.sample_reset_pose()
+    expected_xyz = nominal[:3] + np.random.default_rng(123).uniform(
+        -bounds[:3], bounds[:3]
+    )
+    np.testing.assert_allclose(sampled[:3], expected_xyz)
+    np.testing.assert_allclose(
+        sampled[3:], Rotation.from_euler("xyz", nominal[3:]).as_quat()
+    )
+    env.reset(seed=123)
+    np.testing.assert_array_equal(robot.sample_reset_pose(), sampled)
+    env.reset(seed=124)
+    assert not np.array_equal(robot.sample_reset_pose()[:3], sampled[:3])
+    robot.config.enable_random_reset = False
+    fixed = robot.sample_reset_pose()
+    np.testing.assert_array_equal(fixed[:3], nominal[:3])
+    np.testing.assert_allclose(fixed[3:], sampled[3:])

@@ -38,6 +38,7 @@ This section provides end-to-end evaluation workflows organized by benchmark. Ea
    :maxdepth: 1
 
    realworld
+   ur5e
    behavior
    libero
    maniskill_ood

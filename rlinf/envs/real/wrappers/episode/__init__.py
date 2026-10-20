@@ -16,6 +16,7 @@
 from .eval_control import KeyboardEvalControlWrapper
 from .leader_follower import LeaderFollowerKeyboardIntervention
 from .policy_switch import KeyboardRLTPolicySwitchWrapper
+from .reset import KeyboardResetWrapper
 from .reward_done import (
     KeyboardRewardDoneMultiStageWrapper,
     KeyboardRewardDoneWrapper,
@@ -24,6 +25,7 @@ from .start_end import KeyboardStartEndWrapper
 
 __all__ = [
     "KeyboardEvalControlWrapper",
+    "KeyboardResetWrapper",
     "KeyboardRLTPolicySwitchWrapper",
     "KeyboardRewardDoneMultiStageWrapper",
     "KeyboardRewardDoneWrapper",
