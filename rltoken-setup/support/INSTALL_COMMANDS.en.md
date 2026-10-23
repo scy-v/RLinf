@@ -7,7 +7,7 @@ Auxiliary scripts, environment records, and verification tools live in this `sup
 Install the UR dependencies with the OpenPI model stack:
 
 ```bash
-cd ~/RLinf
+cd ~/RLinf-rltoken
 bash requirements/install.sh embodied --model openpi --env ur \
   --venv .venv --no-root --install-rlinf
 ```
@@ -23,8 +23,8 @@ bash rltoken-setup/support/install.sh
 The `rlt` branch contains the `--env ur` installation target. Clone that branch for a new installation:
 
 ```bash
-git clone --depth 1 --branch rlt https://github.com/scy-v/RLinf.git ~/RLinf
-cd ~/RLinf
+git clone --depth 1 --branch rlt https://github.com/scy-v/RLinf.git ~/RLinf-rltoken
+cd ~/RLinf-rltoken
 
 curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
@@ -38,7 +38,7 @@ bash requirements/install.sh embodied --model openpi --env ur \
 After installing OpenPI, select the GUI OpenCV wheel:
 
 ```bash
-source ~/RLinf/.venv/bin/activate
+source ~/RLinf-rltoken/.venv/bin/activate
 uv pip uninstall opencv-python opencv-python-headless
 uv pip install --no-deps opencv-python==4.11.0.86
 ```
@@ -48,7 +48,7 @@ uv pip install --no-deps opencv-python==4.11.0.86
 Activate the environment:
 
 ```bash
-source ~/RLinf/.venv/bin/activate
+source ~/RLinf-rltoken/.venv/bin/activate
 ```
 
 The UR LeRobot reader is pinned to `d6ea3bbce0fc8c75138f02639ac4ceaf12a67829`, matching your OpenPI environment and supporting this v3.0 dataset. The installer reuses RLinf's existing Torch/Datasets stack.

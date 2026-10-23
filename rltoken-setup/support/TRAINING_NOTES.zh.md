@@ -7,7 +7,7 @@
 ## 数据和归一化
 
 ```bash
-source ~/RLinf/rltoken-setup/activate.sh
+source ~/RLinf-rltoken/rltoken-setup/activate.sh
 DATA="$HOME/.cache/huggingface/lerobot/scylearning/insert_black_rack_into_blue_slot_20260916_v01"
 OUT="$PWD/rltoken-setup/outputs/ur5e_insert_black_rack_state19"
 python toolkits/lerobot/calculate_norm_stats.py \
@@ -33,7 +33,7 @@ OBS_INDICES=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 python toolkits/lero
 
 ## 第一阶段 SFT
 
-使用 `examples/sft/config/ur_rlt_stage1_sft_openpi_pi05.yaml`。本机已将 OpenPI 默认缓存中的 JAX `pi05_base` 转换为 RLinf 使用的 PyTorch 格式，`actor.model.model_path` 已指向 `/home/suchenyu/RLinf/rltoken-setup/outputs/pi05_base_openpi`，其中包含 `model.safetensors` 和 `config.json`。数据路径、默认 1–19 维统计路径和两路相机也已填写。
+使用 `examples/sft/config/ur_rlt_stage1_sft_openpi_pi05.yaml`。本机已将 OpenPI 默认缓存中的 JAX `pi05_base` 转换为 RLinf 使用的 PyTorch 格式，`actor.model.model_path` 已指向 `/home/suchenyu/RLinf-rltoken/rltoken-setup/outputs/pi05_base_openpi`，其中包含 `model.safetensors` 和 `config.json`。数据路径、默认 1–19 维统计路径和两路相机也已填写。
 
 在新机器上，准备好前面的归一化结果和 OpenPI 缓存权重后，执行以下转换；输出 horizon 与训练配置一致，都是 20：
 
@@ -55,7 +55,7 @@ actor:
   model:
     openpi_data:
       obs_indices: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-      norm_stats_path: /home/suchenyu/RLinf/rltoken-setup/outputs/ur5e_insert_black_rack_state19/norm_stats.json
+      norm_stats_path: /home/suchenyu/RLinf-rltoken/rltoken-setup/outputs/ur5e_insert_black_rack_state19/norm_stats.json
     openpi:
       config_name: pi05_ur_state
       num_images_in_input: 2
@@ -73,7 +73,7 @@ UR 安装目标固定使用与你的 `~/openpi` 相同的 LeRobot 提交 `d6ea3b
 bash examples/sft/run_vla_sft.sh ur_rlt_stage1_sft_openpi_pi05
 ```
 
-训练配置使用 GPU 0–3，总步数 30000，每 5000 步保存权重。`runner.resume_dir` 当前仍指向 `20261017-22:41:05` 这次训练的第 5000 步完整 checkpoint；执行同一命令将续训，从头训练需先将该字段设为 `null`。`20261018-22:40:04` 这次训练已生成第 30000 步权重，路径为 `/data/suchenyu/RLinf/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor/model_state_dict/full_weights.pt`。`~/RLinf/logs` 是该数据盘日志目录的软链接。
+训练配置使用 GPU 0–3，总步数 30000，每 5000 步保存权重。`runner.resume_dir` 当前仍指向 `20261017-22:41:05` 这次训练的第 5000 步完整 checkpoint；执行同一命令将续训，从头训练需先将该字段设为 `null`。`20261018-22:40:04` 这次训练已生成第 30000 步权重，路径为 `/data/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor/model_state_dict/full_weights.pt`。`~/RLinf-rltoken/logs` 是该数据盘日志目录的软链接。
 
 当前使用 `is_lora: False`、`train_expert_only: False` 和作者原有的联合 SFT 前向。`no_shard` 与作者第一阶段配置一致，各卡保留完整参数、梯度和优化器状态。`gradient_checkpointing: False` 也与作者配置一致；作者原有的 `Pi0.sft_forward()` 每次前向还会调用 `gradient_checkpointing_disable()`。
 
@@ -112,7 +112,7 @@ rollout:
     openpi_data:
       repo_id: scylearning/insert_black_rack_into_blue_slot_20260916_v01
       obs_indices: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-      norm_stats_path: /home/suchenyu/RLinf/rltoken-setup/outputs/ur5e_insert_black_rack_state19/norm_stats.json
+      norm_stats_path: /home/suchenyu/RLinf-rltoken/rltoken-setup/outputs/ur5e_insert_black_rack_state19/norm_stats.json
     openpi:
       config_name: pi05_ur_state
       num_images_in_input: 2

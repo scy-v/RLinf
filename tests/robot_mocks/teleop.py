@@ -292,10 +292,11 @@ def keyboard() -> types.ModuleType:
         KEY_Q=16,
         KEY_ENTER=28,
         KEY_KPENTER=96,
+        KEY_SPACE=57,
     )
     by_name = {
         name: getattr(codes, f"KEY_{name.upper()}")
-        for name in ("a", "b", "c", "q", "enter", "kpenter")
+        for name in ("a", "b", "c", "q", "enter", "kpenter", "space")
     }
     codes.bytype = {
         codes.EV_KEY: {code: f"KEY_{name.upper()}" for name, code in by_name.items()}

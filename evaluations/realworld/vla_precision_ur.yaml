@@ -1,0 +1,165 @@
+# VLA-Precision UR deployment; only output and checkpoint/model settings differ.
+experiment:
+  name: insert_black_rack_into_blue_slot
+output_root: /home/suchenyu/RLinf-rltoken/results/vla-precision-ur
+policy:
+  location: local
+  host: 127.0.0.1
+  bind_host: 0.0.0.0
+  port: 8000
+  cuda_visible_devices: '0'
+task:
+  description: Insert the black rack into the blue slot
+video:
+  fps: 15
+  visualize: true
+record:
+  num_episodes: 20
+  episode_timeout_sec: 60
+  show_action_fps: false
+  show_inference_fps: true
+  show_time: true
+robot:
+  kind: ur
+  ip: 192.168.201.11
+  gripper_port: /dev/ur5e_left_gripper
+  gripper_reverse: false
+  init_gripper: true
+  fix_gripper: false
+  close_threshold: 0.7
+  target_reached_gripper_open_threshold: 0.7
+  gripper_force: 60
+  gripper_speed: 100
+  pre_reset_tcp_pose: null
+  init_tcp_pose:
+  - 0.389694
+  - 0.107973
+  - 0.382018
+  - -3.14
+  - 0.0
+  - -1.57
+  init_pose_range:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  target_tcp_pose: null
+  target_threshold: null
+  show_target_error: false
+  action_fps: 100
+  action_horizon: 3
+  direct_action_horizon: false
+  debug: false
+  control_space: force
+  reference_frame: tcp
+  filter_zero_output: false
+  action_idle_hold_enabled: true
+  action_idle_position_threshold: 0.0001
+  action_idle_rotation_threshold: 0.001
+  payload:
+    mass: 1.601
+    cog:
+    - 0.011
+    - -0.002
+    - 0.052
+  position_mode:
+    speed: 0.2
+    acceleration: 0.2
+    servo_time: 0.1
+    lookahead_time: 0.1
+    gain: 300
+  force_mode:
+    control_frame_euler_deg:
+    - 0.0
+    - 0.0
+    - 0.0
+    kp: 1200
+    kd: 600
+    kp_rot: 2000
+    kd_rot: 400
+    rtde_freq: 100
+    select_vector:
+    - 1
+    - 1
+    - 1
+    - 0
+    - 0
+    - 1
+    force_limit:
+    - 2
+    - 2
+    - 2
+    - 2
+    - 2
+    - 2
+    pos_delta: 0.048
+    vel_delta: 4.0
+    gain_scale: 1.5
+cameras:
+  wrist_cam_serial: '944622073455'
+  exterior_cam_serial: '348522072391'
+  fps: 15
+  width: 640
+  height: 480
+model:
+  checkpoint_dir: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor
+  norm_stats_path: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/norm_stats.json
+  device: cuda:0
+  torch_num_threads: 4
+  sample_steps: 10
+  network:
+    model_type: openpi
+    precision: bf16
+    pi05: true
+    is_lora: false
+    num_action_chunks: 3
+    action_dim: 7
+    add_value_head: false
+    openpi_data:
+      repo_id: scylearning/insert_black_rack_into_blue_slot_20260916_v01
+      obs_indices:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+      - 19
+    openpi:
+      task: eval
+      config_name: pi05_ur_state
+      embed_dtype: bf16
+      num_images_in_input: 2
+      train_expert_only: false
+      action_horizon: 20
+      action_chunk: 3
+      action_env_dim: 7
+      model_action_dim: 32
+      max_token_len: 200
+      paligemma_variant: gemma_2b
+      action_expert_variant: gemma_300m
+      use_rlt: true
+      rlt_prefix_seq_len: 1024
+      rlt_image_only: false
+      rlt_use_mask: true
+      rtc_enabled: false
+      # false: disable local kernel compilation.
+      # true: compile local kernels and keep the Python sampling loop.
+      # "max-autotune": compile all of sample_actions, as in OpenPI PyTorch.
+      # Other modes: "default", "reduce-overhead", "max-autotune-no-cudagraphs".
+      # Full compilation can take minutes on the first warmup.
+      torch_compile: max-autotune

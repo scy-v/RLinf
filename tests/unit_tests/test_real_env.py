@@ -4650,7 +4650,7 @@ def test_robotwin_eval_success_seed_order_is_controlled_by_base_seed():
     assert selected_seed_0 != selected_seed_1
 
 
-def test_ur5e_reuses_cartesian_delta_and_normalized_gripper():
+def test_ur5e_local_delta_binary_gripper_and_moveL_reset():
     from robot_mocks import mocked_sdks
     from scipy.spatial.transform import Rotation as R
 
@@ -4680,6 +4680,8 @@ def test_ur5e_reuses_cartesian_delta_and_normalized_gripper():
                 "reset_ee_pose": [0.4, 0.0, 0.3, 0.0, 0.0, 0.0],
                 "enable_random_reset": True,
                 "joint_reset_cycle": 1,
+                "payload_settle_seconds": 0.0,
+                "ft_zero_settle_seconds": 0.0,
             },
             robot_info=info,
         )
@@ -4699,16 +4701,19 @@ def test_ur5e_reuses_cartesian_delta_and_normalized_gripper():
             expected = R.from_euler("xyz", action[3:6]) * R.from_quat(current[3:])
             rotation_error = (expected * R.from_quat(current[3:]).inv()).as_rotvec()
             np.testing.assert_allclose(force[3:], 20 * rotation_error, atol=1e-5)
-            np.testing.assert_allclose(obs["state"]["gripper_position"], [0.5])
+            np.testing.assert_allclose(obs["state"]["gripper_position"], [0.08])
             assert not isinstance(env, FrankaEnv)
-            assert UR5eEnv.step is FrankaEnv.step
+            assert UR5eEnv.step is not FrankaEnv.step
             env.reset(seed=123)
             state = sdks["rtde_control"].states["192.0.2.6"]
             offset = np.random.default_rng(123).uniform(-0.03, 0.03, 3)
             np.testing.assert_allclose(
-                state["forces"][-1][2][:3], 1200 * offset, atol=1e-4
+                np.asarray(state["moves"][-1][0])[:3],
+                np.array([0.4, 0.0, 0.3]) + offset,
+                atol=1e-4,
             )
-            assert not state["moves"], "TCP reset must not issue moveJ or moveL"
+            assert "zeroFtSensor" in state["events"]
+            assert "moveJ" not in state["events"]
         finally:
             env.close()
 
@@ -4772,11 +4777,11 @@ def test_ur5e_eval_config_compose(monkeypatch, rtc_enabled):
         "tcp_torque",
         "gripper_position",
     ]
-    assert cfg.env.eval.use_relative_frame
+    assert not cfg.env.eval.use_relative_frame
 
 
 @pytest.fixture
-def keyboard_reset_env(monkeypatch):
+def keyboard_reset_env(monkeypatch, tmp_path):
     from hydra import compose, initialize_config_dir
     from robot_mocks.teleop import keyboard
 
@@ -4793,7 +4798,9 @@ def keyboard_reset_env(monkeypatch):
     monkeypatch.setenv("EMBODIED_PATH", str(root / "examples/embodiment"))
     envs = []
 
-    def build(robot_type="ur5e", interval=0.5, wait_for_start=False, reset=True):
+    def build(
+        robot_type="ur5e", interval=0.5, wait_for_start=False, reset=True, ur_eval=False
+    ):
         with initialize_config_dir(
             config_dir=str(root / "evaluations/realworld"), version_base="1.3"
         ):
@@ -4804,12 +4811,34 @@ def keyboard_reset_env(monkeypatch):
         cfg.env.eval.override_cfg.max_num_steps = 1
         cfg.env.eval.video_cfg.save_video = False
         cfg.env.eval.max_episode_steps = 1
-        cfg.env.eval.keyboard_wrapper_kwargs.double_press_interval = interval
-        cfg.env.eval.keyboard_wrapper_kwargs.wait_for_start = wait_for_start
+        cfg.env.eval.ur_evaluation.enabled = ur_eval
+        cfg.env.eval.ur_evaluation.num_episodes = 2
+        cfg.env.eval.ur_evaluation.wait_for_start = wait_for_start
+        cfg.env.eval.ur_evaluation.output_path = str(
+            tmp_path / f"results-{len(envs)}.json"
+        )
+        cfg.env.eval.keyboard_reward_wrapper = None if ur_eval else "double_enter_reset"
+        from omegaconf import open_dict
+
+        with open_dict(cfg.env.eval):
+            cfg.env.eval.keyboard_wrapper_kwargs = {
+                "double_press_interval": interval,
+                "wait_for_start": wait_for_start,
+            }
         serials = ["348522072391", "944622073455"]
         if robot_type == "franka":
-            del cfg.env.eval.override_cfg.reset_pose_range
+            from dataclasses import fields
+
+            from rlinf.envs.real.franka.base import FrankaEnvConfig
+
+            allowed = {field.name for field in fields(FrankaEnvConfig)}
+            cfg.env.eval.override_cfg = {
+                key: value
+                for key, value in cfg.env.eval.override_cfg.items()
+                if key in allowed
+            }
             cfg.env.eval.override_cfg.enable_random_reset = False
+            cfg.env.eval.use_relative_frame = True
             cfg.env.eval.init_params.id = "FrankaEnv-v1"
             hardware = RobotInfo(
                 type="Franka",
@@ -4985,6 +5014,8 @@ def test_ur_tcp_reset_range_and_seed_match_the_config(keyboard_reset_env):
     env, _ = keyboard_reset_env()
     robot = env.env.envs[0].unwrapped
     nominal = np.asarray(robot.config.reset_ee_pose)
+    robot.config.enable_random_reset = True
+    robot.config.reset_pose_range = np.array([0.03, 0.03, 0.03, 0.0, 0.0, 0.0])
     bounds = np.asarray(robot.config.reset_pose_range)
     env.reset(seed=123)
     sampled = robot.sample_reset_pose()
@@ -5003,3 +5034,537 @@ def test_ur_tcp_reset_range_and_seed_match_the_config(keyboard_reset_env):
     fixed = robot.sample_reset_pose()
     np.testing.assert_array_equal(fixed[:3], nominal[:3])
     np.testing.assert_allclose(fixed[3:], sampled[3:])
+
+
+@pytest.mark.parametrize("reference_frame", ["tcp", "base"])
+def test_ur5e_target_composition_preserves_local_rotation_and_tool_offset(
+    reference_frame,
+):
+    from scipy.spatial.transform import Rotation as R
+
+    from rlinf.envs.real.ur5e.motion import URTargetComposer, ee_to_tcp, tcp_to_ee
+
+    ee = np.r_[[0.4, 0.1, 0.3], R.from_euler("xyz", [0.2, -0.3, 1.0]).as_quat()]
+    offset = np.r_[[0.02, 0.01, 0.1], R.from_euler("x", 0.15).as_quat()]
+    tcp = ee_to_tcp(ee, offset)
+    np.testing.assert_allclose(tcp_to_ee(tcp, offset), ee, atol=1e-12)
+    action = np.array([0.001, -0.002, 0.003, 0.0, 0.0, 0.0])
+    composer = URTargetComposer()
+    result = composer.target(
+        tcp,
+        offset,
+        action,
+        reference_frame=reference_frame,
+        hold_enabled=False,
+        position_threshold=0.0001,
+        rotation_threshold=0.001,
+    )
+    result_ee = tcp_to_ee(result, offset)
+    delta = (
+        R.from_quat(ee[3:]).apply(action[:3])
+        if reference_frame == "tcp"
+        else action[:3]
+    )
+    np.testing.assert_allclose(result_ee[:3], ee[:3] + delta, atol=1e-12)
+    np.testing.assert_allclose(
+        R.from_quat(result_ee[3:]).as_matrix(),
+        R.from_quat(ee[3:]).as_matrix(),
+        atol=1e-12,
+    )
+    action[3:6] = [0.1, -0.08, 0.04]
+    result = composer.target(
+        tcp,
+        offset,
+        action,
+        reference_frame=reference_frame,
+        hold_enabled=False,
+        position_threshold=0.0001,
+        rotation_threshold=0.001,
+    )
+    local = R.from_euler("xyz", action[3:6])
+    expected = (
+        R.from_quat(ee[3:]) * local
+        if reference_frame == "tcp"
+        else local * R.from_quat(ee[3:])
+    )
+    np.testing.assert_allclose(
+        R.from_quat(tcp_to_ee(result, offset)[3:]).as_matrix(),
+        expected.as_matrix(),
+        atol=1e-12,
+    )
+
+
+def test_ur5e_idle_target_holds_axes_until_motion_resumes():
+    from rlinf.envs.real.ur5e.motion import URTargetComposer
+
+    composer = URTargetComposer()
+    tcp = np.array([0.4, 0.0, 0.3, 0.0, 0.0, 0.0, 1.0])
+    offset = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+    settings = {
+        "reference_frame": "tcp",
+        "hold_enabled": True,
+        "position_threshold": 0.0001,
+        "rotation_threshold": 0.001,
+    }
+    first = composer.target(tcp, offset, np.zeros(6), **settings)
+    disturbed = tcp.copy()
+    disturbed[0] += 0.002
+    held = composer.target(disturbed, offset, np.zeros(6), **settings)
+    np.testing.assert_allclose(held, first)
+    action = np.array([0.003, 0.0, 0.0, 0.0, 0.0, 0.0])
+    moving = composer.target(disturbed, offset, action, **settings)
+    assert moving[0] == pytest.approx(disturbed[0] + 0.003)
+    stopped = composer.target(disturbed, offset, np.zeros(6), **settings)
+    assert stopped[0] == pytest.approx(disturbed[0])
+    composer.clear()
+    assert composer.anchor is None
+
+
+def test_ur5e_observation_keeps_base_velocity_and_uses_ee_reset_reference():
+    from scipy.spatial.transform import Rotation as R
+
+    from rlinf.envs.real.ur5e import UR5eEnv
+    from rlinf.envs.real.ur5e.motion import ee_to_tcp
+    from rlinf.robotics import RobotInfo, UR5eConfig
+
+    env = UR5eEnv(
+        {"is_dummy": True},
+        robot_info=RobotInfo(
+            type="UR5e",
+            model="UR5e",
+            config=UR5eConfig(node_rank=0, camera_serials=["dummy"]),
+        ),
+    )
+    env.config.is_dummy = False
+    env._last_frames = {}
+    env._reference_ee_pose = np.r_[
+        [0.4, 0.0, 0.3], R.from_euler("z", np.pi / 2).as_quat()
+    ]
+    env._tcp_offset = np.r_[[0.0, 0.0, 0.1], [0.0, 0.0, 0.0, 1.0]]
+    ee = env._reference_ee_pose.copy()
+    ee[1] += 0.01
+    env._robot_state.tcp_pose = ee_to_tcp(ee, env._tcp_offset)
+    env._robot_state.tcp_vel = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+    env._robot_state.gripper_position = 0.8
+    obs = env._get_observation()["state"]
+    np.testing.assert_allclose(obs["tcp_pose"][:3], [0.01, 0.0, 0.0], atol=1e-7)
+    np.testing.assert_allclose(obs["tcp_vel"], [0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+
+
+def test_ur5e_evaluation_records_success_failure_and_discards_old_chunk(
+    keyboard_reset_env,
+):
+    import json
+
+    env, device = keyboard_reset_env(ur_eval=True)
+    action = np.zeros((1, 7), dtype=np.float32)
+    raw = env.env.envs[0]
+    before = raw.unwrapped.num_steps
+    _press_keys(device, "space", "space")
+    _, reward, terminated, truncated, info = env.chunk_step(
+        np.zeros((1, 3, 7), dtype=np.float32)
+    )
+    assert raw.unwrapped.num_steps == before
+    assert terminated.any() and reward.sum() == 1
+    assert info[-1]["final_info"]["episode"]["success_once"].all()
+    _press_keys(device, "enter", "enter")
+    _, reward, terminated, truncated, _ = env.step(action)
+    assert truncated.all() and not terminated.any() and not reward.any()
+    assert raw.get_wrapper_attr("evaluation_complete")
+    output = raw.get_wrapper_attr("output_path")
+    payload = json.loads(output.read_text())
+    assert payload["summary"] == {
+        "episode_count": 2,
+        "success_count": 1,
+        "success_rate": 0.5,
+    }
+    assert [r["status"] for r in payload["episodes"]] == [
+        "manual_success",
+        "keyboard_reset",
+    ]
+    assert not raw.get_wrapper_attr("waiting_for_start")
+
+
+def test_ur5e_evaluation_timeout_prevents_action_execution(keyboard_reset_env):
+    env, _ = keyboard_reset_env(ur_eval=True)
+    raw = env.env.envs[0]
+    controller = raw
+    while type(controller).__name__ != "UREvaluationWrapper":
+        controller = controller.env
+    controller._episode_started -= 61
+    before = raw.unwrapped.num_steps
+    _, _, _, truncated, _ = env.step(np.zeros((1, 7), dtype=np.float32))
+    assert truncated.all() and raw.unwrapped.num_steps == before
+    assert controller.results[0]["status"] == "timeout"
+
+
+def test_ur5e_sync_worker_stops_after_episode_budget(keyboard_reset_env):
+    from omegaconf import OmegaConf
+
+    from rlinf.workers.env.ur5e_eval_worker import URSyncEnvWorker
+
+    env, device = keyboard_reset_env(ur_eval=True)
+    worker = object.__new__(URSyncEnvWorker)
+    worker.cfg = OmegaConf.create(
+        {
+            "env": {"eval": OmegaConf.to_container(env.cfg)},
+            "rollout": {"group_name": "Rollout"},
+        }
+    )
+    worker.model_cfg = OmegaConf.create(
+        {"model_type": "openpi", "num_action_chunks": 3, "action_dim": 7}
+    )
+    worker.stage_num = worker.eval_num_envs_per_stage = worker.eval_batch_size = 1
+    worker.n_eval_chunk_steps = 100
+    worker.eval_env_list = [env]
+    worker.eval_prev_done = [None]
+    worker.env_decoupled_mode = False
+    worker.use_external_reward_model = worker.enable_rlt = False
+    worker._obs_split_fn = None
+    sent = []
+    worker.send_to = lambda **kwargs: sent.append(kwargs["data"])
+    requests = []
+
+    def recv(**kwargs):
+        requests.append(kwargs)
+        _press_keys(device, "space", "space")
+        return torch.zeros(1, 3, 7)
+
+    worker.recv_from = recv
+    result = worker.evaluate(None, None)
+    assert len(requests) == 2
+    assert len(sent) == 3
+    assert [bool(item["ur_eval_stop"].any()) for item in sent] == [False, False, True]
+    assert result["success_once"].tolist() == [True, True]
+    assert env._closed
+
+
+def test_ur5e_rtc_worker_ends_only_after_final_episode(keyboard_reset_env):
+    from rlinf.workers.env.ur5e_eval_worker import URRTCEnvWorker
+
+    env, device = keyboard_reset_env(ur_eval=True)
+    worker = object.__new__(URRTCEnvWorker)
+    worker.eval_env_list = [env]
+    for complete in (False, True):
+        _press_keys(device, "space", "space")
+        output, _ = worker._evaluate_rtc_action(np.zeros((1, 7), dtype=np.float32), 0)
+        assert output.dones.all()
+        assert env.manual_episode_control_only is (not complete)
+
+
+def test_ur5e_camera_input_keeps_full_view_and_matches_openpi_letterbox():
+    from openpi_client.image_tools import resize_with_pad
+
+    from rlinf.envs.real.ur5e import UR5eEnv
+    from rlinf.robotics import RobotInfo, UR5eConfig
+
+    env = UR5eEnv(
+        {"is_dummy": True},
+        robot_info=RobotInfo(
+            type="UR5e",
+            model="UR5e",
+            config=UR5eConfig(node_rank=0, camera_serials=["dummy"]),
+        ),
+    )
+    rgb = np.zeros((480, 640, 3), dtype=np.uint8)
+    rgb[:, :80] = [255, 10, 20]
+    rgb[:, -80:] = [20, 30, 255]
+    rgb[150:330, 250:390] = [0, 200, 0]
+    env._cameras = {"cam": None}
+    env.camera_player = type("Player", (), {"put_frame": lambda self, frames: None})()
+    frames, _ = env._frames_from({"cam": {"frame": rgb[..., ::-1]}})
+    np.testing.assert_array_equal(frames["cam"], resize_with_pad(rgb, 224, 224))
+    assert next(iter(env.observation_space["frames"].values())).shape == (224, 224, 3)
+
+
+def test_ur5e_rollout_preserves_stop_flag_through_channel_batch_merge():
+    import asyncio
+
+    from omegaconf import OmegaConf
+
+    from rlinf.workers.env.ur5e_eval_worker import URSyncRolloutWorker
+
+    worker = object.__new__(URSyncRolloutWorker)
+    worker.cfg = OmegaConf.create({"env": {"group_name": "Env"}})
+    worker.enable_offload = False
+    worker.eval_batch_size = 1
+    messages = iter(
+        [
+            {
+                "obs": {"states": torch.zeros(1, 19)},
+                "final_obs": None,
+                "ur_eval_stop": torch.tensor([stop]),
+            }
+            for stop in (False, True)
+        ]
+    )
+
+    class Received:
+        async def async_wait(self):
+            return worker._merge_obs_batches([next(messages)])
+
+    def recv_from(**kwargs):
+        # Match Worker.recv_from: only async_op=True returns an async work handle.
+        if kwargs.get("async_op", False):
+            return Received()
+        return worker._merge_obs_batches([next(messages)])
+
+    worker.recv_from = recv_from
+    predictions = []
+
+    def predict(obs, **kwargs):
+        predictions.append(obs)
+        return torch.zeros(1, 3, 7), {}
+
+    worker._predict_rollout_actions = predict
+    sent = []
+    worker.send_to = lambda **kwargs: sent.append(kwargs["data"])
+    asyncio.run(worker.evaluate(None, None))
+    assert len(predictions) == len(sent) == 1
+
+
+def test_vla_precision_ur_port_preserves_robot_execution_methods():
+    """Keep the copied observation/control loop identical to its recorded source."""
+    import ast
+    import hashlib
+    import json
+
+    root = Path(__file__).resolve().parents[2]
+    port = root / "evaluations/realworld/vla_precision_ur"
+    provenance = json.loads((port / "provenance.json").read_text())
+
+    class WithoutAnnotations(ast.NodeTransformer):
+        def visit_arg(self, node):
+            node.annotation = None
+            return node
+
+        def visit_FunctionDef(self, node):
+            self.generic_visit(node)
+            node.returns = None
+            node._fields = tuple(
+                field for field in node._fields if field != "type_params"
+            )
+            return node
+
+    tree = WithoutAnnotations().visit(ast.parse((port / "ur.py").read_text()))
+    backend = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "Inference"
+    )
+    methods = {
+        node.name: node for node in backend.body if isinstance(node, ast.FunctionDef)
+    }
+    expected = provenance["unchanged_ur_methods"]
+    assert {
+        "get_obs_state",
+        "execute_actions",
+        "_calculate_force",
+        "_target_pose_from_action",
+        "reset_episode",
+        "run",
+    } <= expected.keys()
+    for name, digest in expected.items():
+        assert hashlib.sha256(ast.dump(methods[name]).encode()).hexdigest() == digest, (
+            name
+        )
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_vla_precision_ur_warmup_progress_stops_with_inference(fail, monkeypatch):
+    from evaluations.realworld.vla_precision_ur.policy import warmup_policy
+
+    tick = threading.Event()
+
+    class ProgressStream(io.StringIO):
+        def write(self, value):
+            result = super().write(value)
+            if threading.current_thread().name == "ur-warmup-timer":
+                tick.set()
+            return result
+
+    stream = ProgressStream()
+    monkeypatch.setattr(sys, "stderr", stream)
+    observation = {"state": np.zeros(19)}
+    noise = np.zeros((20, 32))
+    expected = {"actions": np.zeros((20, 7))}
+
+    class Policy:
+        def infer(self, obs, **kwargs):
+            assert obs is observation
+            assert kwargs["noise"] is noise
+            assert tick.wait(5), "Warmup timer did not update during inference"
+            if fail:
+                raise RuntimeError("inference failed")
+            return expected
+
+    if fail:
+        with pytest.raises(RuntimeError, match="inference failed"):
+            warmup_policy(Policy(), observation, noise=noise)
+    else:
+        assert warmup_policy(Policy(), observation, noise=noise) is expected
+    output = stream.getvalue()
+    assert output.count("elapsed") >= 2
+    assert output.count("\n") == 1
+    assert "\r[WARMUP]" in output
+    assert ("Stopped before completion" if fail else "Completed") in output
+    assert not any(t.name == "ur-warmup-timer" for t in threading.enumerate())
+
+
+def test_vla_precision_ur_model_config_keeps_native_hardware_settings():
+    import copy
+
+    import yaml
+
+    from evaluations.realworld.vla_precision_ur.policy import model_config_from_yaml
+
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "evaluations/realworld/vla_precision_ur.yaml"
+    )
+    raw = yaml.safe_load(path.read_text())
+    before = copy.deepcopy(raw)
+    model = model_config_from_yaml(raw)
+    assert raw == before
+    assert model.openpi.action_horizon == 20
+    assert raw["robot"]["action_horizon"] == 3
+    assert model.openpi.rtc_enabled is False
+    assert model.openpi_data.norm_stats_path == raw["model"]["norm_stats_path"]
+    raw["model"]["network"]["openpi"]["rtc_enabled"] = True
+    with pytest.raises(ValueError, match="without RTC"):
+        model_config_from_yaml(raw)
+
+
+@pytest.mark.parametrize(
+    "setting",
+    [
+        False,
+        True,
+        "default",
+        "reduce-overhead",
+        "max-autotune",
+        "max-autotune-no-cudagraphs",
+    ],
+)
+def test_vla_precision_ur_sampler_compile_modes(setting, monkeypatch):
+    import copy
+
+    import yaml
+
+    from evaluations.realworld.vla_precision_ur.policy import (
+        _configure_sampler_compile,
+        _torch_compile_setting,
+        model_config_from_yaml,
+    )
+
+    path = _ROOT / "evaluations/realworld/vla_precision_ur.yaml"
+    raw = yaml.safe_load(path.read_text())
+    raw["model"]["network"]["openpi"]["torch_compile"] = setting
+    before = copy.deepcopy(raw)
+    cfg = model_config_from_yaml(raw)
+    assert raw == before
+    assert cfg.openpi.torch_compile is (setting is not False)
+    assert _torch_compile_setting(raw) == setting
+
+    class Sampler(torch.nn.Module):
+        def sample_actions(self, observation):
+            return observation + 1
+
+    model = Sampler()
+    original = model.sample_actions
+    compiled = Mock(side_effect=original)
+    compile_fn = Mock(return_value=compiled)
+    monkeypatch.setattr(torch, "compile", compile_fn)
+    _configure_sampler_compile(model, setting)
+    assert model.sample_actions(torch.tensor(2)).item() == 3
+    if isinstance(setting, str):
+        compile_fn.assert_called_once_with(original, mode=setting)
+        assert model.sample_actions is compiled
+    else:
+        compile_fn.assert_not_called()
+        assert model.sample_actions == original
+
+
+@pytest.mark.parametrize("setting", [None, 0, 1, "false", "true", "max-autotun"])
+def test_vla_precision_ur_sampler_compile_rejects_invalid_setting(setting):
+    import yaml
+
+    from evaluations.realworld.vla_precision_ur.policy import model_config_from_yaml
+
+    raw = yaml.safe_load(
+        (_ROOT / "evaluations/realworld/vla_precision_ur.yaml").read_text()
+    )
+    raw["model"]["network"]["openpi"]["torch_compile"] = setting
+    with pytest.raises(ValueError, match="torch_compile must be a YAML boolean"):
+        model_config_from_yaml(raw)
+
+
+def test_vla_precision_ur_native_observation_and_chunk_execution():
+    for package in ("lerobot.cameras", "pyDHgripper", "av", "crcmod"):
+        pytest.importorskip(package)
+    from robot_mocks.ur5e import modules
+
+    from evaluations.realworld.vla_precision_ur.ur import Inference
+
+    sdk = modules()
+    engine = object.__new__(Inference)
+    engine.rtde_r = sdk["rtde_receive"].RTDEReceiveInterface("native-port-test")
+    engine.rtde_c = sdk["rtde_control"].RTDEControlInterface("native-port-test")
+    engine.rtde_r.state["speed"] = [0.1, -0.2, 0.3, -0.4, 0.5, -0.6]
+    engine.rtde_c.state["tcp_offset"] = [0.03, -0.01, 0.08, 0.1, -0.2, 0.3]
+    engine.fix_gripper = False
+    engine.reference_frame = "tcp"
+    engine.task_description = "Insert the black rack into the blue slot"
+    engine.gripper = SimpleNamespace(position=0.35)
+    engine._episode_reference_ee_pose = None
+    engine.set_episode_reference_pose()
+
+    class Camera:
+        def read(self):
+            rgb = np.zeros((480, 640, 3), dtype=np.uint8)
+            rgb[..., 0] = 255
+            return rgb
+
+    engine.cameras = {"wrist_image": Camera(), "exterior_image": Camera()}
+    obs = engine.get_obs_state()
+    np.testing.assert_allclose(obs["observation/state"][:6], 0, atol=1e-6)
+    np.testing.assert_allclose(
+        obs["observation/state"][6:12], engine.rtde_r.state["speed"]
+    )
+    np.testing.assert_allclose(obs["observation/state"][12:18], [1, 2, 3, 4, 5, 6])
+    assert obs["observation/state"][18] == np.float32(0.35)
+    image = obs["observation/image"]
+    assert image.shape == (224, 224, 3)
+    np.testing.assert_array_equal(image[112, 112], [255, 0, 0])
+    assert not image[:28].any()
+
+    engine.action_horizon = 3
+    engine.action_fps = 100
+    engine.debug = False
+    engine.show_action_fps = False
+    engine.control_space = "force"
+    engine.filter_zero_output = False
+    engine._zero_force_lock_active = False
+    engine.action_idle_hold_enabled = True
+    engine.action_idle_position_threshold = 0.0001
+    engine.action_idle_rotation_threshold = 0.001
+    engine._clear_action_idle_hold()
+    engine.kp, engine.kd = 1200, 600
+    engine.kp_rot, engine.kd_rot = 2000, 400
+    engine.rtde_freq = 100
+    engine.pos_delta, engine.vel_delta = 0.048, 4.0
+    engine.use_control_frame = False
+    engine.task_frame = [0.0] * 6
+    engine.select_vector = [1, 1, 1, 0, 0, 1]
+    engine.force_type = 2
+    engine.force_limit = [2] * 6
+    from evaluations.realworld.vla_precision_ur.utils import FpsCounter
+
+    engine.fps_action = FpsCounter("test")
+    actions = np.zeros((20, 7))
+    actions[:3, 6] = [0.1, 0.8, 0.9]
+    engine.execute_actions(actions)
+    assert len(engine.rtde_c.state["forces"]) == 3
+    assert engine._gripper_position == 0.9
+    force = engine.rtde_c.state["forces"][0][2]
+    np.testing.assert_allclose(force, [-60, 120, -180, 1.6, -2, 2.4], atol=1e-8)

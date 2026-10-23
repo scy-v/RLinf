@@ -45,7 +45,7 @@ def modules() -> dict[str, types.ModuleType]:
             return self.state["pose"]
 
         def getActualTCPSpeed(self):
-            return [0.0] * 6
+            return self.state.get("speed", [0.0] * 6)
 
         def getActualQ(self):
             return self.state["q"]
@@ -67,11 +67,23 @@ def modules() -> dict[str, types.ModuleType]:
         def isPoseWithinSafetyLimits(self, pose):
             return self.safe
 
+        def getTCPOffset(self):
+            return self.state.get("tcp_offset", [0.0] * 6)
+
+        def servoStop(self):
+            self.state["events"].append("servoStop")
+            return True
+
+        def zeroFtSensor(self):
+            self.state["events"].append("zeroFtSensor")
+            return True
+
         def forceModeSetGainScaling(self, gain):
             self.state["gain"] = gain
             return True
 
         def setPayload(self, mass, cog):
+            self.state["events"].append("setPayload")
             self.state["payload"] = (mass, list(cog))
             return True
 
@@ -86,6 +98,7 @@ def modules() -> dict[str, types.ModuleType]:
             return True
 
         def moveL(self, pose, speed, acceleration):
+            self.state["events"].append("moveL")
             self.state["moves"].append((list(pose), speed, acceleration))
             if self.fail_move:
                 return False

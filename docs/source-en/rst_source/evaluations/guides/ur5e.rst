@@ -1,62 +1,97 @@
 UR5e Evaluation
 ================
 
-This guide deploys an RLinf OpenPI checkpoint on a UR5e with a DH Robotics PGI/PGE serial gripper and two RealSense cameras. It uses the standard evaluation runner, robot placement and camera drivers. Hardware dependencies were checked against `VLA-Precision <https://github.com/scy-v/VLA-Precision/tree/41edacde80d8c9d8146d610202299d71b0e79f7c>`_; its HTTP server and actor loop are not used. The UR driver adapts its Cartesian PD impedance calculation and force-mode execution.
+Deploy an RLinf OpenPI checkpoint on a UR5e with a DH Robotics PGI/PGE gripper and two RealSense cameras. This guide uses UR-specific observation, action and episode controls matching the local VLA-Precision UR profile, while retaining RLinf's model sampling and RTC replanning.
 
-Install and Configure
----------------------
+Prepare the Environment
+-----------------------
 
-Install the robot dependencies on the control host. On a host that also runs the model, include OpenPI. Use a separate venv when another training run is active.
-
-.. code-block:: bash
-
-   bash requirements/install.sh embodied --env ur --venv .ur-robot-venv
-   # Combined robot and model host:
-   bash requirements/install.sh embodied --model openpi --env ur --venv .ur-eval-venv
-
-The existing UR extra supplies ``ur-rtde==1.6.3``, ``pydhgripper==1.0.2``, serial and RealSense dependencies. VLA-Precision pins RTDE 1.6.2; this integration retains RLinf's existing 1.6.3 pin. It does not install Franka SDKs.
-
-The defaults in ``evaluations/realworld/realworld_ur5e_eval_pi05_sft.yaml`` and ``examples/embodiment/config/env/realworld_ur5e_sft_env.yaml`` follow VLA-Precision's pinned single-UR ``ur.yaml`` inference profile. The robot IP is ``192.168.201.11``. Exterior camera ``348522072391`` maps to ``exterior_image``; wrist camera ``944622073455`` maps to ``wrist_image``. Both use RLinf's RealSense defaults, 640×480 at 15 FPS. The reset TCP pose is ``[0.392232, 0.104898, 0.335162, -3.14, 0.0, -1.57]`` (base-frame XYZ and Euler XYZ, metres/radians). The PGI port is ``/dev/ur5e_left_gripper``, force 80, speed 100 and raw position limits 80–1000. Payload mass is 1.601 kg and centre of gravity is ``[0.011, -0.002, 0.052]`` metres.
-
-The task workspace is X 0–0.90 m, Y −0.45–0.45 m and Z 0–0.60 m. Absolute Euler XYZ bounds use the nominal orientation with offsets of ±30°, ±30° and ±90°, converted to radians. UR uses its own TCP reset implementation without periodic joint resets. ``enable_random_reset: true`` and ``reset_pose_range: [0.03, 0.03, 0.03, 0, 0, 0]`` apply independent uniform ±3 cm offsets along XYZ with fixed orientation. Range entries use metres for translation and degrees for angular offsets, following VLA-Precision; the nominal pose itself still uses metres and radians. ``target_ee_pose`` matches the reset pose as the orientation anchor for safety clipping; the keyboard wrapper suppresses target-based episode completion. Keep the black-rack task description, dataset and normalization assets from your training run.
-
-The workspace bounds ``ee_pose_limit_min`` and ``ee_pose_limit_max`` each contain six values: base-frame XYZ in metres and Euler XYZ in radians. They clip TCP targets produced by policy actions, independently of the random reset range. UR TCP reset follows its configured pose and range; these bounds do not provide trajectory protection for all physical motion. The preset supplies these values. Keep angular bounds continuous across −π when changing them; leaving a value empty does not disable the limits.
-
-The supplied placement uses one GPU/robot host. For separate hosts, keep the same runner and move the ``env`` placement to a robot node group, as described in :doc:`realworld`. Connect the arm in remote-control mode. ``UR5eArm`` receives absolute XYZ + XYZW targets. Its background loop runs at a nominal 100 Hz, computes a clipped Cartesian PD wrench from the measured pose and velocity, rotates that wrench into the configured force task frame, and calls ``forceMode``. It keeps tracking the latest target between policy requests. The gains, clipping and rotational torque division by controller frequency follow VLA-Precision's running-controller formula. Joint reset stops force mode, executes ``moveJ`` and restarts tracking from the measured pose; normal TCP actions do not use ``moveL``.
-
-Run the Policy
---------------
-
-Activate the prepared evaluation environment, configure Ray as in :doc:`realworld`, and start the ordinary Stage1 policy through RLinf's entry script:
+Install the OpenPI and UR dependencies on the GPU/robot host, then activate the resulting environment. See :doc:`realworld` for robot placement across separate hosts.
 
 .. code-block:: bash
 
-   source .ur-eval-venv/bin/activate
-   bash evaluations/run_eval.sh realworld_ur5e_eval_pi05_sft
+   bash requirements/install.sh embodied --model openpi --env ur \
+       --venv .venv --no-root --install-rlinf
+   source rltoken-setup/activate.sh
 
-The nominal environment step rate is 100 Hz, matching the reference's ``action_fps``. Each policy call uses ten denoising steps and executes three actions, following the reference. The predicted horizon stays at 20 to match the trained RLT model. ``rollout.model.model_path`` supplies the converted OpenPI base; ``runner.ckpt_path`` overlays the step-30000 Stage1 weights from the ``20261018-22:40:04`` run. Configure these paths in YAML when deploying on another host. The normalization path, two images and one-based state indices match the local UR SFT config. The state vector is ordered as TCP pose, speed, force, torque and normalized measured gripper position (19 values after the Euler wrapper). The gripper action is an absolute opening in [0, 1], where 0 is closed and 1 is open; device limits are applied by the gripper driver.
+This creates the model and hardware environment. The UR target includes RTDE 1.6.3, the serial gripper and RealSense dependencies.
 
-Set ``runner.rtc.enabled: true`` in the entry YAML for RTC, or ``false`` for synchronous inference (the default). The model guidance switch follows this field. RTC uses RLinf's existing workers to overlap action execution with replanning and guide chunk continuity. The selected task environment is ``UR5eEnv-v1``; it provides ordinary reset and stepping independently of the RTC choice.
+Set the Hardware and Model Paths
+---------------------------------
 
-Keyboard Reset
---------------
+Edit ``evaluations/realworld/realworld_ur5e_eval_pi05_sft.yaml`` for the hardware endpoints and checkpoint. ``rollout.model.model_path`` points directly to the trained ``actor`` directory containing ``model_state_dict/full_weights.pt``. ``rollout.model.openpi_data.norm_stats_path`` points to the supplied ``checkpoints/norm_stats.json``. ``runner.ckpt_path`` is null because the model factory loads the full checkpoint once. The UR profile sets both ``precision`` and ``embed_dtype`` to ``bf16``. The OpenPI loader keeps normalization, vision input and action-head parameters in FP32 while using BF16 for the main backbone and embeddings, matching Franka's default mixed precision.
 
-On the robot host, press Enter once after the initial reset to start the policy. During execution, double-press Enter within 0.5 seconds to end the current episode and return to the configured reset pose. After every reset, the policy waits for another single Enter press. This marks an operator-requested reset, not success. Holding Enter does not count as two presses. Use the physical keyboard attached to the environment worker's host; typing into SSH does not generate these device events. If more than one keyboard is present, select the readable device before starting Ray:
+The supplied hardware profile uses IP ``192.168.201.11``, gripper port ``/dev/ur5e_left_gripper``, exterior camera ``348522072391`` and wrist camera ``944622073455``. Cameras capture 640 by 480 images at 15 FPS. Gripper force is 60, speed is 100 and raw travel is 0 to 1000. The model's gripper action is thresholded at 0.7: values above it open; other values close. Measured gripper feedback remains raw position divided by 1000.
+
+Set task and motion fields in ``examples/embodiment/config/env/realworld_ur5e_sft_env.yaml``. The fixed reset TCP pose is ``[0.389694, 0.107973, 0.382018, -3.14, 0.0, -1.57]``: base-frame XYZ in metres and Euler XYZ in radians. Random reset is disabled. Workspace bounds remain active. The force-mode selection vector is ``[1, 1, 1, 0, 0, 1]``; payload is 1.601 kg with centre of gravity ``[0.011, -0.002, 0.052]`` metres. Confirm these values against the physical setup and put the UR controller in remote-control mode.
+
+Run Synchronous or RTC Evaluation
+----------------------------------
+
+Use the UR entry to stop cleanly after the configured episode count. Activate the environment before launching it:
+
+.. code-block:: bash
+
+   bash evaluations/realworld/run_ur5e_eval.sh
+   # Overlap action execution and model replanning:
+   bash evaluations/realworld/run_ur5e_eval.sh runner.rtc.enabled=true
+
+The launcher creates a timestamped directory under the repository’s real ``results/`` directory. Unless ``RAY_TMPDIR`` is already set, Ray stores its temporary files under ``results/ray/``. Training checkpoints remain under ``logs/``. Synchronous evaluation requests a new prediction after executing the current chunk. RTC uses RLinf's existing guidance sampler and replanning scheduler; the UR worker adds episode-budget completion. Both modes use 10 denoising steps, predict 20 actions and execute chunks of 3 actions. The 100 Hz background controller keeps tracking the last absolute TCP target while the model is busy.
+
+Control Episodes and Read Results
+---------------------------------
+
+After each reset, press Enter once on the robot host's physical keyboard to start. Double Enter within 0.5 seconds records a failed reset; double Space records success. Each episode times out after 60 seconds. The default evaluation records 20 outcomes, homes the robot after the final outcome and exits. The UR wrapper blocks the remaining actions of an ended chunk; RTC drains and discards pending predictions before a new episode.
+
+Set ``RLINF_KEYBOARD_DEVICE`` before launching Ray if device selection is ambiguous:
 
 .. code-block:: bash
 
    export RLINF_KEYBOARD_DEVICE=/dev/input/by-id/your-keyboard-event-kbd
 
-``keyboard_reward_wrapper: double_enter_reset`` selects the shared ``KeyboardResetWrapper``. ``keyboard_wrapper_kwargs.wait_for_start: true`` enables this start wait. Immediately before starting, ``observe()`` refreshes the robot and camera observation without moving. ``keyboard_wrapper_kwargs.double_press_interval`` sets the double-press interval, and ``auto_reset: true`` lets ``RealWorldEnv`` call the robot's own reset implementation. The wrapper suppresses target-based completion and per-episode step timeouts. ``max_steps_per_rollout_epoch: 30000`` remains the total evaluation step budget; a keyboard reset starts a new episode inside that budget. Synchronous execution discards the remaining actions of the current chunk. RTC discards the old pending prediction and bootstraps from the reset observation. These controls are independent of the robot driver and the RTC switch.
+Select a readable physical keyboard event device. Its input events are distinct from text typed into an SSH terminal.
 
-Action Semantics to Confirm
----------------------------
+Configure the budget under ``env.eval.ur_evaluation``: ``num_episodes``, ``episode_timeout_sec``, ``double_press_interval`` and ``wait_for_start``. After each outcome, ``ur5e-evaluation.json`` records the status, success flag, duration and executed action count, plus aggregate success rate. Videos and runner metrics use the same log directory. ``max_steps_per_rollout_epoch`` is an additional upper bound on execution steps.
 
-``UR5eEnv`` and ``FrankaEnv`` independently inherit ``CartesianEnv``, which owns stepping, observations and reset. Each robot supplies its hardware builder and end-effector behavior. Both use the existing ``RelativeFrame``/Euler wrappers and the same TCP delta composition. With the relative-frame wrapper enabled, RLinf transforms a six-value action with the current pose's adjoint, then adds translation to measured TCP position and left-multiplies the Euler increment into measured orientation.
+Match Observation and Action Semantics
+--------------------------------------
 
-VLA-Precision's UR controller instead computes ``p_next = p + R.apply(delta_p)`` and ``R_next = R * EulerXYZ(delta_r)``. Its direct local-pose composition differs from RLinf's adjoint-based six-vector conversion. The frame used for reset-relative observations also needs comparison with the collected dataset. Matching dimension names alone does not establish matching physical semantics. This integration deliberately preserves RLinf's behavior; confirm these differences against the collection code before physical deployment.
+Keep the deployment representation consistent with the training data. The UR adapter removes the controller's TCP offset to compute EE-relative observations and local EE actions, then reapplies that offset to obtain the commanded TCP target. Pose is relative to the measured EE pose at reset; RTDE linear velocity, angular velocity, force and torque remain in their original base-frame representation. The Euler-converted state has 19 values: pose 6, velocity 6, force/torque 6 and measured gripper opening 1.
 
-Validation
-----------
+Camera images retain the full field of view: the UR adapter converts the RealSense BGR frame to RGB and letterboxes it to 224 by 224 using the OpenPI PIL resize convention. This replaces the shared centre-square crop only for UR.
 
-The keyboard tests run the real evdev listener against a pipe-backed fake device and exercise reset through both UR and Franka environments in dummy mode, including long-press rejection, capture timestamps, chunk cancellation and episode bookkeeping. The fake-SDK tests cover the Cartesian PD wrench, error clipping and task-frame rotation; target holding without new policy calls; force-mode stop/restart for joint reset; failure propagation and connection cleanup; PGI units; RLinf delta reuse; and the 19-value model observation. ``ur5e_mock_sac_cnn`` exercises the existing embodied pipeline with fake hardware in CI. The integration does not establish real-robot success rates, contact behavior or timing; those require the physical UR5e and cameras.
+UR actions use ``p_target = p + R * delta_p`` and ``R_target = R * EulerXYZ(delta_r)`` in the EE frame. UR handles this itself and applies only the Euler observation wrapper; ``use_relative_frame`` is false to avoid applying the shared adjoint transform as well. Idle hold tests base-frame position axes against 0.0001 metres and the complete rotation increment against 0.001 radians, latching inactive axes at their hold targets.
+
+Reset opens the gripper, stops force mode, calls ``servoStop`` and ``moveL``, reapplies payload, waits 0.25 seconds, zeros the F/T sensor and waits another 0.50 seconds before resuming tracking. The controller clips position and velocity errors at 0.048 metres and 4.0 m/s. Rotation-error clipping is disabled by ``rotation_error_clip_degrees: null``. These UR implementations leave Franka's shared environment, transforms and controller behavior unchanged.
+
+Validation Scope
+-----------------
+
+SDK fakes verify local action composition with nonzero tool offset, unchanged base-frame velocity input, idle anchors, binary gripper commands, reset ordering and force-sensor zeroing. Keyboard tests cover success, failed reset, timeout and stale chunk cancellation. Synthetic observations can check checkpoint loading and synchronous/RTC GPU inference without connecting hardware. These checks do not measure task success, contact quality or real robot timing; validate those on the configured UR setup.
+
+Compare With VLA-Precision Execution
+------------------------------------
+
+Use the copied VLA-Precision backend to compare robot execution against the distributed RLinf path above. ``evaluations/realworld/vla_precision_ur/`` contains the single-UR hardware loop, recording, image preprocessing and UR policy transforms copied from the local VLA-Precision checkout. ``provenance.json`` records the source revision, file hashes and preserved methods, including changes present in that checkout. The original checkout is not needed at runtime.
+
+Configure this path in ``evaluations/realworld/vla_precision_ur.yaml``. Hardware, camera, task, force-control and episode settings match the source YAML. The output root is ``results/vla-precision-ur``; ``model.checkpoint_dir`` selects the supplied RLinf actor checkpoint and ``model.norm_stats_path`` selects its statistics. ``model.network`` records the trained architecture: a 20-step prediction horizon, 32 internal action dimensions, seven physical action dimensions and RLT enabled. Inference uses the same BF16/FP32 mixed precision as the distributed UR entry, with both ``precision`` and ``embed_dtype`` set to ``bf16``. The statistics contain 19 state channels and 32 padded action channels; only seven action channels reach the robot.
+
+The copied UR entry also accepts a compilation mode in ``model.network.openpi.torch_compile``. Set it to ``max-autotune`` to wrap the complete ``sample_actions`` method with ``torch.compile``, following OpenPI's PyTorch setting. The first inference performs compilation during the existing warmup before episode execution. Warmup displays total elapsed time in place once per second and prints the final duration on completion or interruption. The same timer is used by ``--check-model`` for its first inference. Changing input shapes can trigger recompilation, and compiled floating-point outputs can differ from the original path. A multi-input offline check found a maximum gripper-output difference of about 0.684 after compilation, so task behavior needs validation when selecting this mode. The boolean values retain their previous behavior: ``false`` disables local kernel compilation, while ``true`` compiles local kernels and keeps the Python sampling loop. Other accepted mode strings are ``default``, ``reduce-overhead`` and ``max-autotune-no-cudagraphs``. This extension applies only to the copied UR entry; the shared model loader and distributed UR/RTC entry retain their existing settings.
+
+Activate the existing environment and check imports and paths before running. The optional GPU check uses synthetic observations and fixed diffusion noise to compare native OpenPI policy and RLinf model I/O; neither check connects hardware:
+
+.. code-block:: bash
+
+   source rltoken-setup/activate.sh
+   bash evaluations/realworld/run_ur5e_vla_precision.sh --check
+   bash evaluations/realworld/run_ur5e_vla_precision.sh --check-model
+   # Connect hardware, reset, warm up the model and wait for Enter:
+   bash evaluations/realworld/run_ur5e_vla_precision.sh
+   # Select a different self-contained YAML:
+   bash evaluations/realworld/run_ur5e_vla_precision.sh --config /path/to/ur.yaml
+
+This entry uses OpenPI's native ``Policy.infer()`` in one process, with an adapter for RLinf's network and checkpoint format. It retains VLA-Precision's RGB camera reads, 224-by-224 padding, state construction, pose deltas, gripper thread, force computation, terminal keyboard controls and video-save prompt. Keyboard input comes from the running terminal, including an SSH terminal. Double Enter records failure and resets; double Space records success. The default budget remains 20 episodes of at most 60 seconds each.
+
+VLA-Precision predicts a full horizon and executes its first three actions synchronously. It sends force commands during action execution and has no Python background controller refreshing the target during inference; this differs from the RLinf controller above. The copied path also retains the source's absence of RLinf workspace clipping and does not enable RTC. The source YAML's ``model.infer_fps`` is unused by the hardware loop and is omitted here. These are properties of the comparison, rather than changes to the common robot code.
+
+Matching outputs for fixed synthetic inputs checks the model I/O bridge, while real-world comparison tests the camera, control and timing path. The RLinf network implementation remains shared, so this comparison alone cannot rule out differences between that network and the official OpenPI model or determine checkpoint quality. No Franka or shared environment/controller implementation is changed.

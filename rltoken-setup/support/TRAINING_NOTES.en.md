@@ -7,7 +7,7 @@ Select the raw state dimensions with `obs_indices`, then use the same selection 
 ## Data and Normalization
 
 ```bash
-source ~/RLinf/rltoken-setup/activate.sh
+source ~/RLinf-rltoken/rltoken-setup/activate.sh
 DATA="$HOME/.cache/huggingface/lerobot/scylearning/insert_black_rack_into_blue_slot_20260916_v01"
 OUT="$PWD/rltoken-setup/outputs/ur5e_insert_black_rack_state19"
 python toolkits/lerobot/calculate_norm_stats.py \
@@ -31,7 +31,7 @@ Indices are **one-based**, matching `~/openpi`. `--obs-indices 1,2,3,4,5,6,7,8,9
 
 ## Stage1 SFT
 
-Use `examples/sft/config/ur_rlt_stage1_sft_openpi_pi05.yaml`. The cached OpenPI JAX `pi05_base` has been converted to RLinf's PyTorch layout. `actor.model.model_path` points to `/home/suchenyu/RLinf/rltoken-setup/outputs/pi05_base_openpi`, containing `model.safetensors` and `config.json`. Dataset paths, statistics for dimensions 1–19, and two camera inputs are configured for this machine.
+Use `examples/sft/config/ur_rlt_stage1_sft_openpi_pi05.yaml`. The cached OpenPI JAX `pi05_base` has been converted to RLinf's PyTorch layout. `actor.model.model_path` points to `/home/suchenyu/RLinf-rltoken/rltoken-setup/outputs/pi05_base_openpi`, containing `model.safetensors` and `config.json`. Dataset paths, statistics for dimensions 1–19, and two camera inputs are configured for this machine.
 
 On another machine, prepare the normalization results above and the cached OpenPI weights, then convert with the same 20-step horizon as training:
 
@@ -53,7 +53,7 @@ actor:
   model:
     openpi_data:
       obs_indices: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-      norm_stats_path: /home/suchenyu/RLinf/rltoken-setup/outputs/ur5e_insert_black_rack_state19/norm_stats.json
+      norm_stats_path: /home/suchenyu/RLinf-rltoken/rltoken-setup/outputs/ur5e_insert_black_rack_state19/norm_stats.json
     openpi:
       config_name: pi05_ur_state
       num_images_in_input: 2
@@ -71,7 +71,7 @@ The current configuration uses four A800 GPUs, micro batch 2 per GPU and global 
 bash examples/sft/run_vla_sft.sh ur_rlt_stage1_sft_openpi_pi05
 ```
 
-Training uses GPUs 0–3 for 30000 total steps and saves weights every 5000 steps. `runner.resume_dir` still points to the full step-5000 checkpoint from the `20261017-22:41:05` run; the command therefore resumes training. Set that field to `null` for a fresh run. The `20261018-22:40:04` run produced step-30000 weights at `/data/suchenyu/RLinf/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor/model_state_dict/full_weights.pt`. `~/RLinf/logs` is a symlink to the data-disk log directory.
+Training uses GPUs 0–3 for 30000 total steps and saves weights every 5000 steps. `runner.resume_dir` still points to the full step-5000 checkpoint from the `20261017-22:41:05` run; the command therefore resumes training. Set that field to `null` for a fresh run. The `20261018-22:40:04` run produced step-30000 weights at `/data/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor/model_state_dict/full_weights.pt`. `~/RLinf-rltoken/logs` is a symlink to the data-disk log directory.
 
 The configuration uses `is_lora: False`, `train_expert_only: False` and the author's joint SFT forward. `no_shard` matches the author's Stage1 configuration: each GPU retains full parameters, gradients and optimizer states. `gradient_checkpointing: False` also matches the author's configuration; the original `Pi0.sft_forward()` additionally calls `gradient_checkpointing_disable()` on every forward.
 
@@ -110,7 +110,7 @@ rollout:
     openpi_data:
       repo_id: scylearning/insert_black_rack_into_blue_slot_20260916_v01
       obs_indices: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-      norm_stats_path: /home/suchenyu/RLinf/rltoken-setup/outputs/ur5e_insert_black_rack_state19/norm_stats.json
+      norm_stats_path: /home/suchenyu/RLinf-rltoken/rltoken-setup/outputs/ur5e_insert_black_rack_state19/norm_stats.json
     openpi:
       config_name: pi05_ur_state
       num_images_in_input: 2

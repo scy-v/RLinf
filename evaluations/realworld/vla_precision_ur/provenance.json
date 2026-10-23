@@ -1,0 +1,103 @@
+{
+  "source_repository": "/home/suchenyu/VLA-Precision",
+  "source_commit": "ac23e5382974ae60c2188f535cc8b0fb4eca101e",
+  "license": "Apache-2.0",
+  "changes": [
+    "Local package imports and Python formatting.",
+    "UR model setup and policy factory load RLinf full_weights.pt and explicit norm_stats.json.",
+    "Norm validation accepts 32 padded model action statistics while preserving seven physical action channels.",
+    "Standalone default config path.",
+    "UR first-inference warmup displays elapsed time in place once per second; hardware setup and warmup call order are preserved."
+  ],
+  "source_files": {
+    "ur.py": {
+      "path": "src/vla_precision/integrations/openpi/inference/backends/ur.py",
+      "sha256": "be8bfaed6abf85c3a13078f51c7151ce27c95f6ac7d1b4e9aae6dc8f1d5c8c88"
+    },
+    "utils.py": {
+      "path": "src/vla_precision/integrations/openpi/inference/backends/utils.py",
+      "sha256": "48661144a3958f8cbe5b1b00d255b5f86330b8aaa931fc565b145a1fe59b25f5"
+    },
+    "recording.py": {
+      "path": "src/vla_precision/integrations/openpi/inference/backends/recording.py",
+      "sha256": "71a3a4eac4f6d63be226a042d6896355d004d99b1dab048095a48681220b0903"
+    },
+    "plots.py": {
+      "path": "src/vla_precision/integrations/openpi/inference/backends/plots.py",
+      "sha256": "c40384d33bf0f467313904c18fca6d05c7d124ea97a3b3be3ae411d8608a1a51"
+    },
+    "image_tools.py": {
+      "path": "src/vla_precision/image_tools.py",
+      "sha256": "a03b625d4a0d2fd4fa95a56c1ba98c91893079ded5caa4039222fca75ee7e2b6"
+    },
+    "ur_policy.py": {
+      "path": "src/vla_precision/integrations/openpi/policies/ur5e.py",
+      "sha256": "7d7d363b4975103fee15d0fa0aa84fa54d7ccd1d1e194f5ff783c4e6bc3b7d53"
+    },
+    "ur.yaml": {
+      "path": "src/vla_precision/integrations/openpi/inference/configs/ur.yaml",
+      "sha256": "d4fae4b46fdbd0aac38d276927e10c33d788d6681deb940a38383e52b3328389"
+    }
+  },
+  "unchanged_ur_methods": {
+    "_create_gripper": "c706eed02d3b0a1e8ac64321742802bc4717df35eb748760a7c66dc1095d026d",
+    "_validate_tcp_pose": "597d12b53064119098ae5b3af451b295247c85693ac414ed908d7ebdf56dfc25",
+    "_is_zero_output_action": "8d493637dd914c765f636afe6edc208ff051e8ffa7f394c028e2b16b49c5b7b5",
+    "_close_episode_on_exit": "3d7a186cae5d6e24c8dd7e7dede9484a7cb090ccc51d98f1ff7718ba5b76dd78",
+    "_read_gripper_state": "bbf4a9afdd5976d119bf8a498ca221448051b2d9757119a9626b06fb514ac9cc",
+    "_get_current_tcp_offset": "a8d923d3f555234f30b016b26878822ac2f0d0c3dd243a051036f183f3f0de54",
+    "_pose_to_transform": "865bf56ec9d7108313a2a6f69cbf0981587b7493b0e9283796b33205f7dad26f",
+    "_submit_episode": "31bbb113802a7c9fc5cd283e10f53019310831f0f395b4ab5d78721d498b9fb1",
+    "_transfer_obs_state": "891313bee4ae774211125713ae8d0f7f77f94dc4be326a371339169ede0fd984",
+    "_sample_init_tcp_pose": "6f1d8b83307e28616c72c8152ad9aa2d80f5ed58c98254ad9481178fd0f82227",
+    "_has_success_gripper_state": "042427536d61c421253b8afd13fda54bb98fb291abb953c84d7da30415208cf6",
+    "_reapply_payload_and_zero_ft_sensor": "280250c493defd70cab229c22369a875f5f1432550ece39a9b1e168954098cdc",
+    "connect_robot": "a96af6c8edb64ff469f16f3c5b9b9e7398a746008e51c6d69785e78dc16ed702",
+    "_clear_action_idle_hold": "cc8e3590063012a30378699ff9611c1db9b25466cb67818bdf91e3334c3e0815",
+    "_stop_keyboard_episode_control_listener": "74b9a43ea94104245fa89f935685aae661608415ac72436497c50aa0c8bd4efa",
+    "_print_episode_time_every_second": "5563195a395c82da6dfafdb2b8acf7c0723e9655910709d8b7632eec47f71f02",
+    "_keyboard_episode_control_listener": "cdcbb25eb296d892421cdc31e2065fd94ab3c506ef7315018b08f9491754eeda",
+    "_target_pose_from_action": "81b36dbe9cbd21b4e6d42cb1d0ab32855e73b997d4480249a7f4d58ea8c22d0c",
+    "set_episode_reference_pose": "46eb48db620750e077a7c0d55baf8ac132ee208b730fb38fb38858ff7176da5f",
+    "_wait_for_next_episode_start": "589e8bdebee52a6c45e8861a0fd2691ad4e3566a52c14d645c8fe931b27923c0",
+    "_make_force_task_frame": "6e1f4d27a29f6666ae74464753d9726fe5c10da9c13989c28fd70e425f99bcff",
+    "_submit_step": "51467a0457fa2da4d675666586f5fb227c17b1846ccbf67316b93c89af918ed0",
+    "_base_motion_delta_from_action": "a0bc32eca573dbb307957f5293a6f199f5994dc7f829a2278a1d2ce31314767f",
+    "reset_episode": "ee27222e4c991c81be1f65e183b4830cf4d2c511994c597d4186784119c25ec7",
+    "_relative_pose_euler": "2cead46f394b61877a3e239614e4edb266c619e1fd564186b9d94326c1317bc5",
+    "run": "ad2a5c0e0333389e7b1c33036bb98f49768e2602928362a47763c6f6861e2af4",
+    "get_ee_pose": "cb29f8248c77336e4ef1bfac56ca11edd9d8cee7f3dc48dfa37974a8adae01f8",
+    "_ask_save_video": "0a15493c7699f95d087a1bb4fc600876454d10084080191eaf0fe46ba466fae6",
+    "tcp_to_ee_pose": "b63e79d3735fb1901fc6ee2a617917101e3c0ee58f3cba9c2a2e57964bc8bbdc",
+    "get_obs_state": "ef1ad9f5b8c50c0dfc40e0871a2a950c15017448fa6ed531cc95af0a065dab9e",
+    "_resolve_model_path": "bb0cba2c332234e33577bd91bb001cc6d6be8ca5b0398946e91c923b3ace97ac",
+    "stop_force": "4435ecd158b22eca04f5b309a8722b6bc6476eb79a598bf55fe7b08caa37425b",
+    "_start_episode_time_printer": "6b8e8dee7b7c749603f57dd575fd9e80853b0e0615f6bcadd9fd445dc0d4e532",
+    "_open_gripper_before_reset": "86ccca7ca597ad718a99457d6fb674cbf14babce4bce645087b4b2dd334edc82",
+    "move_to_tcp_pose": "e1322557b59045281454c88f2787e1e3db8416f34d40d377139348289e464324",
+    "_calculate_force": "bc7579f0fadb92c16726daafe8c6007b6c8e4b9c4966ec15539cfa87db536fd2",
+    "_send_force_action": "c252d6868b29569a8934473c809c26979d00255da528a76f8854e91c4afdd1e7",
+    "_stop_episode_time_printer": "81ef009af5b5cb1b6b1756f90cfc84faf08b1536ea809bfb42e280fab91ec1eb",
+    "_start_episode": "24191d8d1a9563d6d7addb12fc31983042675f42a1247d7fd0952ebee2dcad24",
+    "wait_for_gripper_states": "86c3d2a24d6779dff8192353028d420101ab18d5e21e033bcbed7258aa7f73eb",
+    "connect_cameras": "ee770e7c8729619bdd54be06ef392c3827d0d1929cee094578830e0f704248f0",
+    "connect_gripper": "a61e352f2894d8046db8c74632892b97320dc292e774cf64de720e588a7d3514",
+    "_start_gripper_state_reader": "75eb3a1a0715b11075b9a4f293da3494d983ed5fbae34cb9ce5544a4c35e43ba",
+    "has_reached_target": "dad869cfb8df26a81814428c212813d87fc9153a8fcb7a68c06cc267ea9fbb8d",
+    "_reset_before_exit": "f2961893928c6a6386312cc2d81bef41904a1366caa0d416d7d2b6038decbed6",
+    "_pose_euler": "f127a1b99dd864b56c76ecb05b51d243f91c0a9d2e2969a669a929d14df20409",
+    "_wrench_base_to_task": "6e81dd2a685efeb78393c37013fe237656def9cfa5b71cce602d21aba36537f7",
+    "_action_motion_mask": "52e7f0514a7a48be116a921903a14136d0c5b0b1be272741dca6f3c60c64d523",
+    "_start_keyboard_episode_control_listener": "bc972647851556e456e0ef66315d1a2d7d7f395f2ea3ff3121cccd71e1e4ac7e",
+    "_is_none_pose": "2990237fdbdb9697eecd2a34cf88803c2f8fafa717557c59b41705bf499b8c09",
+    "execute_actions": "7a695332cd9284787aaef71946ea80242f72429ec5cf135333b1ba8b5e483cb5",
+    "_transform_to_pose": "608bcd745489ee24f2aa594d03763caa1428320daf4aeb2775619a87c89ddea6",
+    "_finish_episode_if_needed": "7bbcf173dfa46729db625117de1a827bb9f98c90c1f4f2cc26bd0d5c0cdd5ff6",
+    "_calculate_ft_target": "39a4c8d054d474d5a85b6278ed827da9d985ae3d10867e876d1e2a93da6d5023",
+    "_validate_control_frame_euler_deg": "ec8900c3b0cc8eb8a3d7c2be0e57fa75274b0020da767893ca2ad8c32a69d86a",
+    "ee_to_tcp_pose": "d8572fb4fb0913d20d58b0b06cf9b267df5b98f65538c3927a73804f49000ea7",
+    "_resolve_actor_checkpoint_dir": "8d5870a51d4a6c41b78d64e57f5bee71ef7a309a3f872c82be50a82de70756f2"
+  },
+  "method_hash_format": "ast.dump with argument and return annotations removed",
+  "source_worktree_dirty": true
+}

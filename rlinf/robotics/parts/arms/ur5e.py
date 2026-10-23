@@ -63,7 +63,7 @@ class UR5eImpedanceConfig:
     kd_rotation: float = 400.0
     position_error_clip: float = 0.048
     velocity_error_clip: float = 4.0
-    rotation_error_clip_degrees: float = 20.0
+    rotation_error_clip_degrees: float | None = None
     control_frame_euler_deg: tuple[float, ...] = (0.0, 0.0, 0.0)
     selection_vector: tuple[int, ...] = (1, 1, 1, 1, 1, 1)
     force_limits: tuple[float, ...] = (2.0, 2.0, 2.0, 2.0, 2.0, 2.0)
@@ -79,9 +79,13 @@ class UR5eImpedanceConfig:
             self.frequency,
             self.position_error_clip,
             self.velocity_error_clip,
-            self.rotation_error_clip_degrees,
             self.command_timeout,
         )
+        if self.rotation_error_clip_degrees is not None and (
+            not np.isfinite(self.rotation_error_clip_degrees)
+            or self.rotation_error_clip_degrees <= 0
+        ):
+            raise ValueError("Expected a positive rotation clip or None.")
         gains = (self.kp, self.kd, self.kp_rotation, self.kd_rotation)
         if not all(np.isfinite(v) and v > 0 for v in positive) or not all(
             np.isfinite(v) and v >= 0 for v in gains
@@ -282,13 +286,12 @@ class UR5eArm(BaseArm):
             Rotation.from_quat(target[3:])
             * Rotation.from_quat(current.tcp_pose[3:]).inv()
         ).as_rotvec()
-        angle = np.linalg.norm(rotation_error)
-        rotation_error *= min(
-            1.0, np.deg2rad(cfg.rotation_error_clip_degrees) / max(angle, 1e-8)
-        )
-        angular_velocity_error = (
-            Rotation.from_rotvec(current.tcp_vel[3:]).inv().as_rotvec()
-        )
+        if cfg.rotation_error_clip_degrees is not None:
+            angle = np.linalg.norm(rotation_error)
+            rotation_error *= min(
+                1.0, np.deg2rad(cfg.rotation_error_clip_degrees) / max(angle, 1e-8)
+            )
+        angular_velocity_error = -current.tcp_vel[3:]
         torque = (
             cfg.kp_rotation * rotation_error + cfg.kd_rotation * angular_velocity_error
         ) / cfg.frequency
@@ -440,4 +443,59 @@ class UR5eArm(BaseArm):
                     control.moveJ(joints.tolist(), self.speed, self.acceleration),
                     "moveJ",
                 )
+            self._start_loop()
+
+    def get_tcp_offset(self) -> np.ndarray:
+        """Read the tool offset as XYZ + XYZW under the controller I/O lock."""
+        self._check_controller()
+        control, _ = self._device
+        with self._io_lock:
+            offset = np.asarray(control.getTCPOffset(), dtype=np.float64)
+        if offset.shape != (6,) or not np.isfinite(offset).all():
+            raise RuntimeError("Expected a finite six-value UR TCP offset.")
+        return np.r_[offset[:3], Rotation.from_rotvec(offset[3:]).as_quat()]
+
+    def reset_tcp(
+        self,
+        pose: np.ndarray,
+        payload_settle_seconds: float = 0.25,
+        ft_zero_settle_seconds: float = 0.5,
+    ) -> None:
+        """Pause impedance tracking, moveL home, zero F/T and resume tracking."""
+        pose = np.asarray(pose, dtype=np.float64)
+        if pose.shape != (7,) or not np.isfinite(pose).all():
+            raise ValueError("Expected a finite XYZ + XYZW reset pose.")
+        for delay in (payload_settle_seconds, ft_zero_settle_seconds):
+            if not np.isfinite(delay) or delay < 0:
+                raise ValueError("Expected finite nonnegative reset settle times.")
+        target = np.r_[pose[:3], Rotation.from_quat(pose[3:]).as_rotvec()].tolist()
+        with self._command_lock:
+            self._check_controller()
+            control, _ = self._device
+            with self._io_lock:
+                if not control.isPoseWithinSafetyLimits(target):
+                    raise ValueError(
+                        "UR5e TCP reset target is outside robot safety limits."
+                    )
+            self._stop_loop()
+            try:
+                with self._io_lock:
+                    self._require_success(control.servoStop(), "servoStop")
+                    self._require_success(
+                        control.moveL(target, self.speed, self.acceleration), "moveL"
+                    )
+                    if self.impedance.payload_mass is not None:
+                        self._require_success(
+                            control.setPayload(
+                                self.impedance.payload_mass,
+                                list(self.impedance.payload_cog),
+                            ),
+                            "setPayload",
+                        )
+                    time.sleep(payload_settle_seconds)
+                    self._require_success(control.zeroFtSensor(), "zeroFtSensor")
+                    time.sleep(ft_zero_settle_seconds)
+            except BaseException as error:
+                self._loop_error = error
+                raise
             self._start_loop()

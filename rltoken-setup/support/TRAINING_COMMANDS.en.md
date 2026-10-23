@@ -5,7 +5,7 @@
 Run in a separate terminal on the server to view curves during training:
 
 ```bash
-cd ~/RLinf
+cd ~/RLinf-rltoken
 .venv/bin/tensorboard --logdir logs --host 127.0.0.1 --port 6006
 ```
 
@@ -14,7 +14,7 @@ Forward port `6006` through the VS Code **Ports** panel, open http://localhost:6
 ## 1. Activate the Environment
 
 ```bash
-source ~/RLinf/rltoken-setup/activate.sh
+source ~/RLinf-rltoken/rltoken-setup/activate.sh
 ```
 
 ## 2. Compute Normalization Statistics
@@ -52,7 +52,7 @@ Edit [ur_rlt_stage1_sft_openpi_pi05.yaml](../../examples/sft/config/ur_rlt_stage
 Checkpoints are saved under:
 
 ```text
-/data/suchenyu/RLinf/logs/<timestamp>-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_<step>/actor/
+/data/suchenyu/RLinf-rltoken/logs/<timestamp>-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_<step>/actor/
 ```
 
 ## 4. Run UR5e Inference Locally
@@ -60,17 +60,19 @@ Checkpoints are saved under:
 Run on the local machine connected to the arm, gripper and cameras. Prepare a separate environment once:
 
 ```bash
-cd ~/RLinf
+cd ~/RLinf-rltoken
 bash requirements/install.sh embodied --model openpi --env ur --venv .ur-eval-venv
 ```
 
 Check the workspace bounds in the [environment config](../../examples/embodiment/config/env/realworld_ur5e_sft_env.yaml). Check the hardware, local model and normalization paths in the [inference config](../../evaluations/realworld/realworld_ur5e_eval_pi05_sft.yaml), then run:
 
 ```bash
-cd ~/RLinf
+cd ~/RLinf-rltoken
 source .ur-eval-venv/bin/activate
 bash evaluations/run_eval.sh realworld_ur5e_eval_pi05_sft
 ```
+
+Evaluation logs, statistics and videos use the real `results/` directory inside the repository. RLinf evaluation creates timestamped directories; VLA-Precision inference uses `results/vla-precision-ur/`. Ray diagnostics default to `results/ray/`. Training checkpoints remain under `logs/`.
 
 The inference YAML sets `runner.ckpt_path` to the step-30000 checkpoint from the `20261018-22:40:04` training run. RTC defaults to off; set `runner.rtc.enabled: true` in that YAML to enable it. Update the checkpoint, base-model and normalization paths in YAML if local deployment uses different paths.
 

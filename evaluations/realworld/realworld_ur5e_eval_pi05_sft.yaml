@@ -28,9 +28,9 @@ cluster:
         gripper_connection: /dev/ur5e_left_gripper
         end_effector_type: pgi
         end_effector_config:
-          min_position: 80
+          min_position: 0
           max_position: 1000
-          force: 80
+          force: 60
           speed: 100
         camera_type: realsense
         # Exterior camera, then wrist camera; capture defaults are 640x480 at 15 FPS.
@@ -45,9 +45,9 @@ cluster:
           kd_rotation: 400.0
           position_error_clip: 0.048
           velocity_error_clip: 4.0
-          rotation_error_clip_degrees: 20.0
+          rotation_error_clip_degrees: null
           control_frame_euler_deg: [0.0, 0.0, 0.0]
-          selection_vector: [1, 1, 1, 1, 1, 1]
+          selection_vector: [1, 1, 1, 0, 0, 1]
           force_type: 2
           force_limits: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
           force_gain_scale: 1.5
@@ -65,9 +65,9 @@ runner:
   max_epochs: 1
   max_steps: 1
   val_check_interval: -1
-  ckpt_path: /data/suchenyu/RLinf/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor/model_state_dict/full_weights.pt
+  ckpt_path: null
   logger:
-    log_path: ../results
+    log_path: /home/suchenyu/RLinf-rltoken/results/ur5e-eval
     project_name: rlinf-rlt
     experiment_name: ur5e-stage1-eval
     logger_backends:
@@ -85,8 +85,8 @@ rollout:
   collect_prev_infos: false
   model:
     model_type: openpi
-    model_path: /home/suchenyu/RLinf/rltoken-setup/outputs/pi05_base_openpi
-    precision: fp32
+    model_path: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor
+    precision: bf16
     is_lora: false
     num_action_chunks: 3
     action_dim: 7
@@ -94,7 +94,7 @@ rollout:
     num_steps: 10
     openpi_data:
       repo_id: scylearning/insert_black_rack_into_blue_slot_20260916_v01
-      norm_stats_path: /home/suchenyu/RLinf/rltoken-setup/outputs/ur5e_insert_black_rack_state19/norm_stats.json
+      norm_stats_path: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/norm_stats.json
       obs_indices:
       - 1
       - 2

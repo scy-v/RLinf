@@ -1,62 +1,97 @@
 UR5e 真机评估
 ==============
 
-本页介绍如何在 UR5e、大寰 PGI/PGE 串口夹爪和两台 RealSense 相机上部署 RLinf 的 OpenPI checkpoint。推理循环、机器人调度和相机驱动使用 RLinf 现有实现。硬件依赖参考了 `VLA-Precision <https://github.com/scy-v/VLA-Precision/tree/41edacde80d8c9d8146d610202299d71b0e79f7c>`_，没有引入其 HTTP 服务或 Actor 循环；UR 驱动参考其笛卡尔 PD 阻抗计算与 force-mode 执行。
+本页介绍如何在 UR5e、大寰 PGI/PGE 夹爪和两台 RealSense 相机上部署 RLinf OpenPI checkpoint。UR 专用实现对齐本机 VLA-Precision 的观测、动作和回合控制，模型采样与 RTC 重新规划继续使用 RLinf。
 
-安装与配置
-----------
+准备环境
+--------
 
-机器人控制机安装 UR 依赖；同时运行模型的机器还需安装 OpenPI。已有训练正在运行时，使用独立的虚拟环境。
+在 GPU 和机器人控制机上安装 OpenPI、UR 依赖，再激活环境。分机部署的 placement 配置参考 :doc:`realworld`。
 
 .. code-block:: bash
 
-   bash requirements/install.sh embodied --env ur --venv .ur-robot-venv
-   # 同一台机器运行机器人控制和模型：
-   bash requirements/install.sh embodied --model openpi --env ur --venv .ur-eval-venv
+   bash requirements/install.sh embodied --model openpi --env ur \
+       --venv .venv --no-root --install-rlinf
+   source rltoken-setup/activate.sh
 
-现有 UR 安装项提供 ``ur-rtde==1.6.3``、``pydhgripper==1.0.2``、串口和 RealSense 依赖。VLA-Precision 固定 RTDE 1.6.2；本次沿用 RLinf 已有的 1.6.3，不安装 Franka SDK。
+该命令创建模型和硬件运行环境。UR 安装项包含 RTDE 1.6.3、串口夹爪和 RealSense 依赖。
 
-``evaluations/realworld/realworld_ur5e_eval_pi05_sft.yaml`` 和 ``examples/embodiment/config/env/realworld_ur5e_sft_env.yaml`` 的默认硬件数值参考上述固定版本的 VLA-Precision 单 UR 原生推理 ``ur.yaml``。机械臂 IP 为 ``192.168.201.11``。外部相机 ``348522072391`` 映射到 ``exterior_image``，腕部相机 ``944622073455`` 映射到 ``wrist_image``；两者沿用 RLinf RealSense 默认的 640×480、15 FPS。初始 TCP 为 ``[0.392232, 0.104898, 0.335162, -3.14, 0.0, -1.57]``，使用基坐标系 XYZ 和 Euler XYZ，单位为米和弧度。PGI 串口为 ``/dev/ur5e_left_gripper``，力度 80、速度 100、原始位置范围 80–1000。负载质量为 1.601 kg，重心为 ``[0.011, -0.002, 0.052]`` 米。
+配置硬件和模型路径
+------------------
 
-工作空间按本任务配置为：X 为 0–0.90 米、Y 为 −0.45–0.45 米、Z 为 0–0.60 米；Euler XYZ 上下限以初始姿态为中心，分别偏移 ±30°、±30°、±90° 后转换为绝对弧度值。UR 使用自己的 TCP 复位实现，不做周期性关节复位；``enable_random_reset: true`` 和 ``reset_pose_range: [0.03, 0.03, 0.03, 0, 0, 0]`` 使 XYZ 各均匀随机 ±3 cm，姿态固定。范围的前三项单位是米，后三项是角度，沿用 VLA-Precision 的约定；初始位姿本身仍使用米和弧度。``target_ee_pose`` 与复位位姿一致，作为安全裁剪的姿态参考；键盘 wrapper 会屏蔽基于目标位姿的回合结束判定。任务描述、数据集和归一化文件继续使用本次黑色架子插槽任务的训练配置。
+在 ``evaluations/realworld/realworld_ur5e_eval_pi05_sft.yaml`` 中设置硬件和 checkpoint。``rollout.model.model_path`` 直接指向包含 ``model_state_dict/full_weights.pt`` 的训练结果 ``actor`` 目录；``rollout.model.openpi_data.norm_stats_path`` 指向配套的 ``checkpoints/norm_stats.json``。模型工厂直接加载完整权重，``runner.ckpt_path`` 保持 null，避免重复加载。UR 配置将 ``precision`` 和 ``embed_dtype`` 均设为 ``bf16``。OpenPI 加载器保留归一化、视觉输入层和动作输出头等参数的 FP32 精度，主干与嵌入使用 BF16，与 Franka 默认混合精度一致。
 
-工作空间边界 ``ee_pose_limit_min``、``ee_pose_limit_max`` 各包含六个值：基坐标系 XYZ（米）和 Euler XYZ（弧度）。它们用于裁剪模型动作产生的 TCP 目标，限制位置和姿态，不代表随机复位范围。UR 的 TCP 复位路径使用配置的复位位姿及随机范围；这些边界不构成对所有物理运动的轨迹保护。当前默认值已填写；修改范围时保留跨越 −π 的连续角度区间，留空不会自动关闭限制。
+默认机械臂 IP 为 ``192.168.201.11``，夹爪串口为 ``/dev/ur5e_left_gripper``，外部相机为 ``348522072391``，腕部相机为 ``944622073455``。两路相机均使用 640×480、15 FPS。夹爪力度为 60、速度为 100、原始行程为 0–1000；模型夹爪动作大于 0.7 时打开，否则关闭。观测继续使用实测原始位置除以 1000。
 
-默认在同一台机器运行 GPU 推理和机器人环境。分机部署时，按 :doc:`realworld` 配置 Ray 集群，将 ``env`` 放到机器人节点组，无需更换推理循环。UR 需要处于远程控制模式。``UR5eArm`` 接收绝对 XYZ + XYZW 目标，由后台循环以标称 100Hz 读取实测位姿和速度，计算截断后的笛卡尔 PD 力/力矩，转换到配置的力控任务坐标系，再调用 ``forceMode``。两次策略请求之间持续保持最近目标。增益、误差截断和旋转力矩除以控制频率的计算沿用 VLA-Precision 的运行控制公式。关节复位先停止 force mode，执行 ``moveJ``，再从实测位姿恢复阻抗跟踪；正常 TCP 动作不使用 ``moveL``。
+任务和运动设置位于 ``examples/embodiment/config/env/realworld_ur5e_sft_env.yaml``。固定复位 TCP 为 ``[0.389694, 0.107973, 0.382018, -3.14, 0.0, -1.57]``，前三项是基坐标系位置，单位为米，后三项为 Euler XYZ，单位为弧度。随机复位关闭，工作空间边界继续生效。力控选择向量为 ``[1, 1, 1, 0, 0, 1]``，负载为 1.601 kg，重心为 ``[0.011, -0.002, 0.052]`` 米。核对实物设置后，将 UR 控制器置于远程控制模式。
 
-运行策略
---------
+运行同步或 RTC 评估
+-------------------
 
-激活评估环境，按 :doc:`realworld` 配置 Ray，然后通过 RLinf 入口运行第一阶段策略：
+使用 UR 专用入口，在指定回合数结束后正常退出。激活环境后执行：
 
 .. code-block:: bash
 
-   source .ur-eval-venv/bin/activate
-   bash evaluations/run_eval.sh realworld_ur5e_eval_pi05_sft
+   bash evaluations/realworld/run_ur5e_eval.sh
+   # 重叠执行动作和模型重新规划：
+   bash evaluations/realworld/run_ur5e_eval.sh runner.rtc.enabled=true
 
-环境标称执行频率为 100Hz，对应参考实现的 ``action_fps``。每次模型调用采用 10 步去噪、执行 3 个动作，参考其原生推理配置；预测长度仍为 20，与本次 RLT 训练模型一致。``rollout.model.model_path`` 指向转换后的 OpenPI 基座，``runner.ckpt_path`` 加载 ``20261018-22:40:04`` 这次训练第 30000 步的完整第一阶段权重；部署到其他机器时在 YAML 中更新这些路径。归一化文件、两路图像和从 1 开始的 state 索引与本机 UR SFT 配置一致。state 按 TCP 位姿、速度、力、力矩和归一化实测夹爪位置排列，经 Euler wrapper 后为 19 维。夹爪动作为 [0, 1] 的绝对开度，0 关闭、1 打开，驱动负责限制设备行程。
+启动脚本在仓库内真实的 ``results/`` 目录下创建带时间戳的目录。若未设置 ``RAY_TMPDIR``，Ray 临时文件存放在 ``results/ray/`` 下。训练 checkpoint 继续保存在 ``logs/`` 下。同步模式执行完当前动作块后才请求下一次预测；RTC 沿用 RLinf 的引导采样和重新规划调度，UR worker 额外处理评估回合数结束。两种模式均使用 10 步去噪、预测 20 个动作、每块执行 3 个动作。模型推理期间，100 Hz 后台控制器持续跟踪最后一个绝对 TCP 目标。
 
-RTC 使用同一个入口配置，在 YAML 中设置 ``runner.rtc.enabled: true`` 即可开启；设为 ``false`` 则使用同步推理，也是默认值。模型端的引导开关跟随该字段。RTC 复用现有 workers，重叠执行动作和重新规划，并处理动作块衔接。任务环境由 ``UR5eEnv-v1`` 选择，提供通用的复位和执行逻辑，与是否开启 RTC 独立。
+控制回合并读取结果
+------------------
 
-键盘复位
---------
+每次复位后，在机器人控制机的实体键盘上按一次回车开始。0.5 秒内双击回车记录失败并复位，双击空格记录成功；每回合 60 秒超时。默认记录 20 个回合结果，最后一个结果记录后复位并退出。UR wrapper 会屏蔽已结束动作块中剩余的动作；RTC 会等待并丢弃旧预测，再开始新回合。
 
-在机器人控制机上，首次复位完成后按一次回车开始推理。运行期间，0.5 秒内连续按两次回车即可结束当前回合，回到配置的初始位姿；每次复位完成后，都会等待另一次单次回车再开始推理。该操作只表示人工复位，不计为任务成功；长按回车的重复事件不会算作双击。使用环境 worker 所在机器连接的实体键盘，SSH 终端输入不会产生这些设备事件。存在多个键盘时，在启动 Ray 前选择有读取权限的设备：
+存在多个键盘设备时，在启动 Ray 前指定设备：
 
 .. code-block:: bash
 
    export RLINF_KEYBOARD_DEVICE=/dev/input/by-id/your-keyboard-event-kbd
 
-``keyboard_reward_wrapper: double_enter_reset`` 选择通用的 ``KeyboardResetWrapper``，``keyboard_wrapper_kwargs.wait_for_start: true`` 启用开始前的等待，开始前通过 ``observe()`` 重新读取机器人和相机观测，不执行动作。``keyboard_wrapper_kwargs.double_press_interval`` 设置双击间隔；``auto_reset: true`` 让 ``RealWorldEnv`` 调用机器人自己的复位实现。wrapper 屏蔽目标位姿判定和单回合步数超时。``max_steps_per_rollout_epoch: 30000`` 仍限制整次评估的总执行步数，键盘复位会在该预算内开始新回合。同步推理会丢弃当前动作块中剩余的动作；RTC 会丢弃旧的待返回预测，从复位后的观测重新开始。这套控制独立于机器人驱动和 RTC 开关。
+选择当前用户可读的实体键盘 event 设备。SSH 终端中输入的文本不等同于该设备的按键事件。
 
-需要确认的动作语义
+在 ``env.eval.ur_evaluation`` 下设置 ``num_episodes``、``episode_timeout_sec``、``double_press_interval`` 和 ``wait_for_start``。每次回合结束后，``ur5e-evaluation.json`` 保存状态、成功标记、耗时、实际执行动作数和累计成功率；录像和 runner 指标使用同一个日志目录。``max_steps_per_rollout_epoch`` 另外限制总执行步数。
+
+核对观测和动作语义
 ------------------
 
-``UR5eEnv`` 与 ``FrankaEnv`` 分别继承公共的 ``CartesianEnv``，共用动作执行、观测和复位逻辑；各自实现硬件构建和夹爪行为。两者使用现有 ``RelativeFrame``、Euler wrappers 和相同的 TCP 增量合成方式。启用相对坐标变换时，RLinf 先用当前位姿的 adjoint 矩阵转换六维动作，再将位移加到实测 TCP 位置，将 Euler 增量旋转左乘到实测姿态。
+部署时保留与训练数据相同的表示。UR 适配先去除控制器的 TCP offset，在 EE 上计算相对观测和局部动作，再加回 offset 得到要发送的 TCP 目标。位姿相对于复位时的实测 EE 位姿；RTDE 线速度、角速度、力和力矩保持原始基坐标系表示。经过 Euler 转换后的 state 共 19 维：位姿 6、速度 6、力和力矩 6、实测夹爪开度 1。
 
-VLA-Precision 的 UR 控制器使用 ``p_next = p + R.apply(delta_p)`` 和 ``R_next = R * EulerXYZ(delta_r)``。这种局部位姿合成与 RLinf 基于 adjoint 的六维向量转换存在差异。reset-relative 观测使用的坐标系也需要与采集数据核对；维度名称相同不代表物理语义相同。本次按要求保留 RLinf 的算法，真机执行前需结合采集代码讨论这些差异。
+相机图像保留完整视野：UR 将 RealSense 的 BGR 图像转为 RGB，按 OpenPI 的 PIL 缩放方式补边到 224×224；只在 UR 中替代通用的中心正方形裁剪。
+
+局部 EE 动作使用 ``p_target = p + R * delta_p`` 和 ``R_target = R * EulerXYZ(delta_r)``。UR 自己处理该变换，外层只应用 Euler 观测 wrapper；``use_relative_frame`` 为 false，避免重复执行通用 adjoint 变换。微小动作保持在基坐标系逐轴判断位移阈值 0.0001 米，整体判断旋转阈值 0.001 弧度，将静止轴锁存在保持目标上。
+
+复位依次打开夹爪、停止 force mode、调用 ``servoStop`` 和 ``moveL``、重新设置负载、等待 0.25 秒、清零力传感器、再等待 0.50 秒，最后恢复目标跟踪。控制器保留 0.048 米位置误差限制和 4.0 m/s 速度误差限制，``rotation_error_clip_degrees: null`` 关闭旋转误差裁剪。这些行为均属于 UR 实现，Franka 的通用环境、变换和控制逻辑保持原样。
 
 验证范围
 --------
 
-键盘测试通过管道模拟 evdev 设备，让实际监听器分别驱动 dummy UR、Franka 环境，覆盖长按过滤、按键时间戳、动作块取消和回合统计。假 SDK 测试覆盖笛卡尔 PD 力/力矩、误差截断、力控坐标变换、没有新策略请求时的目标保持、关节复位时 force mode 的停止与恢复、错误传播、连接释放、PGI 单位、RLinf 增量复用及 19 维模型观测。CI 中的 ``ur5e_mock_sac_cnn`` 使用原有 embodied 流程运行假硬件。这些测试不能证明真机成功率、接触控制效果或实际时序，仍需 UR5e 和相机验证。
+假 SDK 测试覆盖非零 TCP offset 下的局部动作合成、原始速度输入、微小动作保持、二值夹爪、复位顺序和力传感器清零。键盘测试覆盖成功、失败复位、超时和旧动作块取消。可使用合成观测验证 checkpoint 加载和同步、RTC 的 GPU 推理，不连接硬件。这些检查不衡量任务成功率、接触效果或真机时序，仍需在配置的 UR 工位验证。
+
+与 VLA-Precision 执行流程对照
+----------------------------------------
+
+若需将机器人执行与上述 RLinf 分布式路径对照，可使用移植的 VLA-Precision 后端。``evaluations/realworld/vla_precision_ur/`` 包含从本机 VLA-Precision 复制的单臂 UR 主循环、记录、图像处理和 UR policy 变换。``provenance.json`` 记录来源版本、文件哈希和保留方法，文件哈希也包含来源工作区已有的修改；运行时不依赖原仓库。
+
+该路径使用独立配置 ``evaluations/realworld/vla_precision_ur.yaml``。硬件、相机、任务、力控和回合设置与来源 YAML 一致，输出目录为 ``results/vla-precision-ur``。``model.checkpoint_dir`` 指向给定的 RLinf actor checkpoint，``model.norm_stats_path`` 指向配套统计量；``model.network`` 记录训练网络结构，包括预测 20 步、32 维内部动作、7 维物理动作和启用 RLT。推理与分布式 UR 入口一样采用 BF16/FP32 混合精度，``precision`` 和 ``embed_dtype`` 均设为 ``bf16``。统计量包含 19 维 state 和补齐后的 32 维 action，机器人仅接收前 7 维动作。
+
+移植的 UR 入口还支持通过 ``model.network.openpi.torch_compile`` 选择编译模式。设为 ``max-autotune`` 可参考 OpenPI 的 PyTorch 设置，用 ``torch.compile`` 包装完整的 ``sample_actions`` 方法。首次推理会在现有的回合前预热阶段完成编译。预热期间每秒原地更新累计耗时，完成或中断时输出最终时长。``--check-model`` 的首次推理也使用同一计时显示。输入形状变化可能触发重新编译，编译后的浮点输出也可能与原路径存在差异。多组输入的离线检查发现，编译后夹爪输出的最大差异约为 0.684，因此选择该模式时还需验证任务行为。布尔值保持原有含义：``false`` 关闭局部算子编译，``true`` 编译局部算子并保留 Python 采样循环。其他可选字符串为 ``default``、``reduce-overhead`` 和 ``max-autotune-no-cudagraphs``。该扩展仅作用于移植的 UR 入口；通用模型加载器和分布式 UR/RTC 入口保持原有设置。
+
+激活现有环境后，先检查依赖和路径，再启动。可选的 GPU 检查使用合成观测和固定扩散噪声，对比 OpenPI 原生 policy 与 RLinf 模型输入输出；两个检查命令均不连接硬件：
+
+.. code-block:: bash
+
+   source rltoken-setup/activate.sh
+   bash evaluations/realworld/run_ur5e_vla_precision.sh --check
+   bash evaluations/realworld/run_ur5e_vla_precision.sh --check-model
+   # 连接硬件、复位、预热模型，然后等待 Enter：
+   bash evaluations/realworld/run_ur5e_vla_precision.sh
+   # 选择另一份独立 YAML：
+   bash evaluations/realworld/run_ur5e_vla_precision.sh --config /path/to/ur.yaml
+
+该入口在单进程内运行 OpenPI 原生 ``Policy.infer()``，通过适配层调用 RLinf 网络并加载其 checkpoint。RGB 相机读取、224 × 224 补边、state 拼接、位姿增量、夹爪线程、力控计算、终端键盘控制和退出保存视频提示均沿用 VLA-Precision。键盘输入来自当前终端，SSH 终端也可使用；双击 Enter 记录失败并复位，双击空格记录成功。默认仍为 20 回合，每回合最长 60 秒。
+
+VLA-Precision 预测完整动作序列，同步执行前 3 个动作。它在动作执行时发送力控指令，模型推理期间没有 Python 后台控制线程刷新目标，这与上文 RLinf 控制器不同。移植路径也保留来源代码未使用 RLinf 工作空间裁剪的行为，不开启 RTC。来源 YAML 中的 ``model.infer_fps`` 未被硬件主循环读取，因此此处省略。这些行为用于形成对照，不改变通用机器人代码。
+
+固定合成输入下输出一致，只能验证模型输入输出适配；真机对照用于检查相机、控制和执行时序。两条路径仍共享 RLinf 网络实现，因此仅凭本次对照不能排除其与官方 OpenPI 模型之间的差异，也不能确定 checkpoint 本身的质量。Franka 及通用环境、控制器均未修改。

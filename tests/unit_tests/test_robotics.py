@@ -6639,7 +6639,6 @@ def test_ur5e_rtde_targets_and_lifecycle(fail_force):
                 wrench = np.asarray(state["forces"][-1][2])
                 np.testing.assert_allclose(wrench[:3], [12.0, 24.0, 24.0])
                 rotvec = R.from_quat(pose[3:]).as_rotvec()
-                rotvec *= min(1.0, np.deg2rad(20) / np.linalg.norm(rotvec))
                 np.testing.assert_allclose(wrench[3:], 20 * rotvec)
                 assert not state["moves"]
                 measured = arm.get_state()
@@ -6784,3 +6783,70 @@ def test_ur5e_rejects_invalid_force_controller_settings(settings):
 
     with pytest.raises(ValueError):
         UR5eArm("192.0.2.10", impedance=settings)
+
+
+@pytest.mark.parametrize("fail_move", [False, True])
+def test_ur5e_reset_moves_then_zeroes_before_tracking_resumes(fail_move):
+    from robot_mocks import mocked_sdks
+
+    from rlinf.robotics.parts.arms.ur5e import UR5eArm
+
+    with mocked_sdks() as sdks:
+        arm = UR5eArm("192.0.2.20", impedance={"payload_mass": 1.601})
+        arm.connect()
+        state = sdks["rtde_control"].states["192.0.2.20"]
+        control = sdks["rtde_control"].RTDEControlInterface
+        target = np.array([0.4, 0.1, 0.38, 0.0, 0.0, 0.0, 1.0])
+        state["events"].clear()
+        control.fail_move = fail_move
+        try:
+            if fail_move:
+                with pytest.raises(RuntimeError, match="moveL"):
+                    arm.reset_tcp(target, 0.0, 0.0)
+                assert "zeroFtSensor" not in state["events"]
+                with pytest.raises(RuntimeError, match="controller failed"):
+                    arm.get_state()
+            else:
+                arm.reset_tcp(target, 0.0, 0.0)
+                events = state["events"]
+                assert (
+                    events.index("forceModeStop")
+                    < events.index("servoStop")
+                    < events.index("moveL")
+                    < events.index("setPayload")
+                    < events.index("zeroFtSensor")
+                )
+                np.testing.assert_allclose(arm.get_state().tcp_pose, target)
+                assert not arm._stop_event.is_set()
+                state["tcp_offset"] = [0.01, 0.02, 0.03, 0.0, 0.0, 0.0]
+                np.testing.assert_allclose(
+                    arm.get_tcp_offset(), [0.01, 0.02, 0.03, 0.0, 0.0, 0.0, 1.0]
+                )
+        finally:
+            arm.disconnect()
+
+
+def test_ur5e_rotational_pd_is_unclipped_by_default():
+    from robot_mocks import mocked_sdks
+
+    from rlinf.robotics.parts.arms.ur5e import UR5eArm
+
+    with mocked_sdks() as sdks:
+        arm = UR5eArm("192.0.2.21")
+        arm.connect()
+        state = sdks["rtde_control"].states["192.0.2.21"]
+        state["speed"] = [0.0, 0.0, 0.0, 0.1, 0.2, 0.3]
+        try:
+            target = np.r_[[0.4, 0.0, 0.3], R.from_euler("z", np.pi / 2).as_quat()]
+            arm.send_action({"tcp_pose": target})
+            wrench = state["forces"][-1][2]
+            np.testing.assert_allclose(
+                wrench[3:],
+                (
+                    2000 * np.array([0.0, 0.0, np.pi / 2])
+                    - 400 * np.array([0.1, 0.2, 0.3])
+                )
+                / 100,
+            )
+        finally:
+            arm.disconnect()

@@ -9,6 +9,8 @@ export SRC_FILE="${EVALUATIONS_PATH}/eval_embodied_agent.py"
 
 export PYTHONPATH="${REPO_PATH}:${PYTHONPATH:-}"
 export HYDRA_FULL_ERROR=1
+mkdir -p "${REPO_PATH}/results"
+export RAY_TMPDIR="${RAY_TMPDIR:-${REPO_PATH}/results}"
 
 setup_sim_env() {
     export MUJOCO_GL="${MUJOCO_GL:-egl}"
@@ -114,7 +116,7 @@ run_mani_ood_eval() {
         "PutOnPlateInScene25MultiCarrot-v1" "PutOnPlateInScene25MultiPlate-v1" \
         "PutOnPlateInScene25Position-v1" "PutOnPlateInScene25EEPose-v1" "PutOnPlateInScene25PositionChangeTo-v1"; do
         local obj_set="test"
-        local log_dir="${REPO_PATH}/logs/eval/${eval_name}/$(date +'%Y%m%d-%H:%M:%S')-${env_id}-${obj_set}"
+        local log_dir="${REPO_PATH}/results/eval/${eval_name}/$(date +'%Y%m%d-%H:%M:%S')-${env_id}-${obj_set}"
         local log_file="${log_dir}/run_ppo.log"
         run_eval_cmd "${config_path}" "${config_name}" "${log_dir}" "${log_file}" \
             "${common_args[@]}" \
@@ -126,7 +128,7 @@ run_mani_ood_eval() {
         "PutOnPlateInScene25Carrot-v1" "PutOnPlateInScene25MultiCarrot-v1" \
         "PutOnPlateInScene25MultiPlate-v1"; do
         local obj_set="train"
-        local log_dir="${REPO_PATH}/logs/eval/${eval_name}/$(date +'%Y%m%d-%H:%M:%S')-${env_id}-${obj_set}"
+        local log_dir="${REPO_PATH}/results/eval/${eval_name}/$(date +'%Y%m%d-%H:%M:%S')-${env_id}-${obj_set}"
         local log_file="${log_dir}/run_ppo.log"
         run_eval_cmd "${config_path}" "${config_name}" "${log_dir}" "${log_file}" \
             "${common_args[@]}" \
@@ -197,7 +199,7 @@ else
 fi
 
 echo "Using Python at $(which python)"
-LOG_DIR="${REPO_PATH}/logs/$(date +'%Y%m%d-%H:%M:%S')-${CONFIG_NAME}"
+LOG_DIR="${REPO_PATH}/results/$(date +'%Y%m%d-%H:%M:%S')-${CONFIG_NAME}"
 
 MEGA_LOG_FILE="${LOG_DIR}/eval_embodiment.log"
 
