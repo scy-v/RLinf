@@ -4719,7 +4719,6 @@ def test_ur5e_local_delta_binary_gripper_and_moveL_reset():
 
 
 def test_real_observation_config_preserves_ur_training_order():
-
     from omegaconf import OmegaConf
 
     from rlinf.envs.real.env import RealWorldEnv
