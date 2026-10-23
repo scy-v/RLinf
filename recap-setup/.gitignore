@@ -1,0 +1,8 @@
+/uv-cache/
+/logs/
+/outputs/
+/support/__pycache__/
+/support/libero-config/
+/support/generated-install.sh
+/support/versions.json
+/support/wheels/
