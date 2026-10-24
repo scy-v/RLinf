@@ -73,8 +73,26 @@ from rlinf.models.embodiment.openpi.dataconfig.robocasa_dataconfig import (
 from rlinf.models.embodiment.openpi.dataconfig.robotwin_aloha_dataconfig import (
     LeRobotAlohaDataConfig,
 )
+from rlinf.models.embodiment.openpi.dataconfig.ur_dataconfig import (
+    LeRobotURDataConfig,
+)
 
 _CONFIGS = [
+    TrainConfig(
+        name="pi05_ur_state",
+        model=pi0_config.Pi0Config(
+            pi05=True,
+            action_horizon=20,
+            discrete_state_input=True,
+        ),
+        data=LeRobotURDataConfig(
+            repo_id="scylearning/insert_black_rack_into_blue_slot_20260916_v01",
+            base_config=DataConfig(prompt_from_task=False),
+        ),
+        batch_size=16,
+        num_workers=8,
+        pytorch_weight_path="checkpoints/torch/pi05_base",
+    ),
     TrainConfig(
         name="pi0_libero",
         model=pi0_config.Pi0Config(),
@@ -658,6 +676,8 @@ def get_openpi_config(
         repo_id: Optional LeRobot repo_id or local data path to override.
             When using a local path, the original asset_id is preserved so
             that norm_stats can still be loaded from the model checkpoint.
+        data_kwargs: Robot data overrides and shared obs_indices (one-based,
+            ordered raw state dimensions) or norm_stats_path overrides.
     """
     if config_name not in _CONFIGS_DICT:
         closest = difflib.get_close_matches(
@@ -667,12 +687,17 @@ def get_openpi_config(
         raise ValueError(f"Config '{config_name}' not found.{closest_str}")
 
     config = _CONFIGS_DICT[config_name]
-    norm_stats_path = None
+    # Resolve selection here so every robot factory accepts the same override.
+    obs_indices = getattr(config.data, "obs_indices", None)
     if data_kwargs is not None:
         if isinstance(data_kwargs, DictConfig):
-            norm_stats_path = data_kwargs.get("norm_stats_path")
-        else:
-            norm_stats_path = data_kwargs.get("norm_stats_path")
+            data_kwargs = OmegaConf.to_container(data_kwargs, resolve=True)
+        data_kwargs = dict(data_kwargs)
+        if "obs_indices" in data_kwargs:
+            obs_indices = data_kwargs.pop("obs_indices")
+    norm_stats_path = (
+        data_kwargs.get("norm_stats_path") if data_kwargs is not None else None
+    )
     if model_path is not None:
         config = _override_with_model_path(config, model_path)
     if data_kwargs is not None:
@@ -688,4 +713,21 @@ def get_openpi_config(
         new_data = dataclasses.replace(config.data, repo_id=repo_id, assets=assets)
         config = dataclasses.replace(config, data=new_data)
 
+    if obs_indices is not None:
+        from rlinf.models.embodiment.openpi.dataconfig.state_selection import (
+            StateSelectionDataConfig,
+        )
+        from rlinf.models.embodiment.openpi.transforms.state import validate_obs_indices
+
+        factory = config.data
+        config = dataclasses.replace(
+            config,
+            data=StateSelectionDataConfig(
+                repo_id=factory.repo_id,
+                assets=factory.assets,
+                base_config=factory.base_config,
+                data_factory=factory,
+                obs_indices=validate_obs_indices(obs_indices),
+            ),
+        )
     return config

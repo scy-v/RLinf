@@ -3489,3 +3489,187 @@ def test_reward_loaders_accept_one_batch_per_rank(tmp_path):
 
     assert len(train_loader) == 1
     assert len(val_loader) == 1
+
+
+@pytest.mark.parametrize("indices", [(1, 2, 19), (19, 3, 1), tuple(range(1, 20))])
+def test_ur_sft_selects_raw_state_before_normalization(indices, tmp_path):
+    pytest.importorskip("openpi")
+    from openpi.shared.normalize import NormStats, save
+    from openpi.transforms import Normalize, compose
+
+    from rlinf.models.embodiment.openpi.dataconfig import get_openpi_config
+
+    raw_state = np.arange(48, dtype=np.float32)
+    selected = raw_state[np.asarray(indices) - 1]
+    save(
+        tmp_path,
+        {
+            "state": NormStats(mean=selected, std=np.ones(len(indices))),
+            "actions": NormStats(mean=np.zeros(32), std=np.ones(32)),
+        },
+    )
+    (tmp_path / "norm_metadata.json").write_text(
+        json.dumps({"obs_indices": list(indices)})
+    )
+    config = get_openpi_config(
+        "pi05_ur_state",
+        data_kwargs={"obs_indices": indices, "norm_stats_path": str(tmp_path)},
+    )
+    data = config.data.create(config.assets_dirs, config.model)
+    transform = compose(
+        [
+            *data.repack_transforms.inputs,
+            *data.data_transforms.inputs,
+            Normalize(data.norm_stats),
+        ]
+    )
+    image = np.zeros((8, 8, 3), dtype=np.uint8)
+    sample = transform(
+        {
+            "observation.state": raw_state,
+            "observation.images.exterior_image": image,
+            "observation.images.wrist_image": image,
+            "action": np.ones((20, 7), dtype=np.float32),
+            "task": "insert",
+        }
+    )
+    np.testing.assert_allclose(sample["state"], np.zeros(len(indices)))
+    assert sample["actions"].shape == (20, 32)
+    np.testing.assert_allclose(sample["actions"][..., :7], 1, atol=1e-5)
+    np.testing.assert_array_equal(sample["actions"][..., 7:], 0)
+    assert sample["image_mask"]["left_wrist_0_rgb"]
+    assert not sample["image_mask"]["right_wrist_0_rgb"]
+    assert sample["prompt"] == "insert"
+
+
+@pytest.mark.parametrize("indices", [(), (0,), (-1,), (1, 1), (True,), (1.5,), (49,)])
+def test_ur_sft_rejects_invalid_raw_state_selection(indices):
+    pytest.importorskip("openpi")
+    from openpi.transforms import compose
+
+    from rlinf.models.embodiment.openpi.dataconfig import get_openpi_config
+
+    with pytest.raises(ValueError):
+        config = get_openpi_config(
+            "pi05_ur_state", data_kwargs={"obs_indices": indices}
+        )
+        data = config.data.create(config.assets_dirs, config.model)
+        compose(data.data_transforms.inputs)(
+            {"observation/state": np.zeros(48, dtype=np.float32)}
+        )
+
+
+def test_ur_sft_rejects_norm_stats_with_different_selection_order(tmp_path):
+    pytest.importorskip("openpi")
+    from rlinf.models.embodiment.openpi.dataconfig import get_openpi_config
+
+    (tmp_path / "norm_metadata.json").write_text(
+        json.dumps({"obs_indices": [1, 3, 19]})
+    )
+    config = get_openpi_config(
+        "pi05_ur_state",
+        data_kwargs={"obs_indices": [19, 3, 1], "norm_stats_path": str(tmp_path)},
+    )
+    with pytest.raises(ValueError, match="recompute stats"):
+        config.data.create(config.assets_dirs, config.model)
+
+
+@pytest.mark.parametrize("config_name", ["pi05_ur_state"])
+@pytest.mark.parametrize("version", ["v2.1", "v3.0"])
+def test_openpi_normalization_env_selection_and_terminal_windows(
+    tmp_path, monkeypatch, config_name, version
+):
+    pytest.importorskip("openpi")
+    import json
+
+    import numpy as np
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from toolkits.lerobot.calculate_norm_stats import main
+
+    is_ur = config_name == "pi05_ur_state"
+    state_key, action_key = (
+        ("observation.state", "action") if is_ur else ("state", "actions")
+    )
+    dataset = tmp_path / "dataset"
+    (dataset / "meta").mkdir(parents=True)
+    (dataset / "data").mkdir()
+    states = np.arange(5 * 48, dtype=np.float64).reshape(5, 48)
+    actions = np.repeat(np.array([1, 2, 3, 10, 20])[:, None], 7, axis=1)
+    pq.write_table(
+        pa.table(
+            {
+                state_key: states.tolist(),
+                action_key: actions.tolist(),
+                "episode_index": [0, 0, 0, 1, 1],
+                "frame_index": [0, 1, 2, 0, 1],
+            }
+        ),
+        dataset / "data/frames.parquet",
+    )
+    (dataset / "meta/info.json").write_text(
+        json.dumps(
+            {
+                "robot_type": "ur5e" if is_ur else "franka",
+                "codebase_version": version,
+                "total_frames": 5,
+                "total_episodes": 2,
+                "features": {
+                    state_key: {"names": [str(i) for i in range(1, 49)]},
+                    action_key: {"names": [str(i) for i in range(7)]},
+                    **(
+                        {
+                            "observation.images.exterior_image": {"dtype": "video"},
+                            "observation.images.wrist_image": {"dtype": "video"},
+                        }
+                        if is_ur
+                        else {"image": {"dtype": "video"}}
+                    ),
+                },
+            }
+        )
+    )
+    monkeypatch.setenv("OBS_INDICES", "19,1")
+    for cli_indices, expected in [(None, [19, 1]), ("3,2,1", [3, 2, 1])]:
+        output = tmp_path / f"stats{len(expected)}"
+        main(
+            config_name,
+            str(dataset),
+            obs_indices=cli_indices,
+            output_dir=str(output),
+            data_backend="auto" if version == "v3.0" else "parquet",
+        )
+        stats = json.loads((output / "norm_stats.json").read_text())["norm_stats"]
+        metadata = json.loads((output / "norm_metadata.json").read_text())
+        assert metadata["obs_indices"] == expected
+        np.testing.assert_allclose(
+            stats["state"]["mean"][: len(expected)],
+            states[:, np.array(expected) - 1].mean(0),
+        )
+        horizon = metadata["action_horizon"]
+        windows = np.array(
+            [
+                [1, 2] + [3] * (horizon - 2),
+                [2] + [3] * (horizon - 1),
+                [3] * horizon,
+                [10] + [20] * (horizon - 1),
+                [20] * horizon,
+            ]
+        )
+        np.testing.assert_allclose(stats["actions"]["mean"][:7], windows.mean())
+        np.testing.assert_allclose(stats["actions"]["std"][:7], windows.std())
+        assert len(stats["actions"]["mean"]) == 32
+        assert metadata["total_frames"] == 5
+
+        # Reloading the produced stats must accept both raw and padded state layouts.
+        from rlinf.models.embodiment.openpi.dataconfig import get_openpi_config
+
+        loaded = get_openpi_config(
+            config_name,
+            data_kwargs={
+                "obs_indices": expected,
+                "norm_stats_path": str(output),
+            },
+        )
+        loaded.data.create(loaded.assets_dirs, loaded.model)

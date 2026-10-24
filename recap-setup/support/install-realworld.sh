@@ -24,6 +24,8 @@ assert source.is_dir(), source
 shutil.copytree(source, site / 'transformers', dirs_exist_ok=True)
 PY
 uv pip install 'tokenizers>=0.21,<0.22'
+# Match the LeRobot v3 reader used by the UR data collection environment.
+uv pip install --no-deps 'git+https://github.com/huggingface/lerobot.git@d6ea3bbce0fc8c75138f02639ac4ceaf12a67829'
 python - <<'PY'
 import torch
 assert torch.__version__.startswith('2.11.'), torch.__version__
