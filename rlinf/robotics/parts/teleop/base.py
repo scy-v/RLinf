@@ -67,6 +67,8 @@ CONTEXT_KEYS = (
     "joint_positions",
     "gripper_open",
     "hand_reset_pose",
+    "policy_action",
+    "keyboard_action_transform",
 )
 
 

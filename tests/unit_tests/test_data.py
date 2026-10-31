@@ -18,9 +18,11 @@ import asyncio
 import copy
 import inspect
 import json
+import queue
 import random
 import shutil
 import time
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
@@ -47,6 +49,7 @@ from rlinf.data.schema.embodied_types import (
     EnvOutput,
     EnvPart,
     EnvTransition,
+    EpisodeReplay,
     LeRobotFrame,
     PolicyInput,
     PolicyOutput,
@@ -93,6 +96,451 @@ from rlinf.workers.rollout.hf.huggingface_worker import MultiStepRolloutWorker
 def _scalar_trajectory(value: float) -> Trajectory:
     """One-sample trajectory so checkpoint tests write only tiny files."""
     return Trajectory(max_episode_length=1, rewards=torch.full((1, 1, 1), float(value)))
+
+
+@pytest.fixture
+def realworld_rlt_actor(tmp_path, monkeypatch):
+    from rlinf.scheduler import Worker
+    from rlinf.workers.actor.fsdp_rlt_ac_policy_worker import AsyncRLTACFSDPPolicy
+
+    monkeypatch.setattr(Worker, "torch_platform", torch.cpu)
+    torch.distributed.init_process_group(
+        "gloo", init_method=(tmp_path / "rlt-dist").as_uri(), rank=0, world_size=1
+    )
+    worker = object.__new__(AsyncRLTACFSDPPolicy)
+    from rlinf.utils.logging import get_logger
+
+    worker._logger = get_logger()
+    worker._stacklevel = 1
+    worker.cfg = OmegaConf.create(
+        {
+            "env": {"train": {"env_type": "real", "auto_reset": True}},
+            "actor": {"model": {"num_action_chunks": 2, "action_dim": 2}},
+            "algorithm": {
+                "rlt_transition_replay": True,
+                "update_epoch": 8,
+                "replay_buffer": {"min_buffer_size": 2},
+                "rlt_schedule": {
+                    "enable": True,
+                    "warmup_min_size": 150,
+                    "warmup_post_collect_updates": 150,
+                    "continuous_updates": True,
+                },
+            },
+        }
+    )
+    worker.replay_buffer = TrajectoryReplayBuffer(seed=42, sample_window_size=2000)
+    worker.demo_buffer = None
+    worker.use_rlt_schedule = True
+    worker.rlt_schedule_cfg = worker.cfg.algorithm.rlt_schedule
+    worker.update_step = worker.version = 0
+    worker.transitions_since_train = worker.episodes_since_train = 0
+    worker.total_transitions_added = worker.total_episodes_added = 0
+    worker._warmup_ready_total_transitions = None
+    worker._warmup_ready_total_episodes = None
+    worker.pending_update_budget = 0
+    try:
+        yield worker
+    finally:
+        worker.replay_buffer.close()
+        torch.distributed.destroy_process_group()
+
+
+def _rlt_replay_trajectory(count, *, critical=True, marker=1.0):
+    obs = {
+        "z_rl": torch.full((count, 1, 2), marker),
+        "proprio": torch.full((count, 1, 1), marker),
+        "ref_chunk": torch.full((count, 1, 4), 0.25),
+    }
+    return Trajectory(
+        max_episode_length=count,
+        actions=torch.full((count, 1, 4), 0.25),
+        intervene_flags=torch.zeros(count, 1, 4, dtype=torch.bool),
+        rewards=torch.zeros(count, 1, 2),
+        dones=torch.zeros(count + 1, 1, 2, dtype=torch.bool),
+        terminations=torch.zeros(count + 1, 1, 2, dtype=torch.bool),
+        truncations=torch.zeros(count + 1, 1, 2, dtype=torch.bool),
+        forward_inputs={
+            "record_transition": torch.full((count, 1, 1), critical),
+            "actor_switch": torch.zeros(count, 1, 1, dtype=torch.bool),
+        },
+        curr_obs=obs,
+        next_obs=copy.deepcopy(obs),
+    )
+
+
+@pytest.fixture(
+    params=[("sync", True), ("sync", False), ("async", True), ("async", False)]
+)
+def rlt_checkpoint_actor(realworld_rlt_actor, monkeypatch, request):
+    from rlinf.hybrid_engines.fsdp.strategy.fsdp import FSDPStrategy
+    from rlinf.utils.logging import get_logger
+    from rlinf.workers.actor.fsdp_rlt_ac_policy_worker import RLTACFSDPPolicy
+
+    mode, use_orig_params = request.param
+    worker = realworld_rlt_actor
+    if mode == "sync":
+        worker = object.__new__(RLTACFSDPPolicy)
+        worker.__dict__.update(realworld_rlt_actor.__dict__)
+    monkeypatch.setattr(torch.cpu, "ipc_collect", lambda: None, raising=False)
+    monkeypatch.setattr(torch.cpu, "empty_cache", lambda: None, raising=False)
+    monkeypatch.setattr(torch.cpu, "is_available", lambda: False)
+    worker._rank = 0
+    worker._logger = get_logger()
+    worker._stacklevel = 1
+    worker.cfg.actor.fsdp_config = {"use_orig_params": use_orig_params}
+    worker.cfg.algorithm.rlt_schedule.warmup_min_size = 2
+    worker.cfg.algorithm.actor_weight_schedule = {
+        "enable": True,
+        "warmup_updates": 150,
+        "warmup_bc_weight": 5.0,
+        "warmup_q_weight": 0.02,
+        "online_bc_weight": 5.0,
+        "online_q_weight": 0.1,
+    }
+    worker._strategy = FSDPStrategy(worker.cfg.actor, world_size=1)
+    worker.model = torch.nn.ModuleDict(
+        {"actor": torch.nn.Linear(2, 4), "critic": torch.nn.Linear(2, 1)}
+    )
+    worker.target_model = copy.deepcopy(worker.model).requires_grad_(False)
+    worker.optimizer = torch.optim.AdamW(worker.model["actor"].parameters())
+    worker.qf_optimizer = torch.optim.AdamW(worker.model["critic"].parameters())
+    worker.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+        worker.optimizer, lambda _: 1
+    )
+    worker.qf_lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+        worker.qf_optimizer, lambda _: 1
+    )
+    worker.alpha_optimizer = None
+    worker.is_weight_offloaded = worker.is_optimizer_offloaded = False
+    added, completed = worker._ingest_rollout_trajectories([_rlt_replay_trajectory(2)])
+    worker._update_rollout_ingest_counters(added, completed)
+    worker._rlt_updates_to_run()
+    return worker
+
+
+def _advance_rlt_checkpoint_actor(worker, updates):
+    for _ in range(updates):
+        optimizers = [
+            (worker.model["critic"], worker.qf_optimizer, worker.qf_lr_scheduler)
+        ]
+        if worker.update_step % 4 == 0:
+            optimizers.append(
+                (worker.model["actor"], worker.optimizer, worker.lr_scheduler)
+            )
+        for module, optimizer, scheduler in optimizers:
+            optimizer.zero_grad()
+            module(torch.ones(1, 2)).square().mean().backward()
+            optimizer.step()
+            scheduler.step()
+        worker.update_step += 1
+    worker.transitions_since_train = worker.episodes_since_train = 0
+    worker.pending_update_budget = 0
+
+
+@pytest.mark.parametrize("updates", [149, 150])
+def test_rlt_checkpoint_restores_warmup_and_replay(
+    rlt_checkpoint_actor, tmp_path, updates
+):
+    worker = rlt_checkpoint_actor
+    _advance_rlt_checkpoint_actor(worker, updates)
+    added, completed = worker._ingest_rollout_trajectories([_rlt_replay_trajectory(1)])
+    worker._update_rollout_ingest_counters(added, completed)
+    expected_counters = {
+        name: getattr(worker, name) for name in worker._CHECKPOINT_COUNTERS
+    }
+    expected_weights = copy.deepcopy(worker.model.state_dict())
+    expected_target = copy.deepcopy(worker.target_model.state_dict())
+    expected_q_weight = worker._actor_objective_weights()[1]
+    checkpoint = tmp_path / "actor"
+    worker.save_checkpoint(str(checkpoint), step=19)
+
+    with torch.no_grad():
+        for module in (worker.model, worker.target_model):
+            for parameter in module.parameters():
+                parameter.zero_()
+    worker.qf_optimizer.state.clear()
+    worker.optimizer.state.clear()
+    worker.model.zero_grad(set_to_none=True)
+    worker.replay_buffer.clear()
+    worker.update_step = 0
+    worker.total_transitions_added = 0
+    worker._warmup_ready_total_transitions = None
+    worker.load_checkpoint(str(checkpoint))
+
+    assert {
+        name: getattr(worker, name) for name in worker._CHECKPOINT_COUNTERS
+    } == expected_counters
+    for name, tensor in expected_weights.items():
+        torch.testing.assert_close(worker.model.state_dict()[name], tensor)
+    for name, tensor in expected_target.items():
+        torch.testing.assert_close(worker.target_model.state_dict()[name], tensor)
+    assert worker.replay_buffer.total_samples == 3
+    assert worker.get_rollout_sync_version() == updates
+    assert worker._actor_objective_weights()[1] == expected_q_weight
+    assert worker._rlt_updates_to_run()[0] == (1 if updates == 149 else 8)
+    _advance_rlt_checkpoint_actor(worker, 1)
+    assert all(
+        state["step"].item() == updates + 1
+        for state in worker.qf_optimizer.state.values()
+    )
+
+
+def test_rlt_legacy_checkpoint_recovers_critic_update_count(
+    rlt_checkpoint_actor, tmp_path
+):
+    worker = rlt_checkpoint_actor
+    _advance_rlt_checkpoint_actor(worker, 150)
+    checkpoint = tmp_path / "actor"
+    worker.save_checkpoint(str(checkpoint), step=19)
+    (checkpoint / "sac_components/rlt_training_state_rank_0.json").unlink()
+    worker.update_step = 0
+    worker.load_checkpoint(str(checkpoint))
+    assert worker.get_rollout_sync_version() == 150
+    assert worker._actor_objective_weights()[1] == 0.1
+    assert worker._rlt_updates_to_run()[0] == 8
+    assert worker.total_transitions_added == worker.transitions_since_train == 0
+
+
+def test_rlt_checkpoint_rejects_negative_update_count(rlt_checkpoint_actor, tmp_path):
+    worker = rlt_checkpoint_actor
+    _advance_rlt_checkpoint_actor(worker, 1)
+    checkpoint = tmp_path / "actor"
+    worker.save_checkpoint(str(checkpoint), step=1)
+    state_path = checkpoint / "sac_components/rlt_training_state_rank_0.json"
+    state = json.loads(state_path.read_text())
+    state["update_step"] = -1
+    state_path.write_text(json.dumps(state))
+    with pytest.raises(
+        ValueError, match="nonnegative integer RLT counter 'update_step'"
+    ):
+        worker.load_checkpoint(str(checkpoint))
+
+
+@pytest.fixture
+def rlt_warmup_cache_actor(realworld_rlt_actor, tmp_path):
+    from rlinf.utils.logging import get_logger
+
+    worker = realworld_rlt_actor
+    worker._world_size = 1
+    worker._logger = get_logger()
+    worker._stacklevel = 1
+    worker.cfg.runner = {"resume_dir": None}
+    worker.rlt_schedule_cfg.warmup_cache_path = str(tmp_path / "warmup.pt")
+    worker._setup_warmup_cache()
+    return worker
+
+
+def test_rlt_warmup_cache_reuses_first_150_with_human_actions(rlt_warmup_cache_actor):
+    worker = rlt_warmup_cache_actor
+    path = Path(worker.rlt_schedule_cfg.warmup_cache_path)
+    worker._ingest_rollout_trajectories([_rlt_replay_trajectory(10, critical=False)])
+    initial = _rlt_replay_trajectory(149, marker=2.0)
+    initial.actions[:] = 0.75
+    initial.intervene_flags[:] = True
+    worker._ingest_rollout_trajectories([initial])
+    assert not path.exists()
+    human = _rlt_replay_trajectory(1, marker=3.0)
+    human.actions[:] = 0.75
+    human.intervene_flags[:] = True
+    worker._ingest_rollout_trajectories([human, _rlt_replay_trajectory(5, marker=9.0)])
+    assert worker.replay_buffer.total_samples == 155
+    payload = torch.load(path, weights_only=True)
+    assert len(payload["transitions"]) == payload["manifest"]["count"] == 150
+    assert list(path.parent.glob("warmup*")) == [path]
+    last = payload["transitions"][-1]
+    assert torch.equal(last["actions"], human.actions)
+    assert torch.equal(last["intervene_flags"], human.intervene_flags)
+    assert torch.equal(last["rewards"], human.rewards)
+    for key in ("z_rl", "proprio", "ref_chunk"):
+        assert torch.equal(last["curr_obs"][key], human.curr_obs[key])
+        assert torch.equal(last["next_obs"][key], human.next_obs[key])
+    saved_index = path.read_bytes()
+    worker._ingest_rollout_trajectories([_rlt_replay_trajectory(5)])
+    assert path.read_bytes() == saved_index
+
+    worker.replay_buffer.close()
+    worker.replay_buffer = TrajectoryReplayBuffer(seed=42, sample_window_size=2000)
+    worker._setup_warmup_cache()
+    assert worker.replay_buffer.total_samples == worker.total_transitions_added == 150
+    batch = worker.replay_buffer.sample(150)
+    assert (batch["curr_obs"]["proprio"] < 9).all()
+    human_mask = batch["intervene_flags"].bool()
+    assert human_mask.any()
+    assert (batch["actions"][human_mask] == 0.75).all()
+    assert worker.update_step == 0
+    updates, metrics = worker._rlt_updates_to_run()
+    assert updates == 8
+    assert metrics["rlt/warmup_required_updates"] == 150
+
+
+def test_rlt_warmup_cache_resume_ignores_cache(rlt_warmup_cache_actor):
+    worker = rlt_warmup_cache_actor
+    path = Path(worker.rlt_schedule_cfg.warmup_cache_path)
+    path.write_bytes(b"invalid cache")
+    worker.cfg.runner.resume_dir = "/checkpoint"
+    worker._setup_warmup_cache()
+    worker._ingest_rollout_trajectories([_rlt_replay_trajectory(150)])
+    assert path.read_bytes() == b"invalid cache"
+    assert worker._warmup_cache_pending is None
+
+
+def test_rlt_warmup_cache_rejects_incompatible_model(rlt_warmup_cache_actor):
+    worker = rlt_warmup_cache_actor
+    worker._ingest_rollout_trajectories([_rlt_replay_trajectory(150)])
+    worker.cfg.actor.model.action_dim = 3
+    with pytest.raises(ValueError, match="configuration mismatch"):
+        worker._setup_warmup_cache()
+
+
+@pytest.mark.parametrize("damage", ["missing_transition", "multiple_chunks"])
+def test_rlt_warmup_file_validates_data_before_ingestion(
+    rlt_warmup_cache_actor, damage
+):
+    worker = rlt_warmup_cache_actor
+    worker._ingest_rollout_trajectories([_rlt_replay_trajectory(150)])
+    path = Path(worker.rlt_schedule_cfg.warmup_cache_path)
+    payload = torch.load(path, weights_only=True)
+    if damage == "missing_transition":
+        payload["transitions"].pop()
+    else:
+        payload["transitions"][0]["actions"] = torch.zeros(2, 1, 4)
+    torch.save(payload, path)
+    worker.replay_buffer.close()
+    worker.replay_buffer = TrajectoryReplayBuffer(seed=42, sample_window_size=2000)
+    with pytest.raises(ValueError, match="Expected"):
+        worker._setup_warmup_cache()
+    assert worker.replay_buffer.total_samples == 0
+
+
+def test_rlt_realworld_replay_filters_prefix_and_keeps_human_bc(realworld_rlt_actor):
+    worker = realworld_rlt_actor
+    prefix = _rlt_replay_trajectory(5, critical=False, marker=-1.0)
+    warmup = _rlt_replay_trajectory(2, marker=2.0)
+    warmup.actions[1] = 0.75
+    warmup.intervene_flags[1] = True
+    added, _ = worker._ingest_rollout_trajectories([prefix, warmup])
+    assert added == worker.replay_buffer.total_samples == 2
+    batch = worker.replay_buffer.sample(2)
+    assert (batch["curr_obs"]["proprio"] == 2.0).all()
+    assert batch["forward_inputs"]["record_transition"].all()
+
+    flat = worker.replay_buffer._flatten_trajectory(warmup)
+    targets = torch.where(
+        flat["intervene_flags"], flat["actions"], flat["curr_obs"]["ref_chunk"]
+    )
+    loss, metrics = worker._bc_metrics(
+        targets, flat["actions"], flat["curr_obs"]["ref_chunk"], flat["intervene_flags"]
+    )
+    assert loss.item() == metrics["bc_human_loss"] == metrics["bc_ref_loss"] == 0
+    assert metrics["human_mask_ratio"] == 0.5
+    wrong_loss, _ = worker._bc_metrics(
+        flat["curr_obs"]["ref_chunk"],
+        flat["actions"],
+        flat["curr_obs"]["ref_chunk"],
+        flat["intervene_flags"],
+    )
+    assert wrong_loss.item() > 0
+
+
+@pytest.mark.parametrize("flat_reference", [False, True])
+def test_rlt_realworld_warmup_then_continues_without_new_data(
+    realworld_rlt_actor, flat_reference
+):
+    from rlinf.algorithms.rlt.route import (
+        RealworldRLTRoute,
+        RLTRouteContext,
+        build_rlt_route,
+    )
+
+    worker = realworld_rlt_actor
+    route = build_rlt_route(worker.cfg)
+    assert isinstance(route, RealworldRLTRoute)
+
+    def routed(version, critical):
+        ref = torch.full((1, 2, 2), 0.25)
+        result = {
+            "forward_inputs": {"ref_chunk": ref.flatten(1) if flat_reference else ref}
+        }
+        return route.route(
+            RLTRouteContext(
+                env_obs={},
+                rlt_obs={"ref_chunk": ref},
+                student_actions=torch.full_like(ref, 0.75),
+                result=result,
+                mode="train",
+                rlt_switch_flags=torch.tensor([critical]),
+                version=version,
+            )
+        )
+
+    empty = routed(worker.get_rollout_sync_version(), True)
+    assert (empty.actions == 0.25).all()
+    assert empty.result["forward_inputs"]["record_transition"].all()
+    assert not empty.result["forward_inputs"]["actor_switch"].any()
+    worker._ingest_rollout_trajectories([_rlt_replay_trajectory(149)])
+    assert worker._rlt_updates_to_run()[0] == 0
+    worker._ingest_rollout_trajectories([_rlt_replay_trajectory(1)])
+    assert worker._rlt_updates_to_run()[0] == 8
+    worker.update_step = 149
+    assert worker._rlt_updates_to_run()[0] == 1
+    assert (routed(worker.get_rollout_sync_version(), True).actions == 0.25).all()
+    worker.update_step = 150
+    assert (routed(worker.get_rollout_sync_version(), True).actions == 0.75).all()
+    assert (routed(149, True).actions == 0.25).all()
+    assert (routed(worker.get_rollout_sync_version(), False).actions == 0.25).all()
+    worker.update_step = 10000
+    assert worker._rlt_updates_to_run()[0] == 8
+    worker._ingest_rollout_trajectories([_rlt_replay_trajectory(1, marker=9.0)])
+    assert worker.replay_buffer.total_samples == 151
+
+
+def test_rlt_maniskill_keeps_data_budget_schedule(realworld_rlt_actor):
+    from rlinf.algorithms.rlt.route import SimulatorRLTRoute, build_rlt_route
+
+    worker = realworld_rlt_actor
+    worker.cfg.env.train.env_type = "maniskill_rlt"
+    worker.rlt_schedule_cfg.continuous_updates = False
+    worker.rlt_schedule_cfg.train_every_transitions = 1
+    assert isinstance(build_rlt_route(worker.cfg), SimulatorRLTRoute)
+    worker._ingest_rollout_trajectories([_rlt_replay_trajectory(150)])
+    assert worker._rlt_updates_to_run()[0] == 150
+    worker.update_step = 150
+    assert worker._rlt_updates_to_run()[0] == 0
+
+
+def test_rlt_warmup_waits_while_receiving_only_critical_data(realworld_rlt_actor):
+    worker = realworld_rlt_actor
+    worker._recv_queue = queue.Queue()
+
+    async def collect():
+        waiter = asyncio.create_task(worker._wait_for_warmup_data(150))
+        try:
+            await asyncio.sleep(0)
+            assert not waiter.done()
+            worker._recv_queue.put(_rlt_replay_trajectory(200, critical=False))
+            worker._recv_queue.put(_rlt_replay_trajectory(149))
+            await asyncio.sleep(1.1)
+            assert worker.replay_buffer.total_samples == 149
+            assert not waiter.done()
+            worker._recv_queue.put(_rlt_replay_trajectory(1))
+            await asyncio.wait_for(waiter, timeout=5)
+            assert worker.replay_buffer.total_samples == 150
+            assert worker.update_step == 0
+        finally:
+            waiter.cancel()
+            await asyncio.gather(waiter, return_exceptions=True)
+
+    asyncio.run(collect())
+
+
+def test_rlt_replay_ignores_unexecuted_bootstrap_action(realworld_rlt_actor):
+    trajectory = _rlt_replay_trajectory(2)
+    trajectory.actions = torch.cat([trajectory.actions, trajectory.actions[-1:]])
+    for key, value in trajectory.forward_inputs.items():
+        trajectory.forward_inputs[key] = torch.cat([value, value[-1:]])
+    added, _ = realworld_rlt_actor._ingest_rollout_trajectories([trajectory])
+    assert added == 2
 
 
 def test_memory_checkpoint_indexes_only_cached_trajectories(tmp_path):
@@ -1778,7 +2226,9 @@ def test_history_reward_assignment_matches_main_across_chunks():
 
 
 @pytest.mark.parametrize("loss_type", ["rlt_ac", "rlt_td3"])
-def test_rlt_output_matches_main_transition_and_intervention_behavior(loss_type):
+def test_rlt_output_matches_main_transition_and_intervention_behavior(
+    loss_type, realworld_rlt_actor
+):
     collector = _make(_config(algorithm={"loss_type": loss_type}))
     key = TrajectoryKey(3, 0, 0, 0, 0)
     current_ref_chunk = torch.tensor([[1.0, 2.0]])
@@ -1792,6 +2242,7 @@ def test_rlt_output_matches_main_transition_and_intervention_behavior(loss_type)
                 "z_rl": torch.tensor([[3.0, 4.0]]),
                 "proprio": torch.tensor([[5.0, 6.0, 7.0]]),
                 "ref_chunk": current_ref_chunk,
+                "record_transition": torch.ones(1, 1, dtype=torch.bool),
             },
             prev_logprobs=torch.zeros(1, 1),
             prev_values=torch.zeros(1, 1),
@@ -1825,6 +2276,12 @@ def test_rlt_output_matches_main_transition_and_intervention_behavior(loss_type)
     assert torch.equal(
         trajectory.next_obs["ref_chunk"][0], torch.tensor([[11.0, 12.0]])
     )
+    added, _ = realworld_rlt_actor._ingest_rollout_trajectories([trajectory])
+    assert added == 1
+    batch = realworld_rlt_actor.replay_buffer.sample(1)
+    assert torch.equal(batch["actions"], intervened_chunk)
+    assert torch.equal(batch["curr_obs"]["ref_chunk"], intervened_chunk)
+    assert batch["intervene_flags"].all()
 
 
 def test_pipeline_output_contains_main_actor_training_fields():
@@ -2600,6 +3057,7 @@ def test_env_uses_mode_qualified_decoupled_response_tag():
         route_key=None,
         batch_size=32,
         infer_batch_size_fn=env._infer_action_batch_size,
+        async_op=False,
         decoupled_mode=True,
     )
 
@@ -2733,9 +3191,11 @@ def test_env_sends_terminal_observation_only_as_a_boundary_override():
     assert policy_input.env_parts[0].requires_inference
 
 
-def test_rollout_completes_each_epoch_through_policy_inputs():
+@pytest.mark.parametrize("episode_replay", [False, True])
+def test_rollout_completes_each_epoch_through_policy_inputs(episode_replay):
     rollout = object.__new__(MultiStepRolloutWorker)
-    rollout.n_train_chunk_steps = 2
+    rollout.n_train_chunk_steps = 150 if episode_replay else 2
+    rollout.episode_replay = episode_replay
     rollout.num_pipeline_stages = 1
     rollout.env_decoupled_mode = False
     rollout.enable_rlt = False
@@ -2836,6 +3296,11 @@ def test_rollout_completes_each_epoch_through_policy_inputs():
     assert torch.equal(env_parts[1].bootstrap_values, torch.tensor([[4.0]]))
     assert torch.equal(env_parts[1].final_prev_values, torch.tensor([[4.0, 5.0]]))
     assert rollout._predict_rollout_actions.call_count == 3
+    assert [call.args[1] for call in rollout._receive_policy_input.call_args_list] == [
+        "policy",
+        "policy",
+        "policy" if episode_replay else "policy_final",
+    ]
 
 
 def test_rollout_routes_external_input_without_model_inference():
@@ -2970,6 +3435,7 @@ def test_decoupled_final_completion_uses_next_bootstrap():
 
 def test_env_closes_reward_stream_with_final_chunk():
     env = object.__new__(EnvWorker)
+    env.should_stop = False
     env.rollout_epoch = 2
     env.stage_num = 1
     env.n_train_chunk_steps = 2
@@ -3402,3 +3868,204 @@ def test_openpi_normalization_env_selection_and_terminal_windows(
             },
         )
         loaded.data.create(loaded.assets_dirs, loaded.model)
+
+
+@pytest.mark.parametrize("critical", [False, True])
+def test_env_bootstrap_preserves_critical_phase_until_reset(critical):
+    env = object.__new__(EnvWorker)
+    env.cfg = OmegaConf.create({"env": {"train": {"auto_reset": True}}})
+    env.stage_num = env.train_num_envs_per_stage = 1
+    env.model_cfg = OmegaConf.create({"num_action_chunks": 10})
+    output = EnvOutput(
+        obs={"states": torch.zeros(1, 19)},
+        transition=EnvTransition(rlt_switch_flags=torch.full((1, 10), critical)),
+    )
+    env.store_last_obs_and_intervened_info([output])
+    [bootstrap] = inspect.unwrap(EnvWorker.bootstrap_step)(env)
+    assert bootstrap.rlt_switch_flags.tolist() == [[critical] * 10]
+    assert not bootstrap.dones.any()
+    reset_output = EnvOutput(
+        obs=output.obs,
+        transition=EnvTransition(rlt_switch_flags=torch.tensor([False])),
+    )
+    env.store_last_obs_and_intervened_info([reset_output])
+    [bootstrap] = inspect.unwrap(EnvWorker.bootstrap_step)(env)
+    assert bootstrap.rlt_switch_flags.tolist() == [False]
+
+
+def test_twenty_chunk_rollout_waits_for_all_execution_results():
+    from rlinf.config import get_rollout_chunk_count
+
+    cfg = _config(
+        env={
+            "train": {
+                "max_chunks_per_rollout_epoch": 20,
+                "max_steps_per_rollout_epoch": 300,
+            }
+        }
+    )
+    collector = _make(cfg, chunk_count=get_rollout_chunk_count(cfg.env.train, 1))
+    keys = [TrajectoryKey(0, 0, 0, 0, i) for i in range(20)]
+    for key in keys:
+        assert _collect(collector, _policy(key)) == []
+    for key in keys[:-1]:
+        initial = EnvTransition() if key == keys[0] else None
+        assert _collect(collector, _env_part(key, initial_transition=initial)) == []
+    [(_, trajectory)] = _collect(collector, _env_part(keys[-1]))
+    assert trajectory.rewards.shape[0] == 20
+
+
+def test_rlt_warmup_progress_uses_restored_update_count(realworld_rlt_actor, caplog):
+    worker = realworld_rlt_actor
+    worker.cfg.runner = {"timing_mode": "basic"}
+    worker.update_step = 149
+    with caplog.at_level("INFO"):
+        worker._prepare_training_progress()
+        worker.update_step = 150
+        worker._report_training_progress()
+        worker._report_training_progress()
+    assert "149/150" in caplog.text
+    assert caplog.text.count("Completed Warmup updates") == 1
+    assert worker._update_timing.enabled
+
+
+@pytest.mark.parametrize("length", [1, 7, 150])
+@pytest.mark.parametrize("outcome", ["success", "timeout"])
+def test_episode_replay_flushes_variable_length_and_preserves_boundaries(
+    length, outcome
+):
+    cfg = _config(
+        env={"train": {"flush_replay_on_episode_end": True}},
+        rollout={"collect_transitions": True},
+    )
+    collector = _make(cfg, chunk_count=150)
+    for episode in range(2):
+        # End fragments may arrive before the policy/environment halves before them.
+        order = [length - 1, *range(length - 1)]
+        for position, index in enumerate(order):
+            key = TrajectoryKey(episode, 0, 0, 0, index)
+            env = _env_part(
+                key,
+                initial_transition=(
+                    EnvTransition(dones=torch.zeros(1, 1, dtype=torch.bool))
+                    if index == 0
+                    else None
+                ),
+            )
+            last = index == length - 1
+            env.episode_end = last
+            env.transition.dones[:] = last
+            env.transition.terminations[:] = last and outcome == "success"
+            env.transition.truncations[:] = last and outcome == "timeout"
+            outputs = _collect(collector, env, _policy(key, value=float(index)))
+            if position < length - 1:
+                assert outputs == []
+        [(queue_key, payload)] = outputs
+        assert queue_key == DEFAULT_KEY
+        assert isinstance(payload, EpisodeReplay)
+        assert payload.end_key == TrajectoryKey(episode, 0, 0, 0, length - 1)
+        trajectory = payload.trajectory
+        assert trajectory.actions[:, 0, 0].tolist() == list(range(length))
+        assert trajectory.dones.shape[0] == length + 1
+        assert not trajectory.dones[:-1].any() and trajectory.dones[-1].all()
+        assert bool(trajectory.terminations[-1].any()) == (outcome == "success")
+        assert bool(trajectory.truncations[-1].any()) == (outcome == "timeout")
+        assert not collector._output._pending
+        assert not collector._output._ends
+
+
+@pytest.mark.parametrize("critical", [False, True])
+def test_episode_replay_receipt_follows_actual_buffer_ingestion(
+    realworld_rlt_actor, critical
+):
+    worker = realworld_rlt_actor
+    OmegaConf.update(
+        worker.cfg, "env.train.flush_replay_on_episode_end", True, force_add=True
+    )
+    key = TrajectoryKey(3, 0, 0, 0, 6)
+    worker._recv_queue = queue.Queue()
+    trajectory = _rlt_replay_trajectory(7, critical=critical)
+    trajectory.dones[-1] = True
+    trajectory.terminations[-1] = True
+    trajectory.next_obs["z_rl"][:] = 9
+    worker._recv_queue.put(EpisodeReplay(trajectory=trajectory, end_key=key))
+
+    class Receipts:
+        def put(self, receipt, *, async_op):
+            assert async_op
+            assert worker.replay_buffer.total_samples == (7 if critical else 0)
+            assert worker.total_transitions_added == (7 if critical else 0)
+            assert receipt == key
+            self.committed = True
+
+    worker._replay_ack_channel = Receipts()
+    worker._drain_received_trajectories()
+    assert worker._replay_ack_channel.committed
+    assert worker._recv_queue.empty()
+    if critical:
+        batch = worker.replay_buffer.sample(7)
+        assert (batch["next_obs"]["z_rl"] == 9).all()
+
+
+def test_episode_end_survives_environment_part_transport():
+    key = TrajectoryKey(2, 0, 0, 0, 3)
+    part = EnvPart(
+        sources=[TrajectorySource(key, 2)],
+        transition=EnvTransition(dones=torch.ones(2, 1, dtype=torch.bool)),
+        episode_end=True,
+    )
+    merged = EnvPart.merge(part.split([1, 1]))
+    completed = merged.complete(next_obs=None, next_rlt_obs=None)
+    assert completed.episode_end
+    assert completed.transition.dones.all()
+
+
+def test_episode_replay_survives_channel_tensor_packing():
+    payload = EpisodeReplay(
+        trajectory=_rlt_replay_trajectory(3),
+        end_key=TrajectoryKey(5, 0, 0, 0, 2),
+    )
+    skeleton, tensors = pack_dataclass_tensors(payload)
+    restored = unpack_dataclass_tensors(skeleton, tensors)
+    assert isinstance(restored, EpisodeReplay)
+    assert restored.end_key == payload.end_key
+    assert torch.equal(restored.trajectory.actions, payload.trajectory.actions)
+    for name in ("z_rl", "proprio", "ref_chunk"):
+        assert torch.equal(
+            restored.trajectory.next_obs[name], payload.trajectory.next_obs[name]
+        )
+
+
+@pytest.mark.parametrize("episode_replay", [False, True])
+@pytest.mark.parametrize("chunk_id,terminal", [(6, True), (49, False), (149, True)])
+def test_env_episode_replay_closes_only_at_actual_episode_end(
+    episode_replay, chunk_id, terminal
+):
+    worker = object.__new__(EnvWorker)
+    worker.cfg = _config(rollout={"group_name": "RolloutGroup"})
+    worker.episode_replay = episode_replay
+    worker._trajectory_step = worker._rank = 0
+    worker.n_train_chunk_steps = 150 if episode_replay else 50
+    worker.train_num_envs_per_stage = worker.train_batch_size = 1
+    worker.enable_online_lerobot = worker.env_decoupled_mode = False
+    worker.smooth_intervene = SmoothInterveneController(1, 1, 1, 1)
+    sent = []
+    worker.send_to = lambda **kwargs: sent.append(kwargs)
+    final_state = torch.tensor([[7.0]])
+    output = EnvOutput(
+        obs={"states": final_state},
+        final_obs={"states": final_state} if terminal else None,
+        transition=EnvTransition(dones=torch.full((1, 1), terminal)),
+    )
+    worker._publish_step(None, output, EnvTransition(), None, None, 0, chunk_id, 0)
+    [message] = sent
+    request = message["data"]
+    expected_last = terminal if episode_replay else chunk_id == 49
+    assert request.is_last == expected_last
+    assert request.env_parts[0].episode_end == (episode_replay and terminal)
+    assert message["tag"] == (
+        "policy_final" if expected_last and not episode_replay else "policy"
+    )
+    if terminal:
+        assert torch.equal(request.env_parts[0].next_obs["states"], final_state)
+        assert request.env_parts[0].requires_inference

@@ -89,9 +89,19 @@ def create_device_mesh(world_size: int) -> DeviceMesh:
             f"{Cluster.get_full_env_var_name(ClusterEnvVar.TIMEOUT)}."
         )
     else:
-        # No backend is passed, so torch still resolves the per-device backend
-        # it would have picked on its own; only the timeout changes.
-        torch.distributed.init_process_group(timeout=Cluster.get_collective_timeout())
+        kwargs = {"timeout": Cluster.get_collective_timeout()}
+        # Bind the already selected local CUDA device so barriers never guess it.
+        if Worker.torch_device_type == "cuda":
+            # Keep CPU collectives available as with the unbound default group.
+            kwargs["backend"] = (
+                "cpu:gloo,cuda:nccl"
+                if torch.distributed.is_gloo_available()
+                else "nccl"
+            )
+            kwargs["device_id"] = torch.device(
+                Worker.torch_device_type, Worker.torch_platform.current_device()
+            )
+        torch.distributed.init_process_group(**kwargs)
     return init_device_mesh(
         Worker.torch_device_type, mesh_shape=(world_size,), mesh_dim_names=["fsdp"]
     )

@@ -14,6 +14,8 @@
 
 """UR-only evaluation entry retaining RLinf model sampling and RTC scheduling."""
 
+from contextlib import ExitStack
+
 import hydra
 import torch.multiprocessing as mp
 
@@ -21,12 +23,13 @@ from rlinf.config import validate_cfg
 from rlinf.runners.embodied_eval_runner import EmbodiedEvalRunner
 from rlinf.scheduler import Cluster
 from rlinf.utils.placement import HybridComponentPlacement
+from rlinf.utils.robot_lifecycle import termination_signals
 from rlinf.workers.env.ur5e_eval_worker import (
     URRTCEnvWorker,
+    URRTCRolloutWorker,
     URSyncEnvWorker,
     URSyncRolloutWorker,
 )
-from rlinf.workers.rollout.hf.rtc_huggingface_worker import RTCMultiStepRolloutWorker
 
 
 @hydra.main(
@@ -48,20 +51,22 @@ def main(cfg) -> None:
     placement = HybridComponentPlacement(cfg, cluster)
     rtc = cfg.runner.rtc.enabled
     env_cls = URRTCEnvWorker if rtc else URSyncEnvWorker
-    rollout_cls = RTCMultiStepRolloutWorker if rtc else URSyncRolloutWorker
-    rollout = rollout_cls.create_group(cfg).launch(
-        cluster,
-        name=cfg.rollout.group_name,
-        placement_strategy=placement.get_strategy("rollout"),
-    )
-    env = env_cls.create_group(cfg).launch(
-        cluster,
-        name=cfg.env.group_name,
-        placement_strategy=placement.get_strategy("env"),
-    )
-    runner = EmbodiedEvalRunner(cfg=cfg, rollout=rollout, env=env)
-    runner.init_workers()
-    runner.run()
+    rollout_cls = URRTCRolloutWorker if rtc else URSyncRolloutWorker
+    with termination_signals(), ExitStack() as cleanup:
+        rollout = rollout_cls.create_group(cfg).launch(
+            cluster,
+            name=cfg.rollout.group_name,
+            placement_strategy=placement.get_strategy("rollout"),
+        )
+        env = env_cls.create_group(cfg).launch(
+            cluster,
+            name=cfg.env.group_name,
+            placement_strategy=placement.get_strategy("env"),
+        )
+        cleanup.callback(lambda: env.close().wait())
+        runner = EmbodiedEvalRunner(cfg=cfg, rollout=rollout, env=env)
+        runner.init_workers()
+        runner.run()
 
 
 if __name__ == "__main__":

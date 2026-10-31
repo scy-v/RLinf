@@ -1,0 +1,167 @@
+{
+  "description": "Model-only, current denoise compilation; GPU synchronized before timing; no Ray, weight transfer or robot. First post-warmup collection reported separately; normal automatic GC left enabled.",
+  "first_post_warmup": {
+    "gc_ms": 192.57572293281555,
+    "empty_cache_ms": 5.851976107805967,
+    "collected_objects": 31966
+  },
+  "rows": [
+    {
+      "run": 1,
+      "gc_ms": 177.03293403610587,
+      "empty_cache_ms": 5.845060804858804,
+      "total_ms": 182.87799484096467,
+      "collected_objects": 78
+    },
+    {
+      "run": 2,
+      "gc_ms": 171.86521994881332,
+      "empty_cache_ms": 5.853508831933141,
+      "total_ms": 177.71872878074646,
+      "collected_objects": 78
+    },
+    {
+      "run": 3,
+      "gc_ms": 171.60600307397544,
+      "empty_cache_ms": 5.849854089319706,
+      "total_ms": 177.45585716329515,
+      "collected_objects": 78
+    },
+    {
+      "run": 4,
+      "gc_ms": 180.40044605731964,
+      "empty_cache_ms": 5.85290789604187,
+      "total_ms": 186.2533539533615,
+      "collected_objects": 78
+    },
+    {
+      "run": 5,
+      "gc_ms": 172.63859696686268,
+      "empty_cache_ms": 5.836025113239884,
+      "total_ms": 178.47462208010256,
+      "collected_objects": 78
+    },
+    {
+      "run": 6,
+      "gc_ms": 173.97397803142667,
+      "empty_cache_ms": 5.836301017552614,
+      "total_ms": 179.81027904897928,
+      "collected_objects": 78
+    },
+    {
+      "run": 7,
+      "gc_ms": 173.74025704339147,
+      "empty_cache_ms": 6.05646101757884,
+      "total_ms": 179.7967180609703,
+      "collected_objects": 78
+    },
+    {
+      "run": 8,
+      "gc_ms": 174.84814301133156,
+      "empty_cache_ms": 6.057871039956808,
+      "total_ms": 180.90601405128837,
+      "collected_objects": 78
+    },
+    {
+      "run": 9,
+      "gc_ms": 170.49438902176917,
+      "empty_cache_ms": 6.218004040420055,
+      "total_ms": 176.71239306218922,
+      "collected_objects": 78
+    },
+    {
+      "run": 10,
+      "gc_ms": 177.98647889867425,
+      "empty_cache_ms": 5.850758869200945,
+      "total_ms": 183.8372377678752,
+      "collected_objects": 78
+    },
+    {
+      "run": 11,
+      "gc_ms": 175.91121210716665,
+      "empty_cache_ms": 5.862880032509565,
+      "total_ms": 181.7740921396762,
+      "collected_objects": 78
+    },
+    {
+      "run": 12,
+      "gc_ms": 177.13049799203873,
+      "empty_cache_ms": 5.835229996591806,
+      "total_ms": 182.96572798863053,
+      "collected_objects": 78
+    },
+    {
+      "run": 13,
+      "gc_ms": 176.09036806970835,
+      "empty_cache_ms": 5.8437788393348455,
+      "total_ms": 181.9341469090432,
+      "collected_objects": 78
+    },
+    {
+      "run": 14,
+      "gc_ms": 175.88176019489765,
+      "empty_cache_ms": 5.859097000211477,
+      "total_ms": 181.74085719510913,
+      "collected_objects": 78
+    },
+    {
+      "run": 15,
+      "gc_ms": 189.5214810501784,
+      "empty_cache_ms": 5.86699484847486,
+      "total_ms": 195.38847589865327,
+      "collected_objects": 78
+    },
+    {
+      "run": 16,
+      "gc_ms": 173.49335085600615,
+      "empty_cache_ms": 5.868282867595553,
+      "total_ms": 179.3616337236017,
+      "collected_objects": 78
+    },
+    {
+      "run": 17,
+      "gc_ms": 175.1093480270356,
+      "empty_cache_ms": 5.852279951795936,
+      "total_ms": 180.96162797883153,
+      "collected_objects": 78
+    },
+    {
+      "run": 18,
+      "gc_ms": 174.16851804591715,
+      "empty_cache_ms": 6.103704916313291,
+      "total_ms": 180.27222296223044,
+      "collected_objects": 78
+    },
+    {
+      "run": 19,
+      "gc_ms": 175.59719388373196,
+      "empty_cache_ms": 6.236386019736528,
+      "total_ms": 181.8335799034685,
+      "collected_objects": 78
+    },
+    {
+      "run": 20,
+      "gc_ms": 174.48875214904547,
+      "empty_cache_ms": 6.02295808494091,
+      "total_ms": 180.51171023398638,
+      "collected_objects": 78
+    }
+  ],
+  "summary": {
+    "gc_ms": {
+      "mean": 175.5989464232698,
+      "min": 170.49438902176917,
+      "max": 189.5214810501784
+    },
+    "empty_cache_ms": {
+      "mean": 5.930417263880372,
+      "min": 5.835229996591806,
+      "max": 6.236386019736528
+    },
+    "total_ms": {
+      "mean": 181.52936368715018,
+      "min": 176.71239306218922,
+      "max": 195.38847589865327
+    }
+  }
+}

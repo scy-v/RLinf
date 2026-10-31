@@ -1,0 +1,19 @@
+{
+  "order": "after-reset",
+  "loader": "copy",
+  "physical_hardware": false,
+  "initial_weight_sync": "passed",
+  "delayed_warmup_ms": [
+    10542.514847125858
+  ],
+  "inference_ms": [
+    [
+      85.60266415588558,
+      75.23665996268392,
+      79.43435898050666,
+      74.8894999269396,
+      74.19354096055031
+    ]
+  ],
+  "status": "passed"
+}

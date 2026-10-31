@@ -34,7 +34,7 @@ class UR5eRobot(Robot):
         cls,
         *,
         config: "UR5eConfig",
-        node_rank: int,
+        node_rank: int | None,
         worker_rank: int = 0,
         env_idx: int = 0,
         cameras: dict[str, Any] | None = None,

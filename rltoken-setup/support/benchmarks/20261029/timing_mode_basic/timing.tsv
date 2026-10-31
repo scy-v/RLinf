@@ -1,0 +1,29 @@
+timing_mode	clock	phase	stage_id	input_ms	inference_ms	action_send_ms	data_submit_ms	execute_ms	publish_ms	preprocess_ms	prefix_ms	z_encode_ms	reference_ms	decision_ms	action_prepare_ms	action_execution_ms	chunk_result_ms	request_ms	transition_ms	send_ms	timestamp	source	rank	sample	update	step	actor_updated	critic_updates	actor_updates	policy_version	episode	chunk	action	intervals	active_interval_ms	samples	work_ms	max_ms	work_hz	control_ms	command_ms	pace_wait_ms	observation_ms	action_interval_ms	action_interval_hz	target_hz	measured_hz	max_send_interval_ms	work_overruns	held_target_samples	force_mode_ms	sample_ms	prepare_ms	critic_ms	actor_ms	alpha_ms	target_ms	other_ms
+basic	host_elapsed	normal	0	0.185315	77.723455	2.325524	2.131053														2026-10-30T01:58:12.233+08:00	Rollout step	0	1							1	1				1	82.365347																					
+basic	host_elapsed	normal	0	0.006435				80.637146	5.309071												2026-10-30T01:58:12.685+08:00	Env step	0	1							1	1				1	85.952652																					
+basic	host_elapsed	normal	0	0.178952	74.558862	1.353518	0.673785														2026-10-30T01:58:12.765+08:00	Rollout step	0	2							1	2				1	76.765117																					
+basic	host_elapsed	normal	0	0.004983				79.131287	5.406919												2026-10-30T01:58:12.852+08:00	Env step	0	2							1	2				1	84.543189																					
+basic	host_elapsed	normal	0	0.168141	72.280165	1.152866	0.491776														2026-10-30T01:58:12.928+08:00	Rollout step	0	3							1	3				1	74.092947																					
+basic	host_elapsed	normal	0	0.003137				77.698368	5.648823												2026-10-30T01:58:13.014+08:00	Env step	0	3							1	3				1	83.350328																					
+basic	host_elapsed																				2026-10-30T01:58:14.662+08:00	Learner update	0	1	1		True									1	197.343689	197.343689	5.067302													0.731431	0.262481	171.708473	24.242854		0.124744	0.273706
+basic	host_elapsed																				2026-10-30T01:58:14.667+08:00	Learner update	0	2	2		False									1	5.108165	5.108165	195.765012													0.473553	0.237773	4.216028			0.095096	0.085715
+basic	host_elapsed																				2026-10-30T01:58:14.672+08:00	Learner update	0	3	3		False									1	4.441526	4.441526	225.147854													0.348274	0.222425	3.678620			0.101676	0.090531
+basic	host_elapsed																				2026-10-30T01:58:14.676+08:00	Learner update	0	4	4		False									1	4.009210	4.009210	249.425695													0.278976	0.214699	3.355415			0.086429	0.073691
+basic	host_elapsed																				2026-10-30T01:58:14.684+08:00	Learner update	0	5	5		True									1	7.713742	7.713742	129.638769													0.262774	0.212048	3.426274	3.605439		0.078083	0.129124
+basic	host_elapsed																				2026-10-30T01:58:14.688+08:00	Learner update	0	6	6		False									1	3.920379	3.920379	255.077373													0.330807	0.210840	3.223559			0.085583	0.069591
+basic	host_elapsed																				2026-10-30T01:58:14.692+08:00	Learner update	0	7	7		False									1	3.826053	3.826053	261.365964													0.294706	0.214949	3.166666			0.081441	0.068291
+basic	host_elapsed																				2026-10-30T01:58:14.696+08:00	Learner update	0	8	8		False									1	3.868263	3.868263	258.513965													0.309916	0.211998	3.197644			0.080139	0.068566
+basic	host_elapsed	normal	0	0.148931	74.756193	1.225498	0.379914														2026-10-30T01:58:14.852+08:00	Rollout step	0	4							2	1				1	76.510536																					
+basic	host_elapsed	normal	0	0.002623				79.739108	5.043322												2026-10-30T01:58:14.938+08:00	Env step	0	4							2	1				1	84.785053																					
+basic	host_elapsed	normal	0	0.166998	74.774762	1.333480	0.776860														2026-10-30T01:58:15.018+08:00	Rollout step	0	5							2	2				1	77.052100																					
+basic	host_elapsed	normal	0	0.002842				77.925583	4.262286												2026-10-30T01:58:15.103+08:00	Env step	0	5							2	2				1	82.190711																					
+basic	host_elapsed	normal	0	0.173767	70.906298	1.405184	0.455872														2026-10-30T01:58:15.177+08:00	Rollout step	0	6							2	3				1	72.941121																					
+basic	host_elapsed	normal	0	0.002819				76.529238	4.779351												2026-10-30T01:58:15.260+08:00	Env step	0	6							2	3				1	81.311408																					
+basic	host_elapsed																				2026-10-30T01:58:15.367+08:00	Learner update	0	9	9		True									1	9.791566	9.791566	102.128711													0.472463	0.280929	4.234225	4.571068		0.087237	0.145643
+basic	host_elapsed																				2026-10-30T01:58:15.372+08:00	Learner update	0	10	10		False									1	4.032962	4.032962	247.956711													0.319298	0.242604	3.317789			0.082334	0.070937
+basic	host_elapsed																				2026-10-30T01:58:15.376+08:00	Learner update	0	11	11		False									1	3.943369	3.943369	253.590266													0.278292	0.232116	3.250617			0.107096	0.075248
+basic	host_elapsed																				2026-10-30T01:58:15.380+08:00	Learner update	0	12	12		False									1	4.032309	4.032309	247.996857													0.278302	0.234543	3.367563			0.082393	0.069508
+basic	host_elapsed																				2026-10-30T01:58:15.387+08:00	Learner update	0	13	13		True									1	7.464221	7.464221	133.972454													0.282819	0.236912	3.243000	3.484557		0.083295	0.133638
+basic	host_elapsed																				2026-10-30T01:58:15.391+08:00	Learner update	0	14	14		False									1	3.910001	3.910001	255.754417													0.280216	0.232256	3.245486			0.082675	0.069368
+basic	host_elapsed																				2026-10-30T01:58:15.395+08:00	Learner update	0	15	15		False									1	3.893025	3.893025	256.869659													0.299162	0.224638	3.218285			0.083691	0.067249
+basic	host_elapsed																				2026-10-30T01:58:15.399+08:00	Learner update	0	16	16		False									1	3.962076	3.962076	252.392935													0.328609	0.222128	3.259197			0.083286	0.068856

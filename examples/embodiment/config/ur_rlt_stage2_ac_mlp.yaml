@@ -1,0 +1,365 @@
+# UR RLT Stage2: Double Dot marks the critical phase; double Space labels success.
+# target_ee_pose anchors safety clipping, not reward calculation.
+defaults:
+  - env/realworld_ur5e_rlt_env@env.train
+  - env/realworld_ur5e_rlt_env@env.eval
+  - hybrid_engines/fsdp@actor.fsdp_config
+  - weight_syncer/patch_syncer@weight_syncer
+  - override hydra/job_logging: stdout
+  - _self_
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  searchpath:
+    - file://${oc.env:EMBODIED_PATH}/config/
+
+cluster:
+  num_nodes: 1
+  component_placement:
+    rollout: 0
+    env:
+      node_group: ur5e
+      placement: 0
+    actor: 0
+  node_groups:
+    - label: ur5e
+      node_ranks: 0
+      hardware:
+        type: UR5e
+        configs:
+          - node_rank: 0
+            robot_ip: 192.168.201.11
+            gripper_connection: /dev/ur5e_left_gripper
+            end_effector_type: pgi
+            end_effector_config:
+              min_position: 0
+              max_position: 1000
+              force: 60
+              speed: 100
+              background_io: true
+            camera_type: realsense
+            camera_serials:
+              - '348522072391'
+              - '944622073455'
+            speed: 0.2
+            acceleration: 0.2
+            impedance:
+              frequency: 100.0
+              continuous_tracking: true
+              start_paused: true
+              kp: 1200.0
+              kd: 600.0
+              kp_rotation: 20.0
+              kd_rotation: 4.0
+              position_error_clip: 0.048
+              velocity_error_clip: 4.0
+              rotation_error_clip_degrees: null
+              control_frame_euler_deg:
+                - 0.0
+                - 0.0
+                - 0.0
+              selection_vector:
+                - 1
+                - 1
+                - 1
+                - 0
+                - 0
+                - 1
+              force_type: 2
+              force_limits:
+                - 2.0
+                - 2.0
+                - 2.0
+                - 2.0
+                - 2.0
+                - 2.0
+              force_gain_scale: 1.5
+              payload_mass: 1.601
+              payload_cog:
+                - 0.011
+                - -0.002
+                - 0.052
+
+runner:
+  env_init_after_models: true
+  timing_mode: basic  # disabled / basic / detailed; local elapsed time, no timing synchronization.
+  log_data: true  # File-only data records, independent of timing_mode.
+  task_type: embodied
+  logger:
+    log_path: ../results
+    project_name: rlinf-rlt
+    experiment_name: ur_rlt_stage2_ac_mlp
+    logger_backends:
+      - tensorboard
+  max_epochs: 8000
+  max_steps: -1
+  only_eval: false
+  val_check_interval: -1
+  save_interval: 1000
+  resume_dir: null
+  ckpt_path: null
+
+algorithm:
+  update_epoch: 8
+  rlt_transition_replay: true
+  rlt_schedule:
+    enable: true
+    warmup_min_size: 150
+    # Fresh runs reuse the first 150 transitions; resume ignores this cache.
+    # Set null to recollect without caching, or a new path for another task/model.
+    warmup_cache_path: /home/suchenyu/RLinf-rltoken/logs/online_rltoken/warmup/insert_black_rack_into_blue_slot.pt
+    warmup_post_collect_updates: 150
+    continuous_updates: true
+  actor_weight_schedule:
+    enable: true
+    warmup_updates: 150
+    ramp_updates: 0
+    warmup_bc_weight: 5.0
+    warmup_q_weight: 0.02
+    online_bc_weight: 5.0
+    online_q_weight: 0.1
+  group_size: 1
+  agg_q: min
+  actor_agg_q: q1
+  enable_drq: false
+  q_head_type: ${actor.model.q_head_type}
+  adv_type: embodied_sac
+  loss_type: rlt_ac
+  loss_agg_func: token-mean
+  q_weight: 0.1
+  bc_weight: 5
+  reference_dropout_prob: 0.5
+  bootstrap_type: standard
+  gamma: 0.96
+  tau: 0.005
+  entropy_tuning:
+    alpha_type: fixed_alpha
+    initial_alpha: 0.0
+    optim:
+      lr: 0.0003
+      lr_scheduler: torch_constant
+      clip_grad: 10.0
+  replay_buffer:
+    enable_cache: true
+    cache_size: 2000
+    min_buffer_size: 2
+    sample_window_size: 2000
+    auto_save: false
+  target_update_freq: 1
+  target_update_type: all
+  train_actor_steps: 2
+  critic_actor_ratio: 4
+  critic_subsample_size: 0
+  backup_entropy: false
+
+env:
+  group_name: EnvGroup
+  train:
+    rollout_epoch: 1
+    flush_replay_on_episode_end: true  # Commit replay before reset; false uses fixed chunk batches.
+    total_num_envs: 1
+    auto_reset: true
+    ignore_terminations: false
+    keyboard_reward_wrapper: rlt_policy_switch
+    max_episode_chunks: 60
+    max_chunks_per_rollout_epoch: 50
+    # Match record.teleop in ~/ur_data_collection/lerobot_ur5e_keyteleop/scripts/config/cfg.yaml.
+    # force_step_size / force_rot_step_size use m / rad; *_fine_* map to *_alt (/ toggles).
+    teleop:
+      - keyboard:
+          step_size_pos: 0.03
+          step_size_pos_alt: 0.006
+          step_size_rot: 0.05
+          step_size_rot_alt: 0.03
+    no_gripper: false
+    override_cfg:
+      reset_on_init: false
+      is_dummy: false
+      use_dense_reward: false
+      reward_scale: 1.0
+      max_num_steps: 300  # max_episode_chunks supplies the effective runtime limit.
+      target_ee_pose:
+        - 0.389694
+        - 0.107973
+        - 0.382018
+        - -3.14
+        - 0.0
+        - -1.57
+      success_hold_steps: 1
+    keyboard_wrapper_kwargs:
+      wait_for_start: true
+      wait_for_reset: false
+      wait_for_first_reset: true
+      success_key: Key.space
+      success_double_press_interval: 0.5
+      switch_key: Key.dot
+      switch_double_press_interval: 0.5
+  eval:
+    rollout_epoch: 1
+    total_num_envs: 1
+    auto_reset: true
+    ignore_terminations: false
+    keyboard_reward_wrapper: rlt_policy_switch
+    max_episode_chunks: 200
+    max_chunks_per_rollout_epoch: 20
+    use_fixed_reset_state_ids: false
+    group_size: 1
+    # Use the same collection force-control steps as train.teleop, including the / fine mode.
+    teleop:
+      - keyboard:
+          step_size_pos: 0.03
+          step_size_pos_alt: 0.006
+          step_size_rot: 0.05
+          step_size_rot_alt: 0.03
+    no_gripper: false
+    override_cfg:
+      reset_on_init: false
+      is_dummy: false
+      use_dense_reward: false
+      reward_scale: 1.0
+      max_num_steps: 300  # max_episode_chunks supplies the effective runtime limit.
+      target_ee_pose:
+        - 0.389694
+        - 0.107973
+        - 0.382018
+        - -3.14
+        - 0.0
+        - -1.57
+      success_hold_steps: 1
+    video_cfg:
+      save_video: true
+      video_base_dir: ${runner.logger.log_path}/video/eval
+    keyboard_wrapper_kwargs:
+      wait_for_start: true
+      wait_for_reset: false
+      wait_for_first_reset: true
+      success_key: Key.space
+      success_double_press_interval: 0.5
+      switch_key: Key.dot
+      switch_double_press_interval: 0.5
+
+rollout:
+  group_name: RolloutGroup
+  generation_backend: huggingface
+  enable_offload: false
+  # Run synthetic inference before env initialization and its first reset.
+  rlt_inference_warmup:
+    enabled: true
+    iterations: 3
+    image_size: 224
+    state_dim: 20
+  pipeline_stage_num: 1
+  collect_transitions: true
+  collect_prev_infos: false
+  model:
+    model_path: null
+    precision: ${actor.model.precision}
+    action_dim: ${actor.model.action_dim}
+    num_action_chunks: ${actor.model.num_action_chunks}
+    ref_num_action_chunks: ${actor.model.ref_num_action_chunks}
+  rlt_feature_model:
+    model_type: openpi
+    precision: bf16
+    is_lora: false
+    num_action_chunks: ${.openpi.action_horizon}
+    action_dim: 7
+    num_steps: ${.openpi.num_steps}
+    add_value_head: false
+    model_path: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_5000/actor
+    openpi_data:
+      repo_id: scylearning/insert_black_rack_into_blue_slot_20260916_v01
+      norm_stats_path: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/norm_stats.json
+      obs_indices:
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+        - 17
+        - 18
+        - 19
+    openpi:
+      task: eval
+      config_name: pi05_ur_state
+      num_images_in_input: 2
+      action_horizon: 20
+      action_chunk: ${actor.model.ref_num_action_chunks}
+      action_env_dim: ${rollout.rlt_feature_model.action_dim}
+      num_steps: 4
+      model_action_dim: 32
+      paligemma_variant: gemma_2b
+      action_expert_variant: gemma_300m
+      max_token_len: 200
+      discrete_state_input: true
+      state_indices: []
+      noise_method: flow_noise
+      noise_params:
+        - 0.16
+        - 0.12
+        - 200
+      joint_logprob: true
+      use_rlt: true
+      rlt_prefix_seq_len: 1024
+      rlt_image_only: false
+      rlt_use_mask: true
+    pi05: true
+  enable_torch_compile: true
+  rlt_feature_compile_mode: max-autotune  # Reference-action denoising only; null disables compilation.
+  cleanup_after_weight_sync: false  # true forces Python GC and GPU cache cleanup after each sync.
+  enable_cuda_graph: false
+
+actor:
+  group_name: ActorGroup
+  training_backend: fsdp
+  micro_batch_size: 256
+  global_batch_size: 256
+  seed: 1234
+  enable_offload: false
+  model:
+    model_type: rlt_mlp_policy
+    model_path: null
+    precision: fp32
+    add_value_head: false
+    add_q_head: true
+    q_head_type: default
+    fixed_std: 0.002
+    is_lora: false
+    z_dim: 2048
+    proprio_dim: 19
+    action_dim: 7
+    num_action_chunks: 10
+    ref_num_action_chunks: ${rollout.rlt_feature_model.openpi.action_horizon}
+  optim:
+    clip_grad: 10.0
+    lr: 3e-4
+    lr_scheduler: torch_constant
+  critic_optim:
+    clip_grad: 10.0
+    lr: 3e-4
+    lr_scheduler: torch_constant
+  fsdp_config:
+    strategy: fsdp
+    sharding_strategy: no_shard
+    mixed_precision:
+      param_dtype: ${actor.model.precision}
+      reduce_dtype: ${actor.model.precision}
+      buffer_dtype: ${actor.model.precision}
+
+reward:
+  use_reward_model: false
+
+critic:
+  use_critic_model: false

@@ -1,0 +1,292 @@
+{
+  "hardware": "NVIDIA RTX 4090 D, 24 GiB",
+  "checkpoint": "global_step_30000/actor/model_state_dict/full_weights.pt",
+  "inputs": "Synthetic zero RGB images, two cameras at 224x224; raw state dim 20; no robot connection",
+  "num_steps": 10,
+  "action_horizon": 20,
+  "action_chunk": 10,
+  "compile_mode": "max-autotune",
+  "conditions": [
+    "Two fresh Python processes; two calls per process",
+    "Normal existing OS and compiler caches; no cache flush",
+    "First process overlapped briefly with CPU unit tests; these are diagnostic samples, not isolated performance benchmarks",
+    "Startup stage boundaries synchronize the initialized accelerator"
+  ],
+  "limitations": [
+    "Historical 109.72s and 17.11s runs have no phase records, so their difference cannot be assigned retrospectively",
+    "Checkpoint mapping and application both read_bytes=0 in these two probes; no uncached disk read was measured",
+    "Compiler fields describe work within the sample call and are not additive to sample wall time"
+  ],
+  "runs": {
+    "first": {
+      "load_sec": 18.24210892478004,
+      "warmup_sec": [
+        23.637601013761014,
+        0.09634172823280096
+      ],
+      "load_stages": [
+        {
+          "stage": "policy.imports",
+          "duration_sec": 0.9819763912819326,
+          "cpu_sec": 3.516261,
+          "read_bytes": 139264,
+          "major_faults": 0,
+          "minor_faults": 46975
+        },
+        {
+          "stage": "policy.config",
+          "duration_sec": 0.002881609834730625,
+          "cpu_sec": 0.0029020000000006263,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 3
+        },
+        {
+          "stage": "model.imports",
+          "duration_sec": 0.00445121806114912,
+          "cpu_sec": 0.01593,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 82
+        },
+        {
+          "stage": "model.construct",
+          "duration_sec": 12.598428757861257,
+          "cpu_sec": 13.723101999999999,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 4011225
+        },
+        {
+          "stage": "model.transforms",
+          "duration_sec": 1.145678197965026,
+          "cpu_sec": 1.1444639999999993,
+          "read_bytes": 8192,
+          "major_faults": 0,
+          "minor_faults": 44459
+        },
+        {
+          "stage": "checkpoint.read",
+          "duration_sec": 0.011692906729876995,
+          "cpu_sec": 0.011730000000003571,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 310
+        },
+        {
+          "stage": "checkpoint.keys",
+          "duration_sec": 0.00020436104387044907,
+          "cpu_sec": 0.00022200000000083264,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 0
+        },
+        {
+          "stage": "checkpoint.apply",
+          "duration_sec": 0.7789803920313716,
+          "cpu_sec": 3.0987190000000027,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 250259
+        },
+        {
+          "stage": "model.freeze_and_precision",
+          "duration_sec": 1.0076402202248573,
+          "cpu_sec": 3.8370220000000046,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 1688705
+        },
+        {
+          "stage": "model.to_device",
+          "duration_sec": 1.1612665918655694,
+          "cpu_sec": 1.177114000000003,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 2486
+        },
+        {
+          "stage": "model.compile_setup",
+          "duration_sec": 0.0015816199593245983,
+          "cpu_sec": 0.0016099999999994452,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 1
+        }
+      ],
+      "compiler": [
+        {
+          "event": "startup_compile",
+          "probe_iteration": 1,
+          "phase": "warmup",
+          "timestamp": 1793441032.51526,
+          "component": "vla_precision",
+          "compile_id": "0/0",
+          "entire_frame_compile_time_s": 16.397268,
+          "backend_compile_time_s": 1.444137,
+          "triton_compile_time_us": 514,
+          "inductor_fx_local_cache_hit_count": 1,
+          "inductor_fx_local_cache_miss_count": 0
+        },
+        {
+          "event": "startup_compile",
+          "probe_iteration": 1,
+          "phase": "warmup",
+          "timestamp": 1793441032.5152724,
+          "component": "vla_precision",
+          "compile_id": "0/0",
+          "runtime_cudagraphify_time_us": 2531,
+          "runtime_triton_autotune_time_us": 7077342,
+          "inductor_fx_local_cache_hit_count": 0,
+          "inductor_fx_local_cache_miss_count": 0
+        },
+        {
+          "event": "startup_compile",
+          "probe_iteration": 2,
+          "phase": "warmup",
+          "timestamp": 1793441032.611582,
+          "component": "vla_precision",
+          "compile_id": "0/0",
+          "runtime_cudagraphify_time_us": 25572,
+          "inductor_fx_local_cache_hit_count": 0,
+          "inductor_fx_local_cache_miss_count": 0
+        }
+      ]
+    },
+    "second": {
+      "load_sec": 17.89616314601153,
+      "warmup_sec": [
+        24.315776080824435,
+        0.10021443385630846
+      ],
+      "load_stages": [
+        {
+          "stage": "policy.imports",
+          "duration_sec": 0.9874392813071609,
+          "cpu_sec": 3.4174229999999994,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 46861
+        },
+        {
+          "stage": "policy.config",
+          "duration_sec": 0.0029246769845485687,
+          "cpu_sec": 0.0029440000000002797,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 17
+        },
+        {
+          "stage": "model.imports",
+          "duration_sec": 0.004517287015914917,
+          "cpu_sec": 0.016674000000000078,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 123
+        },
+        {
+          "stage": "model.construct",
+          "duration_sec": 12.43550182087347,
+          "cpu_sec": 13.535112000000002,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 4011286
+        },
+        {
+          "stage": "model.transforms",
+          "duration_sec": 1.0661716577596962,
+          "cpu_sec": 1.0654240000000037,
+          "read_bytes": 4096,
+          "major_faults": 0,
+          "minor_faults": 44466
+        },
+        {
+          "stage": "checkpoint.read",
+          "duration_sec": 0.011694707907736301,
+          "cpu_sec": 0.011722999999999928,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 309
+        },
+        {
+          "stage": "checkpoint.keys",
+          "duration_sec": 0.00019915495067834854,
+          "cpu_sec": 0.00021599999999821762,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 0
+        },
+        {
+          "stage": "checkpoint.apply",
+          "duration_sec": 0.7510616290383041,
+          "cpu_sec": 3.002696000000004,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 250259
+        },
+        {
+          "stage": "model.freeze_and_precision",
+          "duration_sec": 1.036409487016499,
+          "cpu_sec": 3.923621999999998,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 1689856
+        },
+        {
+          "stage": "model.to_device",
+          "duration_sec": 1.0747765940614045,
+          "cpu_sec": 1.094619999999999,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 2485
+        },
+        {
+          "stage": "model.compile_setup",
+          "duration_sec": 0.0014750421978533268,
+          "cpu_sec": 0.0015010000000046375,
+          "read_bytes": 0,
+          "major_faults": 0,
+          "minor_faults": 2
+        }
+      ],
+      "compiler": [
+        {
+          "event": "startup_compile",
+          "probe_iteration": 1,
+          "phase": "warmup",
+          "timestamp": 1793441089.4714384,
+          "component": "vla_precision",
+          "compile_id": "0/0",
+          "entire_frame_compile_time_s": 16.357294,
+          "backend_compile_time_s": 1.44177,
+          "triton_compile_time_us": 607,
+          "inductor_fx_local_cache_hit_count": 1,
+          "inductor_fx_local_cache_miss_count": 0
+        },
+        {
+          "event": "startup_compile",
+          "probe_iteration": 1,
+          "phase": "warmup",
+          "timestamp": 1793441089.4714513,
+          "component": "vla_precision",
+          "compile_id": "0/0",
+          "runtime_cudagraphify_time_us": 2399,
+          "runtime_triton_autotune_time_us": 7794200,
+          "inductor_fx_local_cache_hit_count": 0,
+          "inductor_fx_local_cache_miss_count": 0
+        },
+        {
+          "event": "startup_compile",
+          "probe_iteration": 2,
+          "phase": "warmup",
+          "timestamp": 1793441089.571885,
+          "component": "vla_precision",
+          "compile_id": "0/0",
+          "runtime_cudagraphify_time_us": 25739,
+          "inductor_fx_local_cache_hit_count": 0,
+          "inductor_fx_local_cache_miss_count": 0
+        }
+      ]
+    }
+  }
+}

@@ -10,6 +10,7 @@ gymnasium==0.29.1
 opencv-python
 pyrealsense2; sys_platform == 'linux' and platform_machine == 'x86_64'
 imageio[ffmpeg]
+matplotlib==3.10.8
 evdev; sys_platform == 'linux'
 pyspacemouse>=2.0.0
 

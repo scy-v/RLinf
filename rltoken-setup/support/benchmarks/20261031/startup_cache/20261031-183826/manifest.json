@@ -1,0 +1,107 @@
+{
+  "checkpoint": "/data/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor/model_state_dict/full_weights.pt",
+  "checkpoint_bytes": 16401034344,
+  "cache_root": "/tmp/rlt-inference-cache-c10np02c",
+  "conditions": {
+    "input": "Synthetic zero images, two 224x224 RGB cameras, raw state dim 20",
+    "robot_connected": false,
+    "processes": "Three fresh Python processes; four predictions in each",
+    "cold": "Checkpoint file pages evicted with file-scoped POSIX_FADV_DONTNEED; independent empty Inductor/Triton/CUDA cache directories",
+    "warm": "Checkpoint and compiler caches populated by preceding run",
+    "limits": "System libraries, tokenizer assets and device firmware caches are not evicted; no global drop_caches; storage-device internal caches are uncontrolled"
+  },
+  "runs": [
+    {
+      "name": "cold",
+      "returncode": 0,
+      "process_wall_sec": 458.823989930097,
+      "residency_before": {
+        "cached_pages": 0,
+        "pages": 4004159,
+        "cached_fraction": 0.0
+      },
+      "residency_after": {
+        "cached_pages": 4004159,
+        "pages": 4004159,
+        "cached_fraction": 1.0
+      },
+      "compiler_cache_files_before": 0
+    },
+    {
+      "name": "warm_1",
+      "returncode": 0,
+      "process_wall_sec": 54.44143254496157,
+      "residency_before": {
+        "cached_pages": 4004159,
+        "pages": 4004159,
+        "cached_fraction": 1.0
+      },
+      "residency_after": {
+        "cached_pages": 4004159,
+        "pages": 4004159,
+        "cached_fraction": 1.0
+      },
+      "compiler_cache_files_before": 12273
+    },
+    {
+      "name": "warm_2",
+      "returncode": 0,
+      "process_wall_sec": 43.55214994866401,
+      "residency_before": {
+        "cached_pages": 4004159,
+        "pages": 4004159,
+        "cached_fraction": 1.0
+      },
+      "residency_after": {
+        "cached_pages": 4004159,
+        "pages": 4004159,
+        "cached_fraction": 1.0
+      },
+      "compiler_cache_files_before": 13177
+    },
+    {
+      "name": "warm_3",
+      "returncode": 0,
+      "process_wall_sec": 46.37417698604986,
+      "residency_before": {
+        "cached_pages": 4004159,
+        "pages": 4004159,
+        "cached_fraction": 1.0
+      },
+      "residency_after": {
+        "cached_pages": 4004159,
+        "pages": 4004159,
+        "cached_fraction": 1.0
+      },
+      "compiler_cache_files_before": 13393
+    },
+    {
+      "name": "warm_4",
+      "returncode": 0,
+      "process_wall_sec": 47.87918132496998,
+      "residency_before": {
+        "cached_pages": 4004159,
+        "pages": 4004159,
+        "cached_fraction": 1.0
+      },
+      "residency_after": {
+        "cached_pages": 4004159,
+        "pages": 4004159,
+        "cached_fraction": 1.0
+      },
+      "compiler_cache_files_before": 13649
+    }
+  ],
+  "eviction": {
+    "before": {
+      "cached_pages": 3851434,
+      "pages": 4004159,
+      "cached_fraction": 0.9618584077205725
+    },
+    "after": {
+      "cached_pages": 0,
+      "pages": 4004159,
+      "cached_fraction": 0.0
+    }
+  }
+}

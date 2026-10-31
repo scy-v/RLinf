@@ -15,6 +15,7 @@
 # Ported from VLA-Precision; see provenance.json for source and changes.
 
 # Episode recording shared by the native robot backends.
+import json
 import queue
 import threading
 import time
@@ -37,10 +38,14 @@ class Recorder:
         video_path: list,
         display_fps: int = 15,
         visualize: bool = False,
+        save_logs: bool = True,
+        evaluation_path: Path | None = None,
     ):
         self.visualize = visualize
+        self.save_logs = save_logs
         # log path
         self.log_path = log_path
+        self.evaluation_path = evaluation_path
 
         # video paths
         self.left_wrist_video = video_path[0]
@@ -50,7 +55,7 @@ class Recorder:
         self.display_fps = display_fps
 
         # safe queues
-        self.queue_log = queue.Queue(maxsize=1)
+        self.queue_log = queue.Queue()
         self.queue_vis = queue.Queue(maxsize=1)
 
         # store frames for video
@@ -58,10 +63,11 @@ class Recorder:
         self.frames_left_wrist = []  # left wrist camera frames
         self.frames_right_wrist = []  # optional right wrist camera frames
         self.episode_results = []
-        self._episodes_flushed = False
+        self._write_evaluation()
 
         # start threads
-        threading.Thread(target=self._logger_thread, daemon=True).start()
+        if self.save_logs:
+            threading.Thread(target=self._logger_thread, daemon=True).start()
         threading.Thread(target=self._visualizer_thread, daemon=True).start()
 
     # ====================== Logger Thread ====================== #
@@ -286,6 +292,7 @@ class Recorder:
 
         data = dict(extra)
         data["infer_time"] = int(infer_time)
+        data["infer_index"] = int(infer_time)
         data["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
         data["prompt"] = prompt
         if state is not None:
@@ -318,6 +325,8 @@ class Recorder:
         data = self._make_actions_record(
             actions, infer_time, prompt, state=state, **extra
         )
+        if not self.save_logs:
+            return data
         try:
             self.queue_log.put_nowait(data)
         except queue.Full:
@@ -399,10 +408,13 @@ class Recorder:
             episode_index, duration_sec, status, action_batches, completed, **extra
         )
         self._store_episode_result(result)
+        if self.save_logs:
+            self.queue_log.put({"episode_result": result})
+            self.queue_log.join()
+            self._write_evaluation()
         return result
 
-    def submit_episode_summary(self, **extra):
-        """Submit final episode timing summary and print it to terminal."""
+    def _make_episode_summary(self, **extra):
         completed = [
             item
             for item in self.episode_results
@@ -425,28 +437,44 @@ class Recorder:
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
         summary.update(extra)
-        plot_path = save_episode_plot(summary, log_path=self.log_path)
-        if plot_path is not None:
-            summary["episode_plot"] = plot_path
+        return summary
 
-        if not self._episodes_flushed:
-            for item in self.episode_results:
-                self.queue_log.put({"episode_result": item})
-                self.queue_log.join()
-            self._episodes_flushed = True
+    def _write_evaluation(self):
+        if not self.save_logs or self.evaluation_path is None:
+            return
+        summary = self._make_episode_summary()
+        episodes = summary.pop("episodes")
+        payload = {
+            "evaluation": "ur5e-vla-precision",
+            "episodes": episodes,
+            "summary": summary,
+        }
+        self.evaluation_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.evaluation_path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(self.evaluation_path)
 
-        self.queue_log.put({"episode_summary": summary})
-        self.queue_log.join()
+    def submit_episode_summary(self, **extra):
+        """Submit final episode timing summary and print it to terminal."""
+        summary = self._make_episode_summary(**extra)
+        if self.save_logs:
+            plot_path = save_episode_plot(summary, log_path=self.log_path)
+            if plot_path is not None:
+                summary["episode_plot"] = plot_path
+
+            self.queue_log.put({"episode_summary": summary})
+            self.queue_log.join()
+            self._write_evaluation()
 
         print("========== Episode Timing Summary ==========")
         if self.episode_results:
             print(
-                f"[EPISODE] Total {len(self.episode_results)} episodes, "
-                f"completed {len(completed)}, incomplete {len(incomplete)}, "
+                f"[EPISODE] Total {summary['total_episodes']} episodes, "
+                f"completed {summary['completed_episodes']}, incomplete {summary['incomplete_episodes']}, "
                 f"success rate {summary['success_rate_percent']:.2f}%"
             )
             print(
-                f"[EPISODE] Average over {len(completed)} completed episodes: "
+                f"[EPISODE] Average over {summary['completed_episodes']} completed episodes: "
                 f"{summary['average_completed_duration']} "
                 f"({summary['average_completed_duration_sec']}s)"
             )

@@ -1691,3 +1691,324 @@ def test_openpi_ur_default_is_one_through_nineteen_and_franka_is_unchanged(tmp_p
     io.state_indices = None
     io.setup_transforms(data.data_transforms.inputs, data.data_transforms.outputs)
     assert io._select_proprio(io_state) is io_state
+
+
+@pytest.mark.parametrize("legacy_format", [False, True])
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_openpi_full_checkpoint_load_preserves_model_storage(
+    tmp_path, legacy_format, wrapped
+):
+    from rlinf.models.embodiment.openpi.checkpoint import load_full_weights
+
+    source = torch.nn.Module()
+    source.llm = torch.nn.Linear(3, 4)
+    source.rlt_module = torch.nn.Linear(4, 2)
+    target = torch.nn.Module()
+    target.llm = torch.nn.Linear(3, 4)
+    target.rlt_module = torch.nn.Linear(4, 2)
+    pointers = {key: value.data_ptr() for key, value in target.state_dict().items()}
+    state = source.state_dict()
+    if wrapped:
+        state = {"state_dict": {"module." + key: value for key, value in state.items()}}
+    path = tmp_path / "full_weights.pt"
+    torch.save(state, path, _use_new_zipfile_serialization=not legacy_format)
+    original_bytes = path.read_bytes()
+    from rlinf.utils.startup_timing import StartupTiming
+
+    records = []
+    with StartupTiming("load", records.append):
+        load_full_weights(target, path, expect_rlt=True)
+    import json
+
+    stages = [
+        json.loads(line.split("[STARTUP_TIMING] ", 1)[1])
+        for line in records
+        if line.startswith("[STARTUP_TIMING]")
+    ]
+    assert [row["stage"] for row in stages if row["event"] == "startup_stage"] == [
+        "checkpoint.read",
+        "checkpoint.keys",
+        "checkpoint.apply",
+    ]
+    for key, value in target.state_dict().items():
+        torch.testing.assert_close(value, source.state_dict()[key], rtol=0, atol=0)
+        assert value.data_ptr() == pointers[key]
+    # Model parameters must remain independently writable after mapped storage closes.
+    with torch.no_grad():
+        target.llm.weight.add_(1)
+    assert path.read_bytes() == original_bytes
+    load_full_weights(target, path, expect_rlt=True)
+    torch.testing.assert_close(target.llm.weight, source.llm.weight, rtol=0, atol=0)
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_rlt_data_logging(tmp_path, capsys, enabled):
+    import ast
+    import re
+
+    from rlinf.algorithms.rlt.rollout import RLTDataLogger
+    from rlinf.models.embodiment.mlp_policy.rlt_mlp_policy import RLTMLPPolicy
+
+    policy = RLTMLPPolicy(
+        z_dim=4,
+        proprio_dim=2,
+        action_dim=2,
+        num_action_chunks=2,
+        ref_num_action_chunks=3,
+    ).eval()
+    obs = {
+        "z_rl": torch.zeros(2, 4),
+        "proprio": torch.zeros(2, 2),
+        "ref_chunk": torch.arange(12, dtype=torch.float32).reshape(2, 3, 2),
+    }
+    actions, _ = policy.predict_action_batch(obs, mode="eval")
+    logger = RLTDataLogger(str(tmp_path), rank=3, enabled=enabled)
+    for version in [150, 158]:
+        logger.record_actions(
+            vla_action_chunk=obs["ref_chunk"],
+            actor_action_chunk=actions,
+            mode="eval",
+            version=version,
+        )
+    assert capsys.readouterr() == ("", "")
+    if not enabled:
+        assert not (tmp_path / "data.log").exists()
+        assert logger.inference_index == 0
+        return
+    text = logger.path.read_text()
+    blocks = text.strip().split("\n\n")
+    assert len(blocks) == 2
+    assert logger.path == tmp_path / "data.log"
+    for index, (block, version) in enumerate(zip(blocks, [150, 158]), start=1):
+        assert block.startswith(f"--- inference={index} | ")
+        assert f"mode=eval | policy_version={version} ---" in block
+        assert "+00:00" in block
+        assert "VLA (batch=2, steps=3, dim=2)" in block
+        assert "Actor (batch=2, steps=2, dim=2)" in block
+        vla, actor = block.split("Actor (", 1)
+        for section, expected in [(vla, obs["ref_chunk"]), (actor, actions)]:
+            rows = re.findall(r"^    \d+: (\[.*\])$", section, re.MULTILINE)
+            actual = torch.tensor(
+                [ast.literal_eval(row) for row in rows], dtype=expected.dtype
+            )
+            torch.testing.assert_close(actual, expected.reshape(-1, 2), rtol=0, atol=0)
+
+
+def test_rlt_disabled_data_logging_does_not_copy_tensors(tmp_path):
+    from rlinf.algorithms.rlt.rollout import RLTDataLogger
+
+    logger = RLTDataLogger(str(tmp_path), rank=0, enabled=False)
+    logger.record_actions(
+        vla_action_chunk=torch.empty(1, 20, 7, device="meta"),
+        actor_action_chunk=torch.empty(1, 10, 7, device="meta"),
+        mode="train",
+        version=0,
+    )
+    assert not logger.path.exists()
+
+
+def test_rlt_startup_inference_warmup(tmp_path):
+    """Opt-in model-only check: startup warmup never publishes robot actions."""
+    import json
+    import logging
+    import os
+
+    from rlinf.algorithms.rlt.rollout import RLTDataLogger
+    from rlinf.utils.progress import StageTiming
+    from rlinf.workers.rollout.hf.huggingface_worker import MultiStepRolloutWorker
+
+    config_path = os.environ.get("RLINF_RLT_COMPILE_TEST_CONFIG")
+    if not config_path or not torch.cuda.is_available():
+        pytest.skip(
+            "Requires CUDA and RLINF_RLT_COMPILE_TEST_CONFIG with UR RLT assets"
+        )
+    torch.set_num_threads(4)
+    worker = object.__new__(MultiStepRolloutWorker)
+    worker.cfg = OmegaConf.load(config_path)
+    worker.cfg.rollout.rlt_inference_warmup = {
+        "enabled": True,
+        "iterations": 3,
+        "image_size": 224,
+        "state_dim": 20,
+    }
+    worker.cfg.runner.env_init_after_models = True
+    worker.device = torch.device("cuda", 0)
+    worker.enable_train, worker.enable_eval = True, False
+    worker.per_node_train_batch_size = 1
+    worker.version = 0
+    worker._rank = 0
+    worker._logger = logging.getLogger(__name__)
+    worker._stacklevel = 1
+    worker.expert_model = None
+    worker.hf_model = get_model(
+        OmegaConf.merge(worker.cfg.actor.model, worker.cfg.rollout.model)
+    ).eval()
+    worker.rlt_feature_model = (
+        get_model(worker.cfg.rollout.rlt_feature_model).eval().requires_grad_(False)
+    )
+    if worker.cfg.rollout.get("enable_torch_compile", False):
+        worker.hf_model.enable_torch_compile(
+            mode=worker.cfg.rollout.get(
+                "torch_compile_mode", "max-autotune-no-cudagraphs"
+            )
+        )
+    from rlinf.algorithms.rlt import build_rlt_route
+
+    worker.rlt_route = build_rlt_route(worker.cfg)
+    worker._rlt_data_logger = RLTDataLogger(str(tmp_path), rank=0, enabled=True)
+    compile_mode = worker.cfg.rollout.get("rlt_feature_compile_mode")
+    if compile_mode is not None:
+        worker.rlt_feature_model.enable_rlt_torch_compile(mode=compile_mode)
+    records = []
+    worker._inference_timing = StageTiming(
+        "Rollout inference", True, records.append, worker.torch_platform.synchronize
+    )
+    cpu_rng = torch.get_rng_state().clone()
+    gpu_rng = worker.torch_platform.get_rng_state().clone()
+    weights = {
+        key: value.clone() for key, value in worker.hf_model.state_dict().items()
+    }
+    started = time.perf_counter()
+    worker.warmup_rlt_inference()
+    warmup_ms = 1000 * (time.perf_counter() - started)
+    assert worker._rlt_first_prediction_complete
+    assert not records and worker._inference_timing.sequence == 0
+    assert not worker._rlt_data_logger.path.exists()
+    assert torch.equal(cpu_rng, torch.get_rng_state())
+    assert torch.equal(gpu_rng, worker.torch_platform.get_rng_state())
+    for key, value in worker.hf_model.state_dict().items():
+        torch.testing.assert_close(value, weights[key], rtol=0, atol=0)
+
+    obs = {
+        "main_images": torch.randint(256, (1, 224, 224, 3), dtype=torch.uint8),
+        "wrist_images": torch.randint(256, (1, 224, 224, 3), dtype=torch.uint8),
+        "states": torch.zeros(1, 20),
+        "task_descriptions": [worker.cfg.env.train.override_cfg.task_description],
+    }
+    durations = []
+    for _ in range(5):
+        started = time.perf_counter()
+        actions, result = worker._predict_rollout_actions(obs)
+        durations.append(1000 * (time.perf_counter() - started))
+        assert torch.isfinite(actions).all()
+        assert not result["forward_inputs"]["record_transition"].any()
+        text = worker._rlt_data_logger.path.read_text()
+        assert text.count("--- inference=") == len(durations)
+        assert "VLA (batch=1," in text
+        assert "Actor (batch=1," in text
+    assert worker._inference_timing.sequence == 5
+    report = {"startup_warmup_ms": warmup_ms, "post_warmup_inference_ms": durations}
+    (tmp_path / "startup_warmup.json").write_text(json.dumps(report, indent=2))
+    logging.getLogger(__name__).info("RLT model-only warmup timing: %s", report)
+
+
+def test_openpi_rlt_compilation_preserves_features_for_training(tmp_path):
+    """Opt-in UR checkpoint test: parity, graph output lifetime and backward."""
+    import json
+    import logging
+    import os
+
+    config_path = os.environ.get("RLINF_RLT_COMPILE_TEST_CONFIG")
+    if not config_path or not torch.cuda.is_available():
+        pytest.skip(
+            "Requires CUDA and RLINF_RLT_COMPILE_TEST_CONFIG with UR RLT assets"
+        )
+    cfg = OmegaConf.load(config_path)
+    torch.set_num_threads(4)
+    torch.manual_seed(42)
+    feature_model = get_model(cfg.rollout.rlt_feature_model).to("cuda").eval()
+    with pytest.raises(ValueError, match="frozen model"):
+        feature_model.enable_rlt_torch_compile()
+    feature_model.requires_grad_(False)
+    policy = get_model(OmegaConf.merge(cfg.actor.model, cfg.rollout.model)).to("cuda")
+    observations = [
+        {
+            "main_images": torch.randint(256, (1, 224, 224, 3), dtype=torch.uint8),
+            "wrist_images": torch.randint(256, (1, 224, 224, 3), dtype=torch.uint8),
+            "states": torch.zeros(1, 20),
+            "task_descriptions": ["Insert the black rack into the blue slot"],
+        }
+        for _ in range(8)
+    ]
+    noise = torch.randn(1, 20, 32, device="cuda")
+    baseline = [feature_model.extract_rlt_obs(obs, noise=noise) for obs in observations]
+    feature_model.enable_rlt_torch_compile(mode="max-autotune")
+    feature_model.enable_rlt_torch_compile(mode="max-autotune")
+    with pytest.raises(ValueError, match="cannot switch"):
+        feature_model.enable_rlt_torch_compile(mode="default")
+    compiled = [feature_model.extract_rlt_obs(obs, noise=noise) for obs in observations]
+    snapshots = [{key: value.clone() for key, value in row.items()} for row in compiled]
+    for _ in range(2):
+        for obs, expected in zip(observations, compiled):
+            repeated = feature_model.extract_rlt_obs(obs, noise=noise)
+            for key in expected:
+                torch.testing.assert_close(repeated[key], expected[key], rtol=0, atol=0)
+    errors = []
+    mismatches = []
+    for reference, actual, snapshot in zip(baseline, compiled, snapshots):
+        case_errors = {}
+        for key in reference:
+            assert not actual[key].is_inference()
+            assert not actual[key].requires_grad
+            torch.testing.assert_close(actual[key], snapshot[key], rtol=0, atol=0)
+            difference = (reference[key] - actual[key]).float()
+            case_errors[key] = {
+                "max_abs": difference.abs().max().item(),
+                "rmse": difference.square().mean().sqrt().item(),
+            }
+            try:
+                tolerance = 0.02 if key == "ref_chunk" else 0
+                torch.testing.assert_close(
+                    actual[key], reference[key], rtol=tolerance, atol=tolerance
+                )
+            except AssertionError as error:
+                mismatches.append(f"{key}: {error}")
+        with torch.no_grad():
+            expected_actions = policy.sac_forward(reference, deterministic=True)[0]
+            actual_actions = policy.sac_forward(actual, deterministic=True)[0]
+        torch.testing.assert_close(
+            actual_actions, expected_actions, rtol=0.02, atol=0.02
+        )
+        case_errors["actor_max_abs"] = (
+            (actual_actions - expected_actions).abs().max().item()
+        )
+        errors.append(case_errors)
+    # Saved features remain usable after subsequent graph replays and disk reload.
+    path = tmp_path / "features.pt"
+    torch.save(compiled, path)
+    replay = torch.load(path, weights_only=True)
+    optimizer = torch.optim.Adam(policy.parameters(), lr=1e-4)
+    for row in replay:
+        optimizer.zero_grad()
+        actions, logprobs, _ = policy.sac_forward(row)
+        values = policy.sac_q_forward(row, actions)
+        loss = (
+            actions.square().mean() + logprobs.square().mean() + values.square().mean()
+        )
+        assert torch.isfinite(loss)
+        loss.backward()
+        gradients = [
+            param.grad for param in policy.parameters() if param.grad is not None
+        ]
+        assert gradients and all(
+            torch.isfinite(gradient).all() for gradient in gradients
+        )
+        optimizer.step()
+    # Exercise the production random-noise path as well as fixed-noise parity.
+    for _ in range(4):
+        feature_model.extract_rlt_obs(observations[0])
+    durations = []
+    for _ in range(20):
+        torch.cuda.synchronize()
+        started = time.perf_counter()
+        feature_model.extract_rlt_obs(observations[0])
+        torch.cuda.synchronize()
+        durations.append((time.perf_counter() - started) * 1000)
+    logging.getLogger(__name__).info(
+        "RLT compile validation: %s",
+        json.dumps(
+            {"errors": errors, "mean_feature_ms": sum(durations) / len(durations)}
+        ),
+    )
+
+    assert not mismatches, "\n".join(mismatches)

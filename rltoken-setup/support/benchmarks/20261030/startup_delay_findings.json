@@ -1,0 +1,61 @@
+{
+  "physical_hardware": false,
+  "production_source_modified": false,
+  "scope": "Two 146-chunk episodes per probe; real model/GPU/Ray/FSDP with dummy UR. Temporary process-local wrappers. Measurements are host elapsed; nested waits must not be added twice.",
+  "original_run": "20261030-164337",
+  "original_observations": {
+    "first_rollout_end_to_first_action_ms": 1422.5432872772217,
+    "first_inference_end_to_first_action_ms": 1427.4468421936035,
+    "first_terminal_end_to_ack_seconds_bounds": [
+      6.559931755065918,
+      7.559931755065918
+    ]
+  },
+  "probes": {
+    "fast_ingest": {
+      "first_rollout_end_to_first_action_ms": 375.90837478637695,
+      "terminal_end_to_ack_ms": [
+        1441.4772987365723,
+        61.26570701599121
+      ],
+      "first_action_path_init_ms": [
+        {
+          "role": "rollout",
+          "group": "cg-Env:0-RolloutGroup:0",
+          "ms": 184.89062180742621
+        },
+        {
+          "role": "env",
+          "group": "cg-Env:0-EnvGroup:0",
+          "ms": 176.98346404358745
+        }
+      ],
+      "first_buffer_add_ms": 11.018048040568829
+    },
+    "original_one_second_wait": {
+      "first_rollout_end_to_first_action_ms": 378.8294792175293,
+      "terminal_end_to_ack_ms": [
+        2440.2425289154053,
+        802.0355701446533
+      ],
+      "first_action_path_init_ms": [
+        {
+          "role": "rollout",
+          "group": "cg-Env:0-RolloutGroup:0",
+          "ms": 191.57615094445646
+        },
+        {
+          "role": "env",
+          "group": "cg-Env:0-EnvGroup:0",
+          "ms": 173.32683596760035
+        }
+      ],
+      "first_buffer_add_ms": 10.575093096122146
+    }
+  },
+  "conclusions": {
+    "first_action": "The hardware-free probe directly attributes about 0.37 seconds to two sequential lazy communication-group initializations on the Rollout -> Env channel -> Env path. Original 1.43 seconds lies outside local effective work on this path, but per-group original durations were not logged.",
+    "first_commit": "Lazy episode-transfer/ACK channels and original 1-second learner polling produce first-episode startup delays. Buffer insertion itself was about 11ms in both probes. The complete original 6.56-7.56 second tail was not reproduced; exact original attribution remains unresolved.",
+    "env_residual": "Real-run 8.718ms is action_execution_ms minus command_ms/pace_wait_ms/observation_ms, averaged over the same 1060 complete chunks. It includes unsegmented work around UR5eEnv.step: keyboard/teleop context, observation copies/transforms, vector concatenation/deepcopy, RealWorldEnv wrapping/metrics, timing record emission, and chunk aggregation. No component-wise allocation of this residual is measured."
+  }
+}

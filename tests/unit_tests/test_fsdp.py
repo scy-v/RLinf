@@ -14,10 +14,12 @@
 
 """Tests for FSDP meshes, wrapping, precision policies, and optimizer dtypes."""
 
+import copy
 import logging
 import os
 import socket
 from datetime import timedelta
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -1105,3 +1107,135 @@ def test_checkpoint_weights_and_optional_training_state(
         torch.testing.assert_close(model.weight, expected["weight"])
     else:
         assert sorted(path.name for path in tmp_path.iterdir()) == ["model_state_dict"]
+
+
+def test_mesh_barrier_has_explicit_device_when_cuda_is_available(single_rank_env):
+    import warnings
+
+    mesh = create_device_mesh(1)
+    group = mesh["fsdp"].get_group()
+    if Worker.torch_device_type == "cuda":
+        assert group.bound_device_id == torch.device(
+            "cuda", Worker.torch_platform.current_device()
+        )
+        value = torch.ones(1, device="cpu")
+        dist.all_reduce(value, group=group)
+        assert value.item() == 1
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for _ in range(3):
+            dist.barrier(group=group)
+    assert not any(
+        "using the device under current context" in str(item.message) for item in caught
+    )
+
+
+class _SectionTimedPolicy(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.actor = nn.Linear(2, 1)
+        self.critic = nn.Linear(2, 1)
+
+    def clip_grad_norm_(self, max_norm):
+        return torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm)
+
+
+def _section_timing_worker(update_step):
+    from rlinf.workers.actor.fsdp_sac_policy_worker import EmbodiedSACFSDPPolicy
+
+    class CPUActor(EmbodiedSACFSDPPolicy):
+        def forward_critic(self, batch):
+            return (self.model.critic(batch["x"]) - batch["y"]).square().mean(), {}
+
+        def forward_actor(self, batch):
+            loss = (self.model.actor(batch["x"]) - batch["y"]).square().mean()
+            return loss, torch.tensor(0.0), {}
+
+    worker = object.__new__(CPUActor)
+    worker.cfg = OmegaConf.create(
+        {
+            "actor": {
+                "global_batch_size": 2,
+                "micro_batch_size": 2,
+                "optim": {"clip_grad": 10.0},
+                "critic_optim": {"clip_grad": 10.0},
+            },
+            "algorithm": {"tau": 0.005},
+        }
+    )
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(17)
+        worker.model = _SectionTimedPolicy()
+    worker.target_model = copy.deepcopy(worker.model).requires_grad_(False)
+    worker.target_model_initialized = True
+    worker.target_update_type = "all"
+    worker._world_size = worker.gradient_accumulation = 1
+    worker._timer_metrics = {}
+    worker.device = torch.device("cpu")
+    worker.enable_drq = False
+    worker.update_step = update_step
+    worker.critic_actor_ratio = 4
+    worker.alpha_optimizer = None
+    worker.entropy_temp = SimpleNamespace(alpha=torch.tensor(0.0))
+    worker.optimizer = torch.optim.SGD(worker.model.actor.parameters(), lr=0.01)
+    worker.qf_optimizer = torch.optim.SGD(worker.model.critic.parameters(), lr=0.01)
+    worker.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+        worker.optimizer, lambda _: 1
+    )
+    worker.qf_lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+        worker.qf_optimizer, lambda _: 1
+    )
+    worker.buffer_dataloader_iter = iter(
+        [{"x": torch.tensor([[1.0, 2.0], [3.0, 4.0]]), "y": torch.ones(2, 1)}]
+    )
+    return worker
+
+
+@pytest.mark.parametrize("update_step", [0, 1])
+def test_sac_update_section_timing_preserves_optimizer_results(update_step):
+    import json
+
+    from rlinf.utils.progress import StageTiming
+    from rlinf.workers.actor.fsdp_sac_policy_worker import EmbodiedSACFSDPPolicy
+
+    timed = _section_timing_worker(update_step)
+    plain = _section_timing_worker(update_step)
+    initial_actor = timed.model.actor.weight.detach().clone()
+    initial_critic = timed.model.critic.weight.detach().clone()
+    records = []
+    syncs = []
+    timer = StageTiming("Learner update", True, records.append, lambda: syncs.append(1))
+    update = EmbodiedSACFSDPPolicy.update_one_epoch
+    while hasattr(update, "__wrapped__"):
+        update = update.__wrapped__
+    with timer.measure(
+        update=update_step + 1, actor_updated=update_step == 0
+    ) as timing:
+        update(timed, timing=timing)
+    update(plain)
+    for name, parameter in timed.model.named_parameters():
+        torch.testing.assert_close(
+            parameter, dict(plain.model.named_parameters())[name]
+        )
+    for name, parameter in timed.target_model.named_parameters():
+        torch.testing.assert_close(
+            parameter, dict(plain.target_model.named_parameters())[name]
+        )
+    assert not torch.equal(initial_critic, timed.model.critic.weight)
+    assert torch.equal(initial_actor, timed.model.actor.weight) == (update_step != 0)
+    record = json.loads(
+        next(
+            row.split("[TIMING_RECORD] ")[1]
+            for row in records
+            if "[TIMING_RECORD]" in row
+        )
+    )
+    fields = ["sample_ms", "prepare_ms", "critic_ms", "target_ms", "other_ms"]
+    if update_step == 0:
+        fields.append("actor_ms")
+    else:
+        assert "actor_ms" not in record
+    assert all(record[field] >= 0 for field in fields)
+    assert record["critic_ms"] > 0
+    assert record["work_ms"] == pytest.approx(sum(record[field] for field in fields))
+    assert not syncs

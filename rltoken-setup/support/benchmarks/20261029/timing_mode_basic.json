@@ -1,0 +1,19 @@
+{
+  "mode": "basic",
+  "physical_hardware": false,
+  "episodes": [
+    [
+      1
+    ],
+    [
+      2
+    ]
+  ],
+  "updates": 16,
+  "records": {
+    "Learner update": 16,
+    "Env step": 6,
+    "Rollout step": 6
+  },
+  "status": "passed"
+}

@@ -1,0 +1,102 @@
+{
+  "policy.imports": {
+    "path": "evaluations/realworld/vla_precision_ur/policy.py",
+    "line": 194,
+    "meaning": "导入 RLinf OpenPI 加载器"
+  },
+  "policy.config": {
+    "path": "evaluations/realworld/vla_precision_ur/policy.py",
+    "line": 197,
+    "meaning": "解析模型配置"
+  },
+  "model.imports": {
+    "path": "rlinf/models/embodiment/openpi/__init__.py",
+    "line": 47,
+    "meaning": "导入模型实现"
+  },
+  "model.construct": {
+    "path": "rlinf/models/embodiment/openpi/__init__.py",
+    "line": 139,
+    "meaning": "构建模型并初始化参数；网络组装见 pi0.py:90"
+  },
+  "model.transforms": {
+    "path": "rlinf/models/embodiment/openpi/__init__.py",
+    "line": 430,
+    "meaning": "准备输入输出变换、tokenizer 和归一化资源"
+  },
+  "checkpoint.read": {
+    "path": "rlinf/models/embodiment/openpi/checkpoint.py",
+    "line": 150,
+    "meaning": "读取 checkpoint 元数据并映射文件"
+  },
+  "checkpoint.keys": {
+    "path": "rlinf/models/embodiment/openpi/checkpoint.py",
+    "line": 154,
+    "meaning": "参数键名归一化和旧格式适配"
+  },
+  "checkpoint.apply": {
+    "path": "rlinf/models/embodiment/openpi/checkpoint.py",
+    "line": 164,
+    "meaning": "将映射的权重复制进模型，触发数据页实际读取"
+  },
+  "model.freeze_and_precision": {
+    "path": "rlinf/models/embodiment/openpi/__init__.py",
+    "line": 281,
+    "meaning": "冻结参数和转换参数精度"
+  },
+  "model.to_device": {
+    "path": "evaluations/realworld/vla_precision_ur/policy.py",
+    "line": 205,
+    "meaning": "将模型搬到 GPU"
+  },
+  "model.compile_setup": {
+    "path": "evaluations/realworld/vla_precision_ur/policy.py",
+    "line": 207,
+    "meaning": "包装 torch.compile；尚不执行首次图编译"
+  },
+  "inference.input": {
+    "path": "rlinf/models/embodiment/openpi/env_io.py",
+    "line": 143,
+    "meaning": "输入变换、tokenization 和设备搬运"
+  },
+  "inference.sample": {
+    "path": "rlinf/models/embodiment/openpi/env_io.py",
+    "line": 160,
+    "meaning": "动作采样；前缀和去噪循环见 pi0.py:522"
+  },
+  "inference.decode": {
+    "path": "rlinf/models/embodiment/openpi/env_io.py",
+    "line": 164,
+    "meaning": "输出反归一化和裁剪"
+  },
+  "inference.to_cpu": {
+    "path": "evaluations/realworld/vla_precision_ur/policy.py",
+    "line": 166,
+    "meaning": "动作复制回 CPU"
+  },
+  "compiler.metrics": {
+    "path": "rlinf/utils/startup_timing.py",
+    "line": 227,
+    "meaning": "读取 PyTorch 原生编译、调优和缓存指标"
+  },
+  "compiler.frame": {
+    "path": ".venv/lib/python3.11/site-packages/torch/_dynamo/convert_frame.py",
+    "line": 1490,
+    "meaning": "TorchDynamo 首次图处理和编译入口"
+  },
+  "compiler.autotune": {
+    "path": ".venv/lib/python3.11/site-packages/torch/_inductor/select_algorithm.py",
+    "line": 3119,
+    "meaning": "TorchInductor 比较候选实现并选择内核；调优日志输出见同文件 4374 行"
+  },
+  "compiler.backend": {
+    "path": ".venv/lib/python3.11/site-packages/torch/_inductor/compile_fx.py",
+    "line": 2497,
+    "meaning": "TorchInductor 后端编译入口"
+  },
+  "compiler.runtime_autotune": {
+    "path": ".venv/lib/python3.11/site-packages/torch/_inductor/runtime/triton_heuristics.py",
+    "line": 1173,
+    "meaning": "Triton 运行时配置调优；进程内首次调用可再次执行"
+  }
+}

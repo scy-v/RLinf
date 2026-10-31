@@ -1,0 +1,302 @@
+[
+  {
+    "role": "actor",
+    "name": "MultiChannelProcessGroup.init",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354612.7674906,
+    "end": 1793354612.9490402,
+    "ms": 181.5468119457364,
+    "thread": "Thread-2 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354612.7642305,
+    "end": 1793354612.9498682,
+    "ms": 185.63743587583303,
+    "thread": "Thread-2 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354612.7642245,
+    "end": 1793354612.9506035,
+    "ms": 186.37887109071016,
+    "thread": "Thread-2 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354612.9515858,
+    "end": 1793354612.9515948,
+    "ms": 0.007977010682225227,
+    "thread": "Thread-3 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._get_object_info",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354612.9516304,
+    "end": 1793354612.9516609,
+    "ms": 0.029930146411061287,
+    "thread": "Thread-3 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354612.9527183,
+    "end": 1793354612.952722,
+    "ms": 0.0036240089684724808,
+    "thread": "Thread-3 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._get_object_info",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354612.9853365,
+    "end": 1793354612.985374,
+    "ms": 0.03660493530333042,
+    "thread": "Thread-3 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "MultiChannelProcessGroup.init",
+    "group": "cg-Actor:0-ActorGroup:0",
+    "call": 1,
+    "start": 1793354638.9724913,
+    "end": 1793354639.1475358,
+    "ms": 175.0439559109509,
+    "thread": "Thread-6 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-Actor:0-ActorGroup:0",
+    "call": 1,
+    "start": 1793354613.0041585,
+    "end": 1793354639.1475487,
+    "ms": 26143.39000498876,
+    "thread": "Thread-6 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._recv_tensor_list",
+    "group": "cg-Actor:0-ActorGroup:0",
+    "call": 1,
+    "start": 1793354639.1489484,
+    "end": 1793354639.1532373,
+    "ms": 4.2884377762675285,
+    "thread": "Thread-6 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._recv_tensor_dataclass",
+    "group": "cg-Actor:0-ActorGroup:0",
+    "call": 1,
+    "start": 1793354639.1489465,
+    "end": 1793354639.153607,
+    "ms": 4.660148173570633,
+    "thread": "Thread-6 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Actor:0-ActorGroup:0",
+    "call": 1,
+    "start": 1793354613.0041535,
+    "end": 1793354639.1536124,
+    "ms": 26149.45871499367,
+    "thread": "Thread-6 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-Actor:0-ActorGroup:0",
+    "call": 2,
+    "start": 1793354639.154252,
+    "end": 1793354639.1542573,
+    "ms": 0.004953006282448769,
+    "thread": "Thread-6 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "rlinf.workers.actor.fsdp_rlt_ac_policy_worker.all_reduce_dict",
+    "group": "",
+    "call": 1,
+    "start": 1793354640.1603007,
+    "end": 1793354640.1633189,
+    "ms": 3.0176828149706125,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "actor",
+    "name": "rlinf.workers.actor.fsdp_rlt_ac_policy_worker.all_reduce_dict",
+    "group": "",
+    "call": 2,
+    "start": 1793354640.1633463,
+    "end": 1793354640.1634185,
+    "ms": 0.07212604396045208,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "actor",
+    "name": "rlinf.workers.actor.fsdp_rlt_ac_policy_worker.all_reduce_dict",
+    "group": "",
+    "call": 3,
+    "start": 1793354640.1634548,
+    "end": 1793354640.1635067,
+    "ms": 0.05170004442334175,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "actor",
+    "name": "TrajectoryReplayBuffer.add_trajectories",
+    "group": "",
+    "call": 1,
+    "start": 1793354640.1635103,
+    "end": 1793354640.1740859,
+    "ms": 10.575093096122146,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._get_object_info",
+    "group": "cg-ActorGroup:0-EpisodeReplayAck:0",
+    "call": 1,
+    "start": 1793354640.1767771,
+    "end": 1793354640.176806,
+    "ms": 0.028218142688274384,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "actor",
+    "name": "MultiChannelProcessGroup.init",
+    "group": "cg-ActorGroup:0-EpisodeReplayAck:0",
+    "call": 1,
+    "start": 1793354640.1808703,
+    "end": 1793354640.36227,
+    "ms": 181.3987831119448,
+    "thread": "Thread-8 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-ActorGroup:0-EpisodeReplayAck:0",
+    "call": 1,
+    "start": 1793354640.1770098,
+    "end": 1793354640.3633282,
+    "ms": 186.31796911358833,
+    "thread": "Thread-8 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._atomic_send",
+    "group": "cg-ActorGroup:0-EpisodeReplayAck:0",
+    "call": 1,
+    "start": 1793354640.1770082,
+    "end": 1793354640.3639393,
+    "ms": 186.9310790207237,
+    "thread": "Thread-8 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._recv_tensor_list",
+    "group": "cg-Actor:0-ActorGroup:0",
+    "call": 2,
+    "start": 1793354665.5617995,
+    "end": 1793354665.5664804,
+    "ms": 4.6803869772702456,
+    "thread": "Thread-6 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._recv_tensor_dataclass",
+    "group": "cg-Actor:0-ActorGroup:0",
+    "call": 2,
+    "start": 1793354665.5617974,
+    "end": 1793354665.5669436,
+    "ms": 5.146526964381337,
+    "thread": "Thread-6 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Actor:0-ActorGroup:0",
+    "call": 2,
+    "start": 1793354639.1542466,
+    "end": 1793354665.5669496,
+    "ms": 26412.702744826674,
+    "thread": "Thread-6 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-Actor:0-ActorGroup:0",
+    "call": 3,
+    "start": 1793354665.5676286,
+    "end": 1793354665.5676339,
+    "ms": 0.004915986210107803,
+    "thread": "Thread-6 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "TrajectoryReplayBuffer.add_trajectories",
+    "group": "",
+    "call": 2,
+    "start": 1793354666.330343,
+    "end": 1793354666.3406336,
+    "ms": 10.290124919265509,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._get_object_info",
+    "group": "cg-ActorGroup:0-EpisodeReplayAck:0",
+    "call": 2,
+    "start": 1793354666.3418753,
+    "end": 1793354666.3418963,
+    "ms": 0.02078898251056671,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-ActorGroup:0-EpisodeReplayAck:0",
+    "call": 2,
+    "start": 1793354666.342069,
+    "end": 1793354666.3420749,
+    "ms": 0.005507143214344978,
+    "thread": "Thread-8 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._atomic_send",
+    "group": "cg-ActorGroup:0-EpisodeReplayAck:0",
+    "call": 2,
+    "start": 1793354666.3420675,
+    "end": 1793354666.3432267,
+    "ms": 1.158825121819973,
+    "thread": "Thread-8 (_run_queue)"
+  },
+  {
+    "role": "actor",
+    "name": "CollectiveGroup._get_object_info",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354666.7601223,
+    "end": 1793354666.760164,
+    "ms": 0.04148110747337341,
+    "thread": "Thread-3 (_run_queue)"
+  }
+]

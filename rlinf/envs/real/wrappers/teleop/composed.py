@@ -81,6 +81,7 @@ class ComposedTeleop(TeleopDevice):
         ("joint_positions", "get_joint_positions"),
         ("gripper_open", "get_gripper_open"),
         ("hand_reset_pose", "get_hand_reset_pose"),
+        ("keyboard_action_transform", "get_keyboard_action_transform"),
     )
 
     @classmethod
@@ -141,6 +142,7 @@ class ComposedTeleop(TeleopDevice):
     def read(self, env: gym.Env, policy_action: np.ndarray) -> TeleopSample:
         """Read every device, then write each part into the action."""
         context = self.context_from(env)
+        context["policy_action"] = policy_action
         sample = self._read(env, policy_action, context)
         if self.interlock is not None:
             sample = self.interlock(sample, context)

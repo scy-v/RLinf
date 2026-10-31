@@ -17,6 +17,7 @@
 """VLA-Precision UR hardware execution with RLinf checkpoint loading."""
 
 import argparse
+import json
 import logging
 import os
 import select
@@ -25,6 +26,7 @@ import termios
 import threading
 import time
 import tty
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +42,8 @@ from rtde_control import RTDEControlInterface
 from rtde_receive import RTDEReceiveInterface
 from scipy.spatial.transform import Rotation as R
 
+from rlinf.utils.ur_logging import publish_latest
+
 from . import image_tools
 from .recording import Recorder
 from .utils import FpsCounter, validate_single_arm_norm_stats
@@ -48,6 +52,168 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 PAYLOAD_SETTLE_TIME_S = 0.25
 FT_ZERO_SETTLE_TIME_S = 0.50
+
+
+class _ContinuousForceController:
+    """Own force sends and acknowledge each target after its first SDK send."""
+
+    def __init__(self, engine):
+        self.engine = engine
+        self.io_lock = threading.RLock()
+        self._condition = threading.Condition()
+        self._stop = threading.Event()
+        self._thread = None
+        self._error = None
+        self._target = None
+        self._sequence = 0
+        self._applied = -1
+        self._samples = self._intervals = self._overruns = self._held = 0
+        self._interval_sum = self._interval_max = 0.0
+        self._last_sent = self._last_sequence = None
+
+    @property
+    def running(self):
+        return self._thread is not None and self._thread.is_alive()
+
+    @staticmethod
+    def _require_success(result, operation):
+        if isinstance(result, (bool, np.bool_)) and not result:
+            raise RuntimeError(f"RTDE {operation} returned False")
+
+    def _check(self):
+        if self._error is not None:
+            raise RuntimeError("Background UR force controller failed") from self._error
+        if self._stop.is_set() or not self.running:
+            raise RuntimeError("Background UR force controller is not running")
+
+    def start(self):
+        if self._error is not None:
+            raise RuntimeError("Background UR force controller failed") from self._error
+        if self.running:
+            return
+        with self.io_lock:
+            self._target = np.asarray(
+                self.engine.rtde_r.getActualTCPPose(), dtype=float
+            ).copy()
+        self._sequence, self._applied = 0, -1
+        self._last_sent = self._last_sequence = None
+        self._stop.clear()
+        self._thread = threading.Thread(
+            target=self._run, name="VLA-Precision-force-mode", daemon=True
+        )
+        self._thread.start()
+        self._wait_applied(0)
+
+    def _wait_applied(self, sequence):
+        with self._condition:
+            ready = self._condition.wait_for(
+                lambda: (
+                    self._applied >= sequence
+                    or self._error is not None
+                    or self._stop.is_set()
+                ),
+                timeout=2.0,
+            )
+            self._check()
+            if not ready or self._applied < sequence:
+                self._stop.set()
+                raise RuntimeError("Background UR force target send timed out")
+
+    def update_target(self, target):
+        with self._condition:
+            self._check()
+            self._target = None if target is None else np.asarray(target).copy()
+            self._sequence += 1
+            sequence = self._sequence
+        self._wait_applied(sequence)
+
+    def _run(self):
+        engine = self.engine
+        period = 1.0 / engine.rtde_freq
+        try:
+            while not self._stop.is_set():
+                started = time.perf_counter()
+                with self._condition:
+                    target = None if self._target is None else self._target.copy()
+                    sequence = self._sequence
+                with self.io_lock:
+                    pose = np.asarray(engine.rtde_r.getActualTCPPose(), dtype=float)
+                    velocity = np.asarray(
+                        engine.rtde_r.getActualTCPSpeed(), dtype=float
+                    )
+                    wrench = (
+                        np.zeros(6)
+                        if target is None
+                        else engine._calculate_force(target, pose, velocity)
+                    )
+                    self._require_success(
+                        engine.rtde_c.forceMode(
+                            engine.task_frame,
+                            [0] * 6 if target is None else engine.select_vector,
+                            wrench,
+                            engine.force_type,
+                            engine.force_limit,
+                        ),
+                        "forceMode",
+                    )
+                    sent = time.perf_counter()
+                with self._condition:
+                    self._samples += 1
+                    self._overruns += sent - started > period
+                    self._held += sequence == self._last_sequence
+                    if self._last_sent is not None:
+                        interval = sent - self._last_sent
+                        self._intervals += 1
+                        self._interval_sum += interval
+                        self._interval_max = max(self._interval_max, interval)
+                    self._last_sent, self._last_sequence = sent, sequence
+                    self._applied = sequence
+                    self._condition.notify_all()
+                self._stop.wait(max(0.0, period - (time.perf_counter() - started)))
+        except BaseException as error:
+            with self._condition:
+                self._error = error
+                self._stop.set()
+                self._condition.notify_all()
+        finally:
+            try:
+                with self.io_lock:
+                    self._require_success(
+                        engine.rtde_c.forceModeStop(), "forceModeStop"
+                    )
+            except BaseException as error:
+                with self._condition:
+                    self._error = self._error or error
+                    self._condition.notify_all()
+
+    def stop(self):
+        self._stop.set()
+        with self._condition:
+            self._condition.notify_all()
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+            if self.running:
+                raise RuntimeError("Background UR force controller did not stop")
+        if self._error is not None:
+            raise RuntimeError("Background UR force controller failed") from self._error
+
+    def drain_timing(self):
+        with self._condition:
+            if not self._samples:
+                return None
+            timing = {
+                "target_hz": self.engine.rtde_freq,
+                "samples": self._samples,
+                "measured_hz": self._intervals / self._interval_sum
+                if self._interval_sum > 0
+                else None,
+                "max_send_interval_ms": self._interval_max * 1000,
+                "work_overruns": self._overruns,
+                "held_target_samples": self._held,
+            }
+            self._samples = self._intervals = self._overruns = self._held = 0
+            self._interval_sum = self._interval_max = 0.0
+            return timing
 
 
 def update_latest_symlink(target: Path, link_name: Path):
@@ -110,9 +276,8 @@ class Inference:
         model = cfg["model"]
         robot = cfg["robot"]
         self.remote_policy = False
-        self.action_horizon = int(robot["action_horizon"])
-        self.direct_action_horizon = bool(robot.get("direct_action_horizon", False))
         self.model_config = model_config_from_yaml(cfg)
+        self.action_chunk = int(self.model_config.openpi.action_chunk)
         self.checkpoint_dir = Path(model["checkpoint_dir"]).expanduser()
         self.sample_steps = int(model.get("sample_steps", 10))
         self.norm_stats_path = Path(model["norm_stats_path"]).expanduser()
@@ -134,9 +299,8 @@ class Inference:
         record = cfg.get("record", {})
         self.num_episodes = record.get("num_episodes", 10)
         self.ep_timeout = record.get("episode_timeout_sec", 30)
-        self.show_action_fps = record.get("show_action_fps", False)
-        self.show_inference_fps = record.get("show_inference_fps", False)
-        self.show_time = record.get("show_time", False)
+        self.action_timing_enabled = bool(record.get("action_timing_enabled", False))
+        self.save_logs = bool(record.get("save_logs", True))
 
         # Robot config
         self.robot_ip = robot["ip"]
@@ -217,11 +381,20 @@ class Inference:
         self._gain = position_cfg.get("gain", 300)
 
         force_cfg = robot.get("force_mode", {})
+        self.continuous_tracking = force_cfg.get("continuous_tracking", False)
+        if not isinstance(self.continuous_tracking, bool):
+            raise ValueError(
+                "robot.force_mode.continuous_tracking must be a YAML boolean"
+            )
+        if self.continuous_tracking and self.control_space != "force":
+            raise ValueError("continuous_tracking requires robot.control_space: force")
         self.kp = force_cfg.get("kp", 2000)
         self.kd = force_cfg.get("kd", 200)
-        self.kp_rot = force_cfg.get("kp_rot", 4000)
-        self.kd_rot = force_cfg.get("kd_rot", 800)
+        self.kp_rot = force_cfg.get("kp_rot", 32.0)
+        self.kd_rot = force_cfg.get("kd_rot", 6.4)
         self.rtde_freq = force_cfg.get("rtde_freq", 125)
+        if not np.isfinite(self.rtde_freq) or self.rtde_freq <= 0:
+            raise ValueError("robot.force_mode.rtde_freq must be positive and finite")
         self.select_vector = force_cfg.get("select_vector", [1, 1, 1, 1, 1, 1])
         self.force_limit = force_cfg.get("force_limit", [2, 2, 2, 2, 2, 2])
         self.pos_delta = force_cfg.get("pos_delta", 0.2)
@@ -262,6 +435,7 @@ class Inference:
         # log paths
         latest_path = log_dir / "latest.yaml"
         log_path = log_dir / "all_logs" / f"log_{time_str}.yaml"
+        self._timing_path = log_dir / "all_logs" / f"timing_{time_str}.jsonl"
 
         # video paths
         wrist_video = video_dir / f"wrist_{time_str}.mp4"
@@ -273,10 +447,19 @@ class Inference:
             video_path=[wrist_video, exterior_video],
             display_fps=self.video_fps,
             visualize=self.visualize,
+            save_logs=self.save_logs,
+            evaluation_path=(
+                Path(cfg.get("output_root", "./results")).expanduser()
+                / "runs"
+                / f"{time_str}-ur5e-eval"
+                / "ur5e-evaluation.json"
+            ),
         )
 
         # create symlink to latest log
-        update_latest_symlink(log_path, latest_path)
+        if self.save_logs:
+            update_latest_symlink(log_path, latest_path)
+            publish_latest(self._timing_path, log_dir / "latest.jsonl")
 
         # create FPS counters
         self.fps_action = FpsCounter(name="action")
@@ -285,6 +468,12 @@ class Inference:
         self.rtde_r = None
         self.rtde_c = None
         self.cameras = None
+        self.gripper = None
+        self._closed = False
+        self._force_controller = None
+        self._last_force_report = 0.0
+        self._gripper_reader_stop = threading.Event()
+        self._gripper_reader_thread = None
         self._last_gripper_position = 1
         self._gripper_position = 1
         self._last_servoj_ts = None
@@ -304,6 +493,62 @@ class Inference:
         self._keyboard_listener_thread = None
         self._episode_time_printer_stop = None
         self._episode_time_printer_thread = None
+
+        from rlinf.utils.robot_lifecycle import register_robot_cleanup
+
+        register_robot_cleanup(self.close)
+
+    def close(self):
+        """Stop motion and release every connection even when another close fails."""
+        if getattr(self, "_closed", False):
+            return
+        controller = getattr(self, "_force_controller", None)
+        if controller is not None:
+            try:
+                controller.stop()
+            except BaseException:
+                if controller.running:
+                    raise
+                logging.exception(
+                    "[EXIT] Background force control stopped with an error."
+                )
+            self._report_force_timing(force=True)
+        self._closed = True
+        from rlinf.utils.robot_lifecycle import unregister_robot_cleanup
+
+        control = getattr(self, "rtde_c", None)
+        receive = getattr(self, "rtde_r", None)
+        gripper = getattr(self, "gripper", None)
+        stop = getattr(self, "_gripper_reader_stop", None)
+        if stop is not None:
+            stop.set()
+        callbacks = []
+        if control is not None:
+            for name in ("forceModeStop", "servoStop", "stopScript", "disconnect"):
+                callback = getattr(control, name, None)
+                if callback is not None:
+                    callbacks.append(callback)
+        if receive is not None:
+            callbacks.append(receive.disconnect)
+        thread = getattr(self, "_gripper_reader_thread", None)
+        if thread is not None:
+            callbacks.append(lambda: thread.join(timeout=1.0))
+        serial_port = getattr(gripper, "ser", None)
+        if serial_port is not None:
+            callbacks.append(serial_port.close)
+        for camera in (getattr(self, "cameras", None) or {}).values():
+            callbacks.append(camera.disconnect)
+        if hasattr(self, "_keyboard_listener_stop"):
+            callbacks.append(self._stop_keyboard_episode_control_listener)
+        if hasattr(self, "_episode_time_printer_stop"):
+            callbacks.append(self._stop_episode_time_printer)
+        for callback in callbacks:
+            try:
+                callback()
+            except BaseException:
+                logging.exception("[EXIT] Failed to release an inference resource.")
+        self.rtde_c = self.rtde_r = self.gripper = self.cameras = None
+        unregister_robot_cleanup(self.close)
 
     # --------------------------- ROBOT --------------------------- #
     def connect_robot(self):
@@ -388,7 +633,8 @@ class Inference:
         except Exception as e:
             logging.error("[ERROR] Failed to initialize cameras.")
             logging.error(f"Exception: {e}\n")
-            self.cameras = None
+            self.close()
+            raise
 
     # --------------------------- GRIPPER --------------------------- #
     def _create_gripper(self):
@@ -429,11 +675,16 @@ class Inference:
         except Exception as e:
             logging.error("[ERROR] Failed to initialize DH Gripper.")
             logging.error(f"Exception: {e}\n")
-            self.gripper = None
+            self.close()
+            raise
 
     # --------------------------- GRIPPER THREAD --------------------------- #
     def _start_gripper_state_reader(self):
-        threading.Thread(target=self._read_gripper_state, daemon=True).start()
+        self._gripper_reader_stop.clear()
+        self._gripper_reader_thread = threading.Thread(
+            target=self._read_gripper_state, daemon=True
+        )
+        self._gripper_reader_thread.start()
 
     # --------------------------- GRIPPER WAIT --------------------------- #
     def wait_for_gripper_states(self):
@@ -451,7 +702,7 @@ class Inference:
     # --------------------------- GRIPPER STATE --------------------------- #
     def _read_gripper_state(self):
         self.gripper.position = None
-        while True:
+        while not self._gripper_reader_stop.is_set():
             gripper_position = (
                 0.0 if self._gripper_position <= self.close_threshold else 1.0
             )
@@ -468,7 +719,7 @@ class Inference:
                 gripper_pos = 1 - gripper_pos
 
             self.gripper.position = gripper_pos
-            time.sleep(0.01)
+            self._gripper_reader_stop.wait(0.01)
 
     def _open_gripper_before_reset(self):
         if not self.init_gripper or getattr(self, "gripper", None) is None:
@@ -495,7 +746,12 @@ class Inference:
         )
 
     def _get_current_tcp_offset(self) -> np.ndarray:
-        return np.asarray(self.rtde_c.getTCPOffset(), dtype=float)
+        with self._robot_io():
+            return np.asarray(self.rtde_c.getTCPOffset(), dtype=float)
+
+    def _robot_io(self):
+        controller = getattr(self, "_force_controller", None)
+        return controller.io_lock if controller is not None else nullcontext()
 
     def tcp_to_ee_pose(
         self, tcp_pose: np.ndarray, tcp_offset: np.ndarray
@@ -512,8 +768,9 @@ class Inference:
         return self._transform_to_pose(tcp_transform)
 
     def get_ee_pose(self) -> np.ndarray:
-        tcp_pose = np.asarray(self.rtde_r.getActualTCPPose(), dtype=float)
-        tcp_offset = self._get_current_tcp_offset()
+        with self._robot_io():
+            tcp_pose = np.asarray(self.rtde_r.getActualTCPPose(), dtype=float)
+            tcp_offset = self._get_current_tcp_offset()
         return self.tcp_to_ee_pose(tcp_pose, tcp_offset)
 
     def _pose_euler(self, pose: np.ndarray) -> np.ndarray:
@@ -600,6 +857,8 @@ class Inference:
         )
 
     def reset_episode(self):
+        if getattr(self, "continuous_tracking", False):
+            self.stop_force()
         self._clear_action_idle_hold()
         self._open_gripper_before_reset()
 
@@ -808,9 +1067,7 @@ class Inference:
         target_rot = R.from_rotvec(target_pose[3:]).as_matrix()
         current_rot = R.from_rotvec(current_pose[3:]).as_matrix()
         rot_err = R.from_matrix(target_rot @ current_rot.T).as_rotvec()
-        torque = (
-            self.kp_rot * rot_err - self.kd_rot * current_vel[3:]
-        ) / self.rtde_freq
+        torque = self.kp_rot * rot_err - self.kd_rot * current_vel[3:]
         return self._wrench_base_to_task(np.concatenate((force_pos, torque)))
 
     @staticmethod
@@ -851,22 +1108,55 @@ class Inference:
             and np.allclose(action[:6], 0.0, atol=1e-3)
         )
 
-    def _calculate_ft_target(self, action: np.ndarray) -> np.ndarray:
+    def _calculate_ft_target(
+        self, action: np.ndarray, timing: dict[str, float] | None = None
+    ) -> np.ndarray:
+        started = time.perf_counter()
         current_pose = np.asarray(self.rtde_r.getActualTCPPose(), dtype=float)
         current_vel = np.asarray(self.rtde_r.getActualTCPSpeed(), dtype=float)
+        state_read = time.perf_counter()
         target_pose = self._target_pose_from_action(
             action, current_tcp_pose=current_pose
         )
-        return self._calculate_force(target_pose, current_pose, current_vel)
+        target_ready = time.perf_counter()
+        wrench = self._calculate_force(target_pose, current_pose, current_vel)
+        if timing is not None:
+            timing["state_read"] = state_read - started
+            timing["target"] = target_ready - state_read
+            timing["impedance"] = time.perf_counter() - target_ready
+        return wrench
 
-    def _send_force_action(self, action: np.ndarray):
+    def _pace_action_target(self):
+        """Space target submissions without catching up after an overrun."""
+        if not hasattr(self, "_last_action_target"):
+            return
+        started = time.perf_counter()
+        previous = self._last_action_target
+        self._action_preparation_sec = started - self._action_preparation_started
+        if previous is not None:
+            time.sleep(max(0.0, previous + 1.0 / self.action_fps - started))
+        sent = time.perf_counter()
+        if self.action_timing_enabled:
+            self._action_pace_wait += sent - started
+            self._target_interval = None if previous is None else sent - previous
+        self._last_action_target = sent
+
+    def _send_force_action(
+        self, action: np.ndarray, timing: dict[str, float] | None = None
+    ):
+        if getattr(self, "continuous_tracking", False):
+            self._send_tracking_action(action, timing)
+            return
         if self._is_zero_output_action(action):
             if self._zero_force_lock_active:
+                self._pace_action_target()
                 return
             if self.show_target_error:
                 logging.info(
                     f"[ACTION] Zero output detected. Sending zero forceMode once. action={action.tolist()}"
                 )
+            self._pace_action_target()
+            send_started = time.perf_counter()
             self.rtde_c.forceMode(
                 self.task_frame,
                 [0, 0, 0, 0, 0, 0],
@@ -874,11 +1164,15 @@ class Inference:
                 self.force_type,
                 self.force_limit,
             )
+            if timing is not None:
+                timing["send"] = time.perf_counter() - send_started
             self._zero_force_lock_active = True
             return
 
         self._zero_force_lock_active = False
-        ft_target = self._calculate_ft_target(action)
+        ft_target = self._calculate_ft_target(action, timing)
+        self._pace_action_target()
+        send_started = time.perf_counter()
         self.rtde_c.forceMode(
             self.task_frame,
             self.select_vector,
@@ -886,8 +1180,20 @@ class Inference:
             self.force_type,
             self.force_limit,
         )
+        if timing is not None:
+            timing["send"] = time.perf_counter() - send_started
 
     def stop_force(self):
+        if getattr(self, "continuous_tracking", False):
+            controller = self._force_controller
+            if controller is not None:
+                controller.stop()
+                self._report_force_timing(force=True)
+            elif self.rtde_c is not None and not self.debug:
+                _ContinuousForceController._require_success(
+                    self.rtde_c.forceModeStop(), "forceModeStop"
+                )
+            return
         if self.rtde_c is not None and self.control_space == "force":
             self.rtde_c.forceMode(
                 self.task_frame,
@@ -898,6 +1204,44 @@ class Inference:
             )
             if hasattr(self.rtde_c, "forceModeStop"):
                 self.rtde_c.forceModeStop()
+
+    def _send_tracking_action(self, action, timing=None):
+        controller = self._force_controller
+        if controller is None:
+            raise RuntimeError(
+                "Start an episode before sending continuous force targets"
+            )
+        controller._check()
+        started = time.perf_counter()
+        if self._is_zero_output_action(action):
+            target = None
+            state_read = target_ready = started
+        else:
+            with controller.io_lock:
+                pose = np.asarray(self.rtde_r.getActualTCPPose(), dtype=float)
+                state_read = time.perf_counter()
+                target = self._target_pose_from_action(action, current_tcp_pose=pose)
+                target_ready = time.perf_counter()
+        self._pace_action_target()
+        send_started = time.perf_counter()
+        controller.update_target(target)
+        if timing is not None:
+            timing["state_read"] = state_read - started
+            timing["target"] = target_ready - state_read
+            timing["send"] = time.perf_counter() - send_started
+
+    def _report_force_timing(self, *, force=False):
+        controller = getattr(self, "_force_controller", None)
+        if controller is None:
+            return
+        now = time.perf_counter()
+        if not force and now - self._last_force_report < 1.0:
+            return
+        self._last_force_report = now
+        timing = controller.drain_timing()
+        if timing is not None:
+            logging.info("[PD] %s", timing)
+            self._record_timing("controller", **timing)
 
     # --------------------------- OBS TRANSFER --------------------------- #
     def _transfer_obs_state(self, obs: dict[str, Any]) -> dict[str, Any]:
@@ -938,8 +1282,9 @@ class Inference:
                 obs["tcp_pose"] = self._relative_pose_euler(ee_pose)
             else:
                 raise ValueError(f"Unsupported reference_frame: {self.reference_frame}")
-            obs["tcp_speed"] = self.rtde_r.getActualTCPSpeed()
-            obs["tcp_force"] = self.rtde_r.getActualTCPForce()
+            with self._robot_io():
+                obs["tcp_speed"] = self.rtde_r.getActualTCPSpeed()
+                obs["tcp_force"] = self.rtde_r.getActualTCPForce()
 
         if self.cameras:
             for name, cam in self.cameras.items():
@@ -968,8 +1313,30 @@ class Inference:
             logging.info("[STATE] Robot reached TCP pose.")
             return
         self.fps_action.reset()
-        for action in np.asarray(actions)[: self.action_horizon]:
+        self._last_action_target = None
+        chunk = np.asarray(actions)
+        for action_index, action in enumerate(chunk, start=1):
+            self._action_pace_wait = 0.0
+            self._target_interval = None
             start_time = time.perf_counter()
+            if self._last_action_target is not None:
+                ready = self._last_action_target + 1.0 / self.action_fps
+                time.sleep(
+                    max(
+                        0.0,
+                        ready
+                        - getattr(self, "_action_preparation_sec", 0.0)
+                        - start_time,
+                    )
+                )
+            self._action_preparation_started = time.perf_counter()
+            if self.action_timing_enabled and self._last_action_target is not None:
+                self._action_pace_wait += self._action_preparation_started - start_time
+            timing = (
+                dict.fromkeys(("state_read", "target", "impedance", "send"), 0.0)
+                if self.action_timing_enabled
+                else None
+            )
             action = np.asarray(action, dtype=float)
             expected_action_dim = 6 if self.fix_gripper else 7
             if action.ndim != 1 or action.size < expected_action_dim:
@@ -980,7 +1347,20 @@ class Inference:
 
             if not self.debug:
                 if self.control_space == "position":
-                    target_pose = self._target_pose_from_action(action)
+                    state_started = time.perf_counter()
+                    current_pose = np.asarray(
+                        self.rtde_r.getActualTCPPose(), dtype=float
+                    )
+                    state_read = time.perf_counter()
+                    target_pose = self._target_pose_from_action(
+                        action, current_tcp_pose=current_pose
+                    )
+                    target_ready = time.perf_counter()
+                    self._pace_action_target()
+                    send_started = time.perf_counter()
+                    if timing is not None:
+                        timing["state_read"] = state_read - state_started
+                        timing["target"] = target_ready - state_read
                     # t_start = self.rtde_c.initPeriod()
                     self.rtde_c.servoL(
                         target_pose.tolist(),
@@ -990,22 +1370,93 @@ class Inference:
                         self._lookahead_time,
                         self._gain,
                     )
+                    if timing is not None:
+                        timing["send"] = time.perf_counter() - send_started
                     # self.rtde_c.waitPeriod(t_start)
                 elif self.control_space == "force":
                     # t_start = self.rtde_c.initPeriod()
-                    self._send_force_action(action)
+                    self._send_force_action(action, timing)
                     # self.rtde_c.waitPeriod(t_start)
                 else:
                     raise ValueError(f"Unsupported control_space: {self.control_space}")
 
+            if self.debug:
+                self._pace_action_target()
+            gripper_started = time.perf_counter()
             if not self.fix_gripper:
                 self._gripper_position = float(action[6])
 
-            elapsed = time.perf_counter() - start_time
-            to_sleep = 1.0 / self.action_fps - elapsed
-            if to_sleep > 0:
-                time.sleep(to_sleep)
-            self.fps_action.update(show=self.show_action_fps)
+            processing_finished = time.perf_counter()
+            elapsed = processing_finished - start_time
+            if action_index == len(chunk):
+                # Preserve the final target's execution period before the next observation.
+                last_target = self._last_action_target or start_time
+                time.sleep(
+                    max(0.0, last_target + 1.0 / self.action_fps - time.perf_counter())
+                )
+            cycle_finished = time.perf_counter()
+            wait_elapsed = self._action_pace_wait + cycle_finished - processing_finished
+            elapsed -= self._action_pace_wait
+            self.fps_action.update(show=self.action_timing_enabled)
+            if timing is not None:
+                gripper = processing_finished - gripper_started
+                other = max(0.0, elapsed - sum(timing.values()) - gripper)
+                cycle = cycle_finished - start_time
+                logging.info(
+                    "[ACTION TIMING] target_hz=%.2f target_interval_ms=%s control_hz=%.2f "
+                    "control_ms=%.3f processing_ms=%.3f state_read_ms=%.3f "
+                    "target_ms=%.3f impedance_ms=%.3f send_ms=%.3f "
+                    "gripper_target_ms=%.3f other_ms=%.3f wait_ms=%.3f "
+                    "overrun_ms=%.3f",
+                    self.action_fps,
+                    "n/a"
+                    if self._target_interval is None
+                    else f"{self._target_interval * 1000:.3f}",
+                    1.0 / cycle,
+                    cycle * 1000,
+                    elapsed * 1000,
+                    timing["state_read"] * 1000,
+                    timing["target"] * 1000,
+                    timing["impedance"] * 1000,
+                    timing["send"] * 1000,
+                    gripper * 1000,
+                    other * 1000,
+                    wait_elapsed * 1000,
+                    max(0.0, (self._target_interval or 0.0) - 1.0 / self.action_fps)
+                    * 1000,
+                )
+                self._record_timing(
+                    "action",
+                    infer_index=getattr(self, "_infer_index", None),
+                    action_index=action_index,
+                    target_hz=self.action_fps,
+                    control_hz=1.0 / cycle,
+                    control_sec=cycle,
+                    command_sec=elapsed,
+                    state_read_sec=timing["state_read"],
+                    target_sec=timing["target"],
+                    impedance_sec=timing["impedance"],
+                    send_sec=timing["send"],
+                    gripper_target_sec=gripper,
+                    other_sec=other,
+                    pace_wait_sec=wait_elapsed,
+                    target_interval_sec=self._target_interval,
+                    control_overrun_sec=max(
+                        0.0, (self._target_interval or 0.0) - 1.0 / self.action_fps
+                    ),
+                )
+        self._report_force_timing()
+
+    def _record_timing(self, event: str, **values: Any) -> None:
+        """Save routine timings and optionally detailed action measurements."""
+        if event == "action" and not self.action_timing_enabled:
+            return
+        if not self.save_logs:
+            return
+        with self._timing_path.open("a", encoding="utf-8") as stream:
+            stream.write(
+                json.dumps({"event": event, "timestamp": time.time(), **values}) + "\n"
+            )
 
     # --------------------------- KEYBOARD EPISODE CONTROL --------------------------- #
     def _keyboard_episode_control_listener(self):
@@ -1091,7 +1542,7 @@ class Inference:
             next_elapsed_sec = elapsed_sec + 1
 
     def _start_episode_time_printer(self):
-        if not self.show_time or self._ep_start is None:
+        if self._ep_start is None:
             return
 
         self._stop_episode_time_printer()
@@ -1119,7 +1570,7 @@ class Inference:
     def _create_openpi_policy(self):
         from .policy import create_policy
 
-        return create_policy(self._native_config)
+        return create_policy(self._native_config, timing_recorder=self._record_timing)
 
     def _prepare_inference(self):
         logging.info("========== Starting Inference Pipeline ==========")
@@ -1149,7 +1600,11 @@ class Inference:
 
         from .policy import warmup_policy
 
-        warmup_policy(policy, obs)
+        warmup_policy(
+            policy,
+            obs,
+            timing_recorder=self._record_timing,
+        )
 
         if self.fix_gripper:
             logging.info(
@@ -1168,6 +1623,10 @@ class Inference:
 
     def _start_episode(self):
         self._stop_episode_time_printer()
+        if getattr(self, "continuous_tracking", False) and not self.debug:
+            if self._force_controller is None:
+                self._force_controller = _ContinuousForceController(self)
+            self._force_controller.start()
         self._ep_start = time.perf_counter()
         self._ep_steps = 0
         self._ep_done = False
@@ -1175,22 +1634,25 @@ class Inference:
         self._start_episode_time_printer()
 
     def _submit_step(self, result, obs, infer_idx: int):
+        self._infer_index = infer_idx
         action_dim = 6 if self.fix_gripper else 7
         robot_actions = np.asarray(result["actions"])[..., :action_dim]
         self.execute_actions(robot_actions)
         self._ep_steps += 1
         self.recorder.submit_actions(
-            robot_actions[: self.action_horizon],
+            robot_actions,
             infer_idx,
             obs["prompt"],
             state=obs["observation/state"],
             episode_index=self._ep_idx,
             episode_action_count=self._ep_steps,
-            action_horizon=self.action_horizon,
+            action_horizon=len(robot_actions),
         )
         self.recorder.submit_obs(obs)
 
     def _submit_episode(self, status: str, completed: bool, **extra):
+        if getattr(self, "continuous_tracking", False):
+            self.stop_force()
         duration = time.perf_counter() - self._ep_start
         self.recorder.submit_episode_result(
             episode_index=self._ep_idx,
@@ -1287,6 +1749,7 @@ class Inference:
 
     def run(self):
         """Main pipeline: connect robot, cameras, and run inference."""
+        completed = False
         try:
             policy = self._prepare_inference()
             infer_idx = 1
@@ -1304,15 +1767,24 @@ class Inference:
                 submit_start = time.perf_counter()
                 self._submit_step(result, obs, infer_idx)
                 submit_elapsed = time.perf_counter() - submit_start
+                loop_elapsed = time.perf_counter() - loop_start
+                logging.info(
+                    f"[STATE] Inference loop rate: {1 / loop_elapsed:.1f} HZ "
+                    f"(loop={loop_elapsed:.4f}s, get_obs={obs_elapsed:.4f}s, "
+                    f"infer={infer_elapsed:.4f}s, submit_step={submit_elapsed:.4f}s)"
+                )
+                self._record_timing(
+                    "step",
+                    infer_index=infer_idx,
+                    loop_sec=loop_elapsed,
+                    loop_hz=1.0 / loop_elapsed,
+                    observation_sec=obs_elapsed,
+                    infer_sec=infer_elapsed,
+                    action_and_record_sec=submit_elapsed,
+                )
                 self._finish_episode_if_needed()
-                if self.show_inference_fps:
-                    loop_elapsed = time.perf_counter() - loop_start
-                    logging.info(
-                        f"[STATE] Inference loop rate: {1 / loop_elapsed:.1f} HZ "
-                        f"(loop={loop_elapsed:.4f}s, get_obs={obs_elapsed:.4f}s, "
-                        f"infer={infer_elapsed:.4f}s, submit_step={submit_elapsed:.4f}s)"
-                    )
                 infer_idx += 1
+            completed = True
             logging.info(f"[INFO] Finished {self.num_episodes} inference episodes.")
         except KeyboardInterrupt:
             logging.info(
@@ -1321,15 +1793,16 @@ class Inference:
         except Exception as e:
             logging.error(f"[ERROR] Inference loop encountered an error: {e}")
         finally:
-            self._stop_keyboard_episode_control_listener()
+            try:
+                if completed:
+                    self._reset_before_exit()
+            finally:
+                self.close()
             self._close_episode_on_exit()
-            self._stop_episode_time_printer()
-            self._reset_before_exit()
             self.recorder.submit_episode_summary(
-                action_horizon=self.action_horizon,
+                action_horizon=self.action_chunk,
                 description=self.task_description,
             )
-            self.stop_force()
 
         self._ask_save_video()
 

@@ -43,6 +43,7 @@ from rlinf.utils.nested_dict_process import (
     put_tensor_device,
     split_dict_to_chunk,
 )
+from rlinf.utils.progress import StageMeasurement
 from rlinf.utils.utils import clear_memory, collect_param_names_need_sync
 from rlinf.workers.actor.embodied_fsdp_actor_worker import EmbodiedFSDPActor
 
@@ -69,9 +70,14 @@ class EmbodiedSACFSDPPolicy(EmbodiedFSDPActor):
         self.enable_drq = bool(getattr(self.cfg.actor, "enable_drq", False))
 
     def init_worker(self):
-        self.setup_model_and_optimizer(initialize_target=True)
-        self.setup_sac_components()
-        self.soft_update_target_model(tau=1.0)
+        from rlinf.utils.startup_timing import startup_section
+
+        with startup_section("actor.model_optimizer"):
+            self.setup_model_and_optimizer(initialize_target=True)
+        with startup_section("actor.replay"):
+            self.setup_sac_components()
+        with startup_section("actor.target_sync"):
+            self.soft_update_target_model(tau=1.0)
         if self.use_dsrl:
             self._init_target_shadow()
         if self.cfg.actor.get("enable_offload", False):
@@ -557,96 +563,109 @@ class EmbodiedSACFSDPPolicy(EmbodiedFSDPActor):
         return alpha_loss
 
     @Worker.timer("update_one_epoch")
-    def update_one_epoch(self, train_actor: bool = True):
+    def update_one_epoch(
+        self, train_actor: bool = True, timing: StageMeasurement | None = None
+    ):
+        timing = timing if timing is not None else StageMeasurement(False)
         global_batch_size_per_rank = (
             self.cfg.actor.global_batch_size // self._world_size
         )
 
-        with self.worker_timer("sample"):
+        with self.worker_timer("sample"), timing.measure("sample"):
             global_batch = next(self.buffer_dataloader_iter)
 
-        train_micro_batch_list = split_dict_to_chunk(
-            global_batch,
-            global_batch_size_per_rank // self.cfg.actor.micro_batch_size,
-        )
+        with timing.measure("prepare"):
+            train_micro_batch_list = split_dict_to_chunk(
+                global_batch,
+                global_batch_size_per_rank // self.cfg.actor.micro_batch_size,
+            )
 
-        # move train_micro_batch_list to device and apply DRQ for critic/actor/alpha passes
-        for i, batch in enumerate(train_micro_batch_list):
-            batch = put_tensor_device(batch, device=self.device)
-            if self.enable_drq:
-                drq.apply_drq(batch["curr_obs"], pad=4)
-                drq.apply_drq(batch["next_obs"], pad=4)
-            train_micro_batch_list[i] = batch
+            # move train_micro_batch_list to device and apply DRQ for critic/actor/alpha passes
+            for i, batch in enumerate(train_micro_batch_list):
+                batch = put_tensor_device(batch, device=self.device)
+                if self.enable_drq:
+                    drq.apply_drq(batch["curr_obs"], pad=4)
+                    drq.apply_drq(batch["next_obs"], pad=4)
+                train_micro_batch_list[i] = batch
 
-        self.qf_optimizer.zero_grad()
-        gbs_critic_loss = []
-        all_critic_metrics = {}
-        for batch in train_micro_batch_list:
-            critic_loss, critic_metrics = self.forward_critic(batch)
-            critic_loss = critic_loss / self.gradient_accumulation
-            critic_loss.backward()
-            gbs_critic_loss.append(critic_loss.item() * self.gradient_accumulation)
-            append_to_dict(all_critic_metrics, critic_metrics)
-        all_critic_metrics = {
-            f"critic/{key}": np.mean(value) for key, value in all_critic_metrics.items()
-        }
-        qf_grad_norm = self.model.clip_grad_norm_(
-            max_norm=self.cfg.actor.critic_optim.clip_grad
-        )
+        with timing.measure("critic"):
+            self.qf_optimizer.zero_grad()
+            gbs_critic_loss = []
+            all_critic_metrics = {}
+            for batch in train_micro_batch_list:
+                critic_loss, critic_metrics = self.forward_critic(batch)
+                critic_loss = critic_loss / self.gradient_accumulation
+                critic_loss.backward()
+                gbs_critic_loss.append(critic_loss.item() * self.gradient_accumulation)
+                append_to_dict(all_critic_metrics, critic_metrics)
+            all_critic_metrics = {
+                f"critic/{key}": np.mean(value)
+                for key, value in all_critic_metrics.items()
+            }
+            qf_grad_norm = self.model.clip_grad_norm_(
+                max_norm=self.cfg.actor.critic_optim.clip_grad
+            )
 
-        self.qf_optimizer.step()
-        self.qf_lr_scheduler.step()
+            self.qf_optimizer.step()
+            self.qf_lr_scheduler.step()
 
-        metrics_data = {
-            "sac/critic_loss": np.mean(gbs_critic_loss),
-            "critic/lr": self.qf_optimizer.param_groups[0]["lr"],
-            "critic/grad_norm": qf_grad_norm,
-            **all_critic_metrics,
-        }
+            metrics_data = {
+                "sac/critic_loss": np.mean(gbs_critic_loss),
+                "critic/lr": self.qf_optimizer.param_groups[0]["lr"],
+                "critic/grad_norm": qf_grad_norm,
+                **all_critic_metrics,
+            }
 
         if self.update_step % self.critic_actor_ratio == 0 and train_actor:
-            self.optimizer.zero_grad()
-            gbs_actor_loss = []
-            gbs_entropy = []
-            all_actor_metrics = {}
-            for batch in train_micro_batch_list:
-                actor_loss, entropy, q_metrics = self.forward_actor(batch)
-                actor_loss = actor_loss / self.gradient_accumulation
-                actor_loss.backward()
-                gbs_actor_loss.append(actor_loss.item() * self.gradient_accumulation)
-                gbs_entropy.append(entropy.item())
-                append_to_dict(all_actor_metrics, q_metrics)
-            all_actor_metrics = {
-                f"actor/{key}": np.mean(value)
-                for key, value in all_actor_metrics.items()
-            }
-            actor_grad_norm = self.model.clip_grad_norm_(
-                max_norm=self.cfg.actor.optim.clip_grad
-            )
-            self.optimizer.step()
-            self.lr_scheduler.step()
+            with timing.measure("actor"):
+                self.optimizer.zero_grad()
+                gbs_actor_loss = []
+                gbs_entropy = []
+                all_actor_metrics = {}
+                for batch in train_micro_batch_list:
+                    actor_loss, entropy, q_metrics = self.forward_actor(batch)
+                    actor_loss = actor_loss / self.gradient_accumulation
+                    actor_loss.backward()
+                    gbs_actor_loss.append(
+                        actor_loss.item() * self.gradient_accumulation
+                    )
+                    gbs_entropy.append(entropy.item())
+                    append_to_dict(all_actor_metrics, q_metrics)
+                all_actor_metrics = {
+                    f"actor/{key}": np.mean(value)
+                    for key, value in all_actor_metrics.items()
+                }
+                actor_grad_norm = self.model.clip_grad_norm_(
+                    max_norm=self.cfg.actor.optim.clip_grad
+                )
+                self.optimizer.step()
+                self.lr_scheduler.step()
 
             # Update temperature parameter if using automatic entropy tuning
             gbs_alpha_loss = [0]
             alpha_grad_norm = 0
             if self.alpha_optimizer is not None:
-                self.alpha_optimizer.zero_grad()
-                gbs_alpha_loss = []
-                for batch in train_micro_batch_list:
-                    alpha_loss = self.forward_alpha(batch) / self.gradient_accumulation
-                    alpha_loss.backward()
-                    gbs_alpha_loss.append(
-                        alpha_loss.item() * self.gradient_accumulation
+                with timing.measure("alpha"):
+                    self.alpha_optimizer.zero_grad()
+                    gbs_alpha_loss = []
+                    for batch in train_micro_batch_list:
+                        alpha_loss = (
+                            self.forward_alpha(batch) / self.gradient_accumulation
+                        )
+                        alpha_loss.backward()
+                        gbs_alpha_loss.append(
+                            alpha_loss.item() * self.gradient_accumulation
+                        )
+                    torch.distributed.all_reduce(
+                        self.entropy_temp.base_alpha.grad,
+                        op=torch.distributed.ReduceOp.AVG,
                     )
-                torch.distributed.all_reduce(
-                    self.entropy_temp.base_alpha.grad, op=torch.distributed.ReduceOp.AVG
-                )
-                alpha_grad_norm = torch.nn.utils.clip_grad_norm_(
-                    self.entropy_temp.base_alpha,
-                    self.cfg.algorithm.entropy_tuning.optim.clip_grad,
-                )
-                self.alpha_optimizer.step()
-                self.alpha_lr_scheduler.step()
+                    alpha_grad_norm = torch.nn.utils.clip_grad_norm_(
+                        self.entropy_temp.base_alpha,
+                        self.cfg.algorithm.entropy_tuning.optim.clip_grad,
+                    )
+                    self.alpha_optimizer.step()
+                    self.alpha_lr_scheduler.step()
 
             # Collect metrics
             metrics_data.update(
@@ -666,7 +685,8 @@ class EmbodiedSACFSDPPolicy(EmbodiedFSDPActor):
             self.target_model_initialized
             and self.update_step % self.cfg.algorithm.get("target_update_freq", 1) == 0
         ):
-            self.soft_update_target_model()
+            with timing.measure("target"):
+                self.soft_update_target_model()
 
         return metrics_data
 

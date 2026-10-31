@@ -1,0 +1,49 @@
+{
+  "scope": [
+    "online RL and RLinf UR5e inference share UR5eEnv",
+    "repository-local VLA-Precision UR inference"
+  ],
+  "cadence": "Schedule foreground target submissions / per-action forceMode calls within each chunk. Use local host clocks only. No catch-up after a missed period. Hold final target for one period before final observation.",
+  "state_sampling": "Wait before preparing the next target using previous preparation cost, then gate submission to account for preparation jitter.",
+  "timing": "target_interval_ms in RLinf logs / target_interval_sec in native JSONL measures foreground target submission intervals. action_interval_ms retains step-entry semantics; control_ms retains per-call processing plus pacing semantics and is no longer a full action period.",
+  "unchanged": [
+    "background PD frequency",
+    "target application acknowledgement",
+    "model and learner update logic",
+    "configured foreground frequencies"
+  ],
+  "hardware": "CPU and fake vendor SDKs; no physical robot execution",
+  "tests": [
+    {
+      "command": "PYTHONPATH=.:tests/unit_tests .venv/bin/pytest -q tests/unit_tests/test_real_env.py -k '(ur5e or native_ur or vla_precision or rlt_success_chunk or target_cadence) and not sync_worker_stops and not evaluation_can_close'",
+      "result": "106 passed"
+    },
+    {
+      "command": "PYTHONPATH=.:tests/unit_tests .venv/bin/pytest -q tests/unit_tests/test_robotics.py -k ur5e",
+      "result": "30 passed"
+    },
+    {
+      "command": "PYTHONPATH=.:tests/unit_tests .venv/bin/pytest -q tests/unit_tests/test_utils.py -k 'timing or structured_timing or run_logs'",
+      "result": "21 passed"
+    },
+    {
+      "command": "ruff check changed Python files",
+      "result": "passed"
+    }
+  ],
+  "excluded_known_blocking_tests": [
+    "test_ur5e_sync_worker_stops_after_episode_budget",
+    "test_ur5e_evaluation_can_close_while_waiting_for_operator"
+  ],
+  "notes": [
+    "Broad -k ur also matched unrelated SO101 tests and was interrupted; the explicit UR selection above completed.",
+    "Training and pure inference frequency knobs are independent; their test no longer requires identical values."
+  ],
+  "followup_audit": {
+    "frequency_scope": "Same-chunk foreground updates: continuous true publishes a target; false submits per-action forceMode. Chunk boundaries and background PD cadence are separate.",
+    "overrun": "control_overrun_sec now uses max(0, target_interval_sec - period); first target has no interval and overrun=0.",
+    "disabled": "New diagnostic wait accumulations and target interval calculations are conditional on detailed/action timing. Local clocks and preparation cost used to schedule actions remain necessary control logic.",
+    "mode_controls": "Online uses runner.timing_mode. Pure inference retains ur_evaluation.action_timing_enabled/save_logs or record.action_timing_enabled/save_logs; no shared three-mode interface was added.",
+    "regression": "106 UR real-env tests rerun after audit; see /tmp/cadence-audit-regression.log"
+  }
+}

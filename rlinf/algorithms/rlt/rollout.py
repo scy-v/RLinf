@@ -12,13 +12,61 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Literal
+import fcntl
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable, Literal
 
 import numpy as np
 import torch
 
 from rlinf.algorithms.rlt.route import RLTRoute, RLTRouteContext
 from rlinf.algorithms.rlt.transition import RLT_OBS_KEYS, RLT_TRANSITION_PREFIX
+from rlinf.utils.progress import timing_section
+from rlinf.utils.startup_timing import startup_section
+
+
+class RLTDataLogger:
+    """Append inference data to the run's data.log without terminal messages."""
+
+    def __init__(self, log_dir: str, rank: int, *, enabled: bool = False):
+        self.enabled = enabled
+        self.path = Path(log_dir) / "data.log"
+        self.rank = rank
+        self.inference_index = 0
+
+    def record_actions(
+        self,
+        *,
+        vla_action_chunk: torch.Tensor,
+        actor_action_chunk: torch.Tensor,
+        mode: Literal["train", "eval"],
+        version: int,
+    ) -> None:
+        """Append full batched action outputs before routing selects a controller."""
+        if not self.enabled:
+            return
+        timestamp = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+        lines = [
+            f"--- inference={self.inference_index + 1} | {timestamp} | "
+            f"rank={self.rank} | mode={mode} | policy_version={int(version)} ---"
+        ]
+        for name, chunk in (("VLA", vla_action_chunk), ("Actor", actor_action_chunk)):
+            batch_size, steps, action_dim = chunk.shape
+            lines.append(
+                f"{name} (batch={batch_size}, steps={steps}, dim={action_dim})"
+            )
+            for batch_index, actions in enumerate(chunk.detach().cpu().tolist()):
+                lines.append(f"  batch {batch_index}")
+                for step, action in enumerate(actions, start=1):
+                    values = ", ".join(f"{value:.9g}" for value in action)
+                    lines.append(f"    {step:02d}: [{values}]")
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.path.open("a", encoding="utf-8") as stream:
+            # Keep complete inference blocks together when rollout ranks share a run.
+            fcntl.flock(stream, fcntl.LOCK_EX)
+            stream.write("\n".join(lines) + "\n\n")
+        self.inference_index += 1
 
 
 def _append_rlt_transition_obs(
@@ -47,38 +95,48 @@ def predict_rlt_actions(
     rlt_switch_flags: torch.Tensor | None = None,
     intervene_requested: torch.Tensor | None = None,
     expert_model: Any | None = None,
+    data_recorder: Callable[..., None] | None = None,
 ) -> tuple[torch.Tensor, dict[str, Any]]:
     with torch.no_grad():
         rlt_obs = feature_model.extract_rlt_obs(env_obs)
-        actions, result = policy_model.predict_action_batch(
-            env_obs=rlt_obs,
-            mode=mode,
-            return_obs=True,
-        )
-        if isinstance(actions, np.ndarray):
-            actions = torch.from_numpy(actions)
-
-        route_output = rlt_route.route(
-            RLTRouteContext(
-                env_obs=env_obs,
-                rlt_obs=rlt_obs,
-                student_actions=actions,
-                result=result,
+        with timing_section("decision"), startup_section("rlt.actor_and_route"):
+            actions, result = policy_model.predict_action_batch(
+                env_obs=rlt_obs,
                 mode=mode,
-                rlt_switch_flags=rlt_switch_flags,
-                intervene_requested=intervene_requested,
-                expert_model=expert_model,
-                version=version,
+                return_obs=True,
             )
-        )
-        actions = route_output.actions
-        result = route_output.result
+            if isinstance(actions, np.ndarray):
+                actions = torch.from_numpy(actions)
 
-        _append_rlt_transition_obs(
-            feature_model=feature_model,
-            result=result,
-            rlt_obs=rlt_obs,
-            final_obs=final_obs,
-        )
+            if data_recorder is not None:
+                data_recorder(
+                    vla_action_chunk=rlt_obs["ref_chunk"],
+                    actor_action_chunk=actions,
+                    mode=mode,
+                    version=version,
+                )
+
+            route_output = rlt_route.route(
+                RLTRouteContext(
+                    env_obs=env_obs,
+                    rlt_obs=rlt_obs,
+                    student_actions=actions,
+                    result=result,
+                    mode=mode,
+                    rlt_switch_flags=rlt_switch_flags,
+                    intervene_requested=intervene_requested,
+                    expert_model=expert_model,
+                    version=version,
+                )
+            )
+            actions = route_output.actions
+            result = route_output.result
+
+            _append_rlt_transition_obs(
+                feature_model=feature_model,
+                result=result,
+                rlt_obs=rlt_obs,
+                final_obs=final_obs,
+            )
 
     return actions, result

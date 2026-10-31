@@ -20,6 +20,7 @@ import numpy as np
 import torch
 from omegaconf import DictConfig
 
+from rlinf.config import get_rollout_chunk_count
 from rlinf.scheduler import Channel, CommMapper, Worker
 from rlinf.utils.distributed import all_reduce_dict
 from rlinf.utils.metric_utils import compute_rollout_metrics
@@ -41,8 +42,9 @@ class PipelineEmbodiedFSDPActor(EmbodiedFSDPActor):
             actor_world_size=self._world_size,
             micro_batch_size=self.cfg.actor.micro_batch_size,
             rollout_epoch=self.cfg.env.train.rollout_epoch,
-            n_train_chunk_steps=self.cfg.env.train.max_steps_per_rollout_epoch
-            // self.cfg.actor.model.num_action_chunks,
+            n_train_chunk_steps=get_rollout_chunk_count(
+                self.cfg.env.train, self.cfg.actor.model.num_action_chunks
+            ),
         )
         assert self.micro_batches_per_step % self.gradient_accumulation == 0, (
             f"micro_batches_per_step ({self.micro_batches_per_step}) must be divisible by "

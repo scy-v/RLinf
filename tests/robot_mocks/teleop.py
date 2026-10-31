@@ -293,10 +293,50 @@ def keyboard() -> types.ModuleType:
         KEY_ENTER=28,
         KEY_KPENTER=96,
         KEY_SPACE=57,
+        KEY_F8=66,
+        KEY_DOT=52,
+        KEY_SLASH=53,
+        KEY_LEFTBRACE=26,
+        KEY_Z=44,
+        KEY_S=31,
+        KEY_W=17,
+        KEY_D=32,
+        KEY_E=18,
+        KEY_R=19,
+        KEY_T=20,
+        KEY_G=34,
+        KEY_F=33,
+        KEY_V=47,
+        KEY_L=38,
+        KEY_O=24,
     )
     by_name = {
         name: getattr(codes, f"KEY_{name.upper()}")
-        for name in ("a", "b", "c", "q", "enter", "kpenter", "space")
+        for name in (
+            "a",
+            "b",
+            "c",
+            "q",
+            "enter",
+            "kpenter",
+            "space",
+            "f8",
+            "dot",
+            "slash",
+            "leftbrace",
+            "z",
+            "s",
+            "w",
+            "d",
+            "e",
+            "r",
+            "t",
+            "g",
+            "f",
+            "v",
+            "l",
+            "o",
+        )
     }
     codes.bytype = {
         codes.EV_KEY: {code: f"KEY_{name.upper()}" for name, code in by_name.items()}

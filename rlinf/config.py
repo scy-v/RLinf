@@ -16,6 +16,7 @@ import dataclasses
 import importlib.util
 import logging
 import os
+from collections.abc import Mapping
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Callable, ClassVar, Optional
 
@@ -1048,6 +1049,112 @@ def validate_online_lerobot_env_cfg(cfg: DictConfig) -> None:
     )
 
 
+def get_rollout_chunk_count(env_cfg: DictConfig, chunk_size: int) -> int:
+    """Return the explicit chunk horizon, falling back to legacy action steps."""
+    if env_cfg.get("flush_replay_on_episode_end", False):
+        chunks = env_cfg.get("max_episode_chunks")
+        if isinstance(chunks, bool) or not isinstance(chunks, int) or chunks <= 0:
+            raise ValueError(
+                "flush_replay_on_episode_end requires positive integer "
+                f"max_episode_chunks, got {chunks!r}."
+            )
+        return chunks
+    chunks = env_cfg.get("max_chunks_per_rollout_epoch")
+    if chunks is not None:
+        if isinstance(chunks, bool) or not isinstance(chunks, int) or chunks <= 0:
+            raise ValueError(
+                f"Expected positive integer max_chunks_per_rollout_epoch, got {chunks!r}."
+            )
+        return chunks
+    steps = env_cfg.max_steps_per_rollout_epoch
+    if steps <= 0 or steps % chunk_size:
+        raise ValueError(
+            f"Expected positive max_steps_per_rollout_epoch divisible by {chunk_size}, got {steps}."
+        )
+    return steps // chunk_size
+
+
+def get_episode_step_limit(env_cfg: Mapping) -> int | None:
+    """Return the action limit derived from chunks, or the legacy action limit."""
+    if env_cfg.get("max_episode_chunks") is not None:
+        return env_cfg["episode_action_limit"]
+    return env_cfg.get("max_episode_steps")
+
+
+def resolve_chunk_limits(cfg: DictConfig, chunk_size: int) -> None:
+    """Derive the per-action safety limit without overwriting user step settings."""
+    for mode in ("train", "eval"):
+        env_cfg = cfg.env.get(mode)
+        if env_cfg is None:
+            continue
+        if env_cfg.get("init_params", {}).get("id") == "UR5eEnv-v1":
+            with open_dict(env_cfg):
+                from rlinf.utils.progress import get_timing_mode
+
+                env_cfg.online_timing_mode = get_timing_mode(cfg)
+                env_cfg.online_timing_enabled = env_cfg.online_timing_mode == "detailed"
+        chunks = env_cfg.get("max_episode_chunks")
+        if chunks is not None:
+            if env_cfg.env_type != "real":
+                raise ValueError("max_episode_chunks currently requires env_type=real.")
+            if isinstance(chunks, bool) or not isinstance(chunks, int) or chunks <= 0:
+                raise ValueError(
+                    f"Expected positive integer max_episode_chunks, got {chunks!r}."
+                )
+            with open_dict(env_cfg):
+                env_cfg.episode_action_limit = chunks * chunk_size
+        if env_cfg.get("max_chunks_per_rollout_epoch") is not None:
+            if cfg.rollout.get("generation_backend", "huggingface") != "huggingface":
+                raise ValueError(
+                    "max_chunks_per_rollout_epoch requires the huggingface rollout backend."
+                )
+            get_rollout_chunk_count(env_cfg, chunk_size)
+
+
+def validate_episode_replay_cfg(cfg: DictConfig) -> None:
+    """Require the single-UR asynchronous RLT episode replay contract."""
+    env = cfg.env.get("train", {})
+    setting = env.get("flush_replay_on_episode_end", False)
+    if not isinstance(setting, bool):
+        raise ValueError(
+            f"Expected boolean env.train.flush_replay_on_episode_end, got {setting!r}."
+        )
+    if not setting:
+        return
+    required = {
+        "algorithm.loss_type": "rlt_ac",
+        "algorithm.rlt_transition_replay": True,
+        "algorithm.rlt_schedule.enable": True,
+        "env.train.env_type": "real",
+        "env.train.init_params.id": "UR5eEnv-v1",
+        "env.train.total_num_envs": 1,
+        "env.train.rollout_epoch": 1,
+        "env.train.auto_reset": True,
+        "env.train.ignore_terminations": False,
+        "rollout.pipeline_stage_num": 1,
+        "rollout.generation_backend": "huggingface",
+        "rollout.collect_transitions": True,
+    }
+    for key, expected in required.items():
+        found = OmegaConf.select(cfg, key)
+        if found != expected:
+            raise ValueError(
+                "env.train.flush_replay_on_episode_end requires "
+                f"{key}={expected!r}, got {found!r}."
+            )
+    for key in (
+        "runner.use_training_pipeline",
+        "runner.enable_decoupled_mode",
+        "runner.only_eval",
+        "reward.use_reward_model",
+    ):
+        if OmegaConf.select(cfg, key, default=False):
+            raise ValueError(
+                f"env.train.flush_replay_on_episode_end requires {key}=false."
+            )
+    get_rollout_chunk_count(env, cfg.actor.model.num_action_chunks)
+
+
 def validate_embodied_cfg(cfg):
     only_eval = (
         cfg.runner.get("only_eval", False)
@@ -1056,6 +1163,8 @@ def validate_embodied_cfg(cfg):
     if only_eval:
         validate_only_eval_rollout_model(cfg.rollout.model)
     model_cfg = cfg.rollout.model if only_eval else cfg.actor.model
+    resolve_chunk_limits(cfg, model_cfg.num_action_chunks)
+    validate_episode_replay_cfg(cfg)
     algorithm_cfg = cfg.get("algorithm", {}) or {}
     model_type = SupportedModel(model_cfg.model_type)
     assert model_type in EMBODIED_MODEL or model_type in DIFFUSION_MODELS, (
@@ -1247,11 +1356,7 @@ def validate_embodied_cfg(cfg):
         ), (
             "env.eval.total_num_envs // env_world_size // rollout.pipeline_stage_num must be divisible by the group size"
         )
-        assert (
-            cfg.env.eval.max_steps_per_rollout_epoch % model_cfg.num_action_chunks == 0
-        ), (
-            "env.eval.max_steps_per_rollout_epoch must be divisible by actor.model.num_action_chunks"
-        )
+        get_rollout_chunk_count(cfg.env.eval, model_cfg.num_action_chunks)
 
     if not only_eval:
         assert cfg.env.train.total_num_envs > 0, (
@@ -1275,11 +1380,7 @@ def validate_embodied_cfg(cfg):
         ), (
             "env.train.total_num_envs // env_world_size // rollout.pipeline_stage_num must be divisible by the group size"
         )
-        assert (
-            cfg.env.train.max_steps_per_rollout_epoch % model_cfg.num_action_chunks == 0
-        ), (
-            "env.train.max_steps_per_rollout_epoch must be divisible by actor.model.num_action_chunks"
-        )
+        get_rollout_chunk_count(cfg.env.train, model_cfg.num_action_chunks)
     with open_dict(cfg):
         weight_sync_interval = cfg.runner.get("weight_sync_interval", 1)
         assert weight_sync_interval > 0, "weight_sync_interval must be greater than 0"
@@ -1432,12 +1533,7 @@ def validate_offline_cfg(cfg: DictConfig) -> DictConfig:
         ), (
             "env.eval.total_num_envs // env_world_size // rollout.pipeline_stage_num must be divisible by the group size"
         )
-        assert (
-            cfg.env.eval.max_steps_per_rollout_epoch % cfg.actor.model.num_action_chunks
-            == 0
-        ), (
-            "env.eval.max_steps_per_rollout_epoch must be divisible by actor.model.num_action_chunks"
-        )
+        get_rollout_chunk_count(cfg.env.eval, cfg.actor.model.num_action_chunks)
     return cfg
 
 
@@ -1675,6 +1771,9 @@ def adv_requires_group_baseline(
 
 
 def validate_cfg(cfg: DictConfig) -> DictConfig:
+    from rlinf.utils.progress import get_timing_mode
+
+    get_timing_mode(cfg)
     OmegaConf.set_struct(cfg, True)
 
     with open_dict(cfg):

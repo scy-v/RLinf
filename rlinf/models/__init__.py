@@ -23,6 +23,7 @@ from rlinf.config import (
     torch_dtype_from_precision,
 )
 from rlinf.scheduler import Worker
+from rlinf.utils.startup_timing import startup_section
 
 ModelBuilder = Callable[[DictConfig, Optional[object]], object]
 _MODEL_REGISTRY: dict[str, ModelBuilder] = {}
@@ -370,7 +371,8 @@ def get_model(cfg: DictConfig):
         and Worker.torch_platform.is_available()
         and cfg.get("load_to_device", True)
     ):
-        model = model.to(Worker.torch_device_type)
+        with startup_section("model.to_device"):
+            model = model.to(Worker.torch_device_type)
 
     if cfg.is_lora:
         from peft import (

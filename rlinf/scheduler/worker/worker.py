@@ -342,6 +342,9 @@ class Worker(metaclass=WorkerMeta):
             # Ray new the class in main thread but call __init__ in worker thread if it's an Actor with async functions
             # Since signal handlers must be registered in main thread, we call the registration in __new__
             instance._register_signal_handlers()
+            from rlinf.utils.robot_lifecycle import install_robot_cleanup_handlers
+
+            install_robot_cleanup_handlers()
             instance._enable_ptrace()
 
         return instance

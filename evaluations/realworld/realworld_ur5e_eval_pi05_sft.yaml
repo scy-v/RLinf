@@ -32,6 +32,7 @@ cluster:
           max_position: 1000
           force: 60
           speed: 100
+          background_io: true
         camera_type: realsense
         # Exterior camera, then wrist camera; capture defaults are 640x480 at 15 FPS.
         camera_serials: ["348522072391", "944622073455"]
@@ -39,10 +40,12 @@ cluster:
         acceleration: 0.2
         impedance:
           frequency: 100.0
+          continuous_tracking: true
+          start_paused: true
           kp: 1200.0
           kd: 600.0
-          kp_rotation: 2000.0
-          kd_rotation: 400.0
+          kp_rotation: 20.0
+          kd_rotation: 4.0
           position_error_clip: 0.048
           velocity_error_clip: 4.0
           rotation_error_clip_degrees: null
@@ -67,7 +70,7 @@ runner:
   val_check_interval: -1
   ckpt_path: null
   logger:
-    log_path: /home/suchenyu/RLinf-rltoken/results/ur5e-eval
+    log_path: /home/suchenyu/RLinf-rltoken/results/rlinf-ur/runs/ur5e-eval
     project_name: rlinf-rlt
     experiment_name: ur5e-stage1-eval
     logger_backends:
@@ -75,6 +78,9 @@ runner:
 env:
   group_name: EnvGroup
   enable_offload: false
+  eval:
+    override_cfg:
+      enable_camera_player: true
 rollout:
   group_name: RolloutGroup
   rollout_backend: huggingface
@@ -83,12 +89,14 @@ rollout:
   pipeline_stage_num: 1
   collect_transitions: false
   collect_prev_infos: false
+  torch_num_threads: 4
+  sampler_compile_mode: max-autotune
   model:
     model_type: openpi
     model_path: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor
     precision: bf16
     is_lora: false
-    num_action_chunks: 3
+    num_action_chunks: ${.openpi.action_chunk}
     action_dim: 7
     add_value_head: false
     num_steps: 10
@@ -125,7 +133,7 @@ rollout:
       num_images_in_input: 2
       train_expert_only: false
       action_horizon: 20
-      action_chunk: 3
+      action_chunk: 10
       action_env_dim: 7
       model_action_dim: 32
       max_token_len: 200

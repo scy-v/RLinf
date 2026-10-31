@@ -27,6 +27,7 @@ from rlinf.models.embodiment.openpi.checkpoint import (
 from rlinf.models.embodiment.openpi.modules.utils import set_torch_compile
 from rlinf.models.embodiment.openpi.rlt_config import build_rlt_config
 from rlinf.utils.logging import get_logger
+from rlinf.utils.startup_timing import startup_section
 
 logger = get_logger()
 
@@ -43,12 +44,13 @@ def get_model(cfg: Any, torch_dtype: Any = None) -> Any:
     ``cfg.precision`` controls parameter storage. ``cfg.openpi.embed_dtype``
     controls backbone activations and defaults to the parameter precision.
     """
-    import pathlib
+    with startup_section("model.imports"):
+        import pathlib
 
-    from omegaconf import OmegaConf
+        from omegaconf import OmegaConf
 
-    from rlinf.models.embodiment.openpi.pi0 import Pi0
-    from rlinf.models.embodiment.openpi.pi0_config import Pi0Config
+        from rlinf.models.embodiment.openpi.pi0 import Pi0
+        from rlinf.models.embodiment.openpi.pi0_config import Pi0Config
 
     model_cfg = cfg.openpi
     set_torch_compile(bool(OmegaConf.select(model_cfg, "torch_compile", default=True)))
@@ -122,31 +124,37 @@ def get_model(cfg: Any, torch_dtype: Any = None) -> Any:
     task = str(task).lower() if task is not None else "sft"
 
     if task == "sft":
-        model = Pi0(
-            pi0_config,
-            num_steps=num_steps,
-            action_env_dim=action_env_dim,
-            action_chunk=action_chunk,
-            rlt_cfg=rlt_cfg,
-        )
+        with startup_section("model.construct"):
+            model = Pi0(
+                pi0_config,
+                num_steps=num_steps,
+                action_env_dim=action_env_dim,
+                action_chunk=action_chunk,
+                rlt_cfg=rlt_cfg,
+            )
     elif task == "eval":
         from rlinf.models.embodiment.openpi.tasks.eval import Pi0Eval
 
         config_name = _require_config_name(model_cfg, task)
-        model = Pi0Eval(
-            pi0_config,
-            **runtime,
-            config_name=config_name,
-            state_indices=OmegaConf.select(model_cfg, "state_indices", default=None),
-            rlt_cfg=rlt_cfg,
-            rtc_enabled=bool(OmegaConf.select(model_cfg, "rtc_enabled", default=False)),
-            rtc_guidance_mode=str(
-                OmegaConf.select(model_cfg, "rtc_guidance_mode", default="approx")
-            ),
-            rtc_guidance_clip=float(
-                OmegaConf.select(model_cfg, "rtc_guidance_clip", default=5.0)
-            ),
-        )
+        with startup_section("model.construct"):
+            model = Pi0Eval(
+                pi0_config,
+                **runtime,
+                config_name=config_name,
+                state_indices=OmegaConf.select(
+                    model_cfg, "state_indices", default=None
+                ),
+                rlt_cfg=rlt_cfg,
+                rtc_enabled=bool(
+                    OmegaConf.select(model_cfg, "rtc_enabled", default=False)
+                ),
+                rtc_guidance_mode=str(
+                    OmegaConf.select(model_cfg, "rtc_guidance_mode", default="approx")
+                ),
+                rtc_guidance_clip=float(
+                    OmegaConf.select(model_cfg, "rtc_guidance_clip", default=5.0)
+                ),
+            )
         _install_transforms(model, cfg, config_name)
     elif task == "rl":
         from rlinf.models.embodiment.openpi.tasks.rl import Pi0RL, Pi0RLConfig
@@ -184,24 +192,30 @@ def get_model(cfg: Any, torch_dtype: Any = None) -> Any:
             is_nft=bool(OmegaConf.select(model_cfg, "is_nft", default=False)),
             config_name=config_name,
         )
-        model = Pi0RL(
-            pi0_config,
-            **runtime,
-            rl_cfg=rl_cfg,
-            config_name=config_name,
-            state_indices=OmegaConf.select(model_cfg, "state_indices", default=None),
-        )
+        with startup_section("model.construct"):
+            model = Pi0RL(
+                pi0_config,
+                **runtime,
+                rl_cfg=rl_cfg,
+                config_name=config_name,
+                state_indices=OmegaConf.select(
+                    model_cfg, "state_indices", default=None
+                ),
+            )
         _install_transforms(model, cfg, config_name)
     elif task == "dagger":
         from rlinf.models.embodiment.openpi.tasks.dagger import Pi0DAgger
 
         config_name = _require_config_name(model_cfg, task)
-        model = Pi0DAgger(
-            pi0_config,
-            **runtime,
-            config_name=config_name,
-            state_indices=OmegaConf.select(model_cfg, "state_indices", default=None),
-        )
+        with startup_section("model.construct"):
+            model = Pi0DAgger(
+                pi0_config,
+                **runtime,
+                config_name=config_name,
+                state_indices=OmegaConf.select(
+                    model_cfg, "state_indices", default=None
+                ),
+            )
         _install_transforms(model, cfg, config_name)
     elif task == "dsrl":
         from rlinf.models.embodiment.openpi.tasks.dsrl import (
@@ -237,13 +251,16 @@ def get_model(cfg: Any, torch_dtype: Any = None) -> Any:
             ),
             hidden_dims=tuple(int(x) for x in hidden),
         )
-        model = Pi0DSRL(
-            pi0_config,
-            **runtime,
-            config_name=config_name,
-            state_indices=OmegaConf.select(model_cfg, "state_indices", default=None),
-            dsrl_cfg=dsrl_cfg,
-        )
+        with startup_section("model.construct"):
+            model = Pi0DSRL(
+                pi0_config,
+                **runtime,
+                config_name=config_name,
+                state_indices=OmegaConf.select(
+                    model_cfg, "state_indices", default=None
+                ),
+                dsrl_cfg=dsrl_cfg,
+            )
         _install_transforms(model, cfg, config_name)
     else:
         raise ValueError(
@@ -261,8 +278,9 @@ def get_model(cfg: Any, torch_dtype: Any = None) -> Any:
     elif safetensors_path is not None:
         load_base_safetensors(model, safetensors_path)
 
-    _freeze_after_load(model, task)
-    _apply_openpi_param_dtypes(model, target_dtype)
+    with startup_section("model.freeze_and_precision"):
+        _freeze_after_load(model, task)
+        _apply_openpi_param_dtypes(model, target_dtype)
 
     n_params = sum(param.numel() for param in model.parameters())
     source = full_weights_path if full_weights_path is not None else safetensors_path
@@ -409,8 +427,9 @@ def _install_transforms(model, cfg, config_name: str):
         build_openpi_transforms,
     )
 
-    input_transforms, output_transforms = build_openpi_transforms(
-        cfg.model_path, config_name, data_kwargs=_resolve_data_kwargs(cfg)
-    )
-    model.setup_transforms(input_transforms, output_transforms)
+    with startup_section("model.transforms"):
+        input_transforms, output_transforms = build_openpi_transforms(
+            cfg.model_path, config_name, data_kwargs=_resolve_data_kwargs(cfg)
+        )
+        model.setup_transforms(input_transforms, output_transforms)
     return model

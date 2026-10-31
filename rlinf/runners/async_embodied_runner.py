@@ -39,6 +39,15 @@ if TYPE_CHECKING:
     )
 
 
+from rlinf.utils.progress import (
+    ElapsedTime,
+    StageTiming,
+    TrainingProgress,
+    timing_active,
+    timing_detailed,
+)
+
+
 class AsyncEmbodiedRunner(AsyncWeightSyncMixin, EmbodiedRunner):
     def __init__(
         self,
@@ -50,10 +59,20 @@ class AsyncEmbodiedRunner(AsyncWeightSyncMixin, EmbodiedRunner):
         critic=None,
     ):
         super().__init__(cfg, actor, rollout, env, reward, critic)
+        self._step_timing = StageTiming(
+            "Runner step",
+            timing_detailed(cfg),
+            self.logger.info,
+        )
 
         # Data channels
         self.env_metric_channel = Channel.create("EnvMetric")
         self.rollout_metric_channel = Channel.create("RolloutMetric")
+        self.replay_ack_channel = (
+            Channel.create("EpisodeReplayAck")
+            if cfg.env.train.get("flush_replay_on_episode_end", False)
+            else None
+        )
 
         self.init_weight_sync_state()
 
@@ -132,13 +151,23 @@ class AsyncEmbodiedRunner(AsyncWeightSyncMixin, EmbodiedRunner):
         self.env.set_global_step(self.global_step).wait()
         # Rollout must start from the actor's exact initial/resumed weights, so
         # this first sync always blocks even when overlap is enabled.
-        self.update_rollout_weights()
+        with ElapsedTime(
+            "LOAD",
+            "Initial actor-to-rollout weight synchronization",
+            log=self.logger.info,
+            enabled=timing_detailed(self.cfg),
+        ):
+            self.update_rollout_weights()
 
+        replay_options = {}
+        if getattr(self, "replay_ack_channel", None) is not None:
+            replay_options["replay_ack_channel"] = self.replay_ack_channel
         env_handle: Handle = self.env.interact(
             input_channel=self.env_channel,
             rollout_channel=self.rollout_channel,
             reward_channel=self.reward_channel,
             metric_channel=self.env_metric_channel,
+            **replay_options,
         )
         rollout_handle: Handle = self.rollout.generate(
             input_channel=self.rollout_channel,
@@ -152,9 +181,10 @@ class AsyncEmbodiedRunner(AsyncWeightSyncMixin, EmbodiedRunner):
                 output_channel=self.env_channel,
             )
         actor_handle: Handle = self.actor.recv_rollout_trajectories(
-            input_channel=self.actor_channel
+            input_channel=self.actor_channel, **replay_options
         )
 
+        online_progress = None
         while self.global_step < self.max_steps:
             # Use the step we're ABOUT to run as the profiling key, mirroring
             # ``EmbodiedRunner.run`` which gates before ``self.global_step += 1``.
@@ -184,6 +214,27 @@ class AsyncEmbodiedRunner(AsyncWeightSyncMixin, EmbodiedRunner):
                         ).items()
                     }
 
+                    update_step = training_metrics.get("train/rlt/update_step", 0)
+                    warmup = self.cfg.algorithm.get("rlt_schedule", {}).get(
+                        "warmup_post_collect_updates", 0
+                    )
+                    if (
+                        self.cfg.algorithm.get("rlt_schedule", {}).get("enable", False)
+                        and update_step >= warmup
+                    ):
+                        buffer_size = int(
+                            training_metrics.get("train/rlt/replay_size", 0)
+                        )
+                        if online_progress is None:
+                            online_progress = TrainingProgress(
+                                "Online RL runner rounds",
+                                self.max_steps,
+                                self.logger.info,
+                                initial=self.global_step,
+                                enabled=timing_active(self.cfg),
+                            )
+                        online_progress.update(self.global_step, buffer_size)
+
                     run_val, save_model, _ = check_progress(
                         self.global_step,
                         self.max_steps,
@@ -210,6 +261,18 @@ class AsyncEmbodiedRunner(AsyncWeightSyncMixin, EmbodiedRunner):
                 continue
 
             time_metrics = self.timer.consume_durations()
+            self._step_timing.record(
+                time_metrics["step"],
+                context={
+                    "step": self.global_step,
+                    "critic_updates": training_metrics.get(
+                        "train/rlt/critic_updates_run"
+                    ),
+                    "actor_updates": training_metrics.get(
+                        "train/rlt/actor_updates_run"
+                    ),
+                },
+            )
             time_metrics = {f"time/{k}": v for k, v in time_metrics.items()}
             if self.actor_channel is not None:
                 # Total outstanding across consumers, matching the pre-dispatcher

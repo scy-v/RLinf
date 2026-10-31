@@ -1,4 +1,4 @@
-# VLA-Precision UR deployment; only output and checkpoint/model settings differ.
+# VLA-Precision UR deployment with optional background force tracking.
 experiment:
   name: insert_black_rack_into_blue_slot
 output_root: /home/suchenyu/RLinf-rltoken/results/vla-precision-ur
@@ -16,9 +16,9 @@ video:
 record:
   num_episodes: 20
   episode_timeout_sec: 60
-  show_action_fps: false
-  show_inference_fps: true
-  show_time: true
+  # Enable detailed per-action diagnostics; save_logs controls file output.
+  action_timing_enabled: true
+  save_logs: true
 robot:
   kind: ur
   ip: 192.168.201.11
@@ -48,9 +48,7 @@ robot:
   target_tcp_pose: null
   target_threshold: null
   show_target_error: false
-  action_fps: 100
-  action_horizon: 3
-  direct_action_horizon: false
+  action_fps: 20
   debug: false
   control_space: force
   reference_frame: tcp
@@ -71,14 +69,16 @@ robot:
     lookahead_time: 0.1
     gain: 300
   force_mode:
+    # false: one wrench per action; true: track the latest target at rtde_freq.
+    continuous_tracking: true
     control_frame_euler_deg:
     - 0.0
     - 0.0
     - 0.0
     kp: 1200
     kd: 600
-    kp_rot: 2000
-    kd_rot: 400
+    kp_rot: 20
+    kd_rot: 4
     rtde_freq: 100
     select_vector:
     - 1
@@ -114,7 +114,7 @@ model:
     precision: bf16
     pi05: true
     is_lora: false
-    num_action_chunks: 3
+    num_action_chunks: ${.openpi.action_chunk}
     action_dim: 7
     add_value_head: false
     openpi_data:
@@ -146,7 +146,7 @@ model:
       num_images_in_input: 2
       train_expert_only: false
       action_horizon: 20
-      action_chunk: 3
+      action_chunk: 10
       action_env_dim: 7
       model_action_dim: 32
       max_token_len: 200

@@ -1,0 +1,27 @@
+{
+  "cpu": {
+    "test_real_env_selected": 64,
+    "test_models_openpi_rlt_passed": 20,
+    "test_models_openpi_rlt_skipped_asset_opt_in": 2,
+    "test_utils_passed": 105,
+    "test_utils_excluded_existing_ray_entrypoint": 2,
+    "test_fsdp_sac_timing_passed": 2
+  },
+  "gpu": {
+    "hardware": "RTX 4090 D",
+    "vla_precision_fresh_processes": 2,
+    "synthetic_calls_per_process": 2,
+    "online_rlt_model_only_warmup_test": "passed; RNG and model weights preserved, no action publication"
+  },
+  "checks": {
+    "ruff": "passed",
+    "diff_whitespace": "passed",
+    "docs_en": "0 warnings",
+    "docs_zh": "0 warnings",
+    "doc_markup_and_symbols": "passed"
+  },
+  "limitations": [
+    "The full utils test attempt was interrupted after an existing Ray subprocess entrypoint stalled in the sandbox; the remaining 105 cases passed with both Ray entrypoint tests excluded.",
+    "No physical robot connected; online model-only verification does not constitute distributed Ray/FSDP end-to-end training."
+  ]
+}

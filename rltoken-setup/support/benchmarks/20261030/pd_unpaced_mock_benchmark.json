@@ -1,0 +1,39 @@
+{
+  "hardware": "CPU; vendor RTDE interfaces replaced by fake SDK; no physical device",
+  "frequency_parameter": 100.0,
+  "method": "Run the unchanged UR5eArm._run_controller; skip only its final Event.wait in unpaced case. Preserve frequency=100 because wrench computation also uses frequency. Fake RTDE calls do not model real network/device delay.",
+  "cases": [
+    {
+      "paced": true,
+      "repetition": 1,
+      "cycles": 150,
+      "measured_hz": 99.40266517198638,
+      "work_mean_ms": 0.12598504777997732,
+      "fake_forceMode_mean_ms": 0.002626366913318634
+    },
+    {
+      "paced": false,
+      "repetition": 1,
+      "cycles": 15705,
+      "measured_hz": 15630.994395288206,
+      "work_mean_ms": 0.06159110911266415,
+      "fake_forceMode_mean_ms": 0.0012754115155361064
+    },
+    {
+      "paced": false,
+      "repetition": 2,
+      "cycles": 15453,
+      "measured_hz": 15395.069481330776,
+      "work_mean_ms": 0.06254297638784363,
+      "fake_forceMode_mean_ms": 0.0012870460172750753
+    },
+    {
+      "paced": false,
+      "repetition": 3,
+      "cycles": 15459,
+      "measured_hz": 15421.773128094666,
+      "work_mean_ms": 0.062426270442209386,
+      "fake_forceMode_mean_ms": 0.0012680855854691228
+    }
+  ]
+}

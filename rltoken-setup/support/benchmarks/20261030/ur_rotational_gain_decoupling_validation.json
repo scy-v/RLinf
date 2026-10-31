@@ -1,0 +1,69 @@
+{
+  "change": "Direct UR rotational gains; remove torque division by controller frequency.",
+  "profiles": {
+    "online_training": {
+      "kp_rotation": 20,
+      "kd_rotation": 4,
+      "frequency": 100
+    },
+    "rlinf_ur_eval": {
+      "kp_rotation": 20,
+      "kd_rotation": 4,
+      "frequency": 100
+    },
+    "vla_precision_ur_eval": {
+      "kp_rot": 20,
+      "kd_rot": 4,
+      "rtde_freq": 100
+    }
+  },
+  "vla_omitted_gain_defaults": {
+    "kp_rot": 32,
+    "kd_rot": 6.4,
+    "original_reference_frequency": 125
+  },
+  "new_tests": {
+    "passed": 15,
+    "rates_hz": [
+      50,
+      100,
+      200
+    ],
+    "driver_modes": [
+      false,
+      true
+    ],
+    "checks": [
+      "legacy wrench equality",
+      "frequency-independent wrench",
+      "actual YAML profile gains"
+    ]
+  },
+  "regression": {
+    "passed": 137,
+    "incomplete": 5,
+    "runs_passed": [
+      96,
+      29,
+      12
+    ],
+    "blocked_tests": [
+      "test_ur5e_sync_worker_stops_after_episode_budget[False-False]",
+      "test_ur5e_evaluation_can_close_while_waiting_for_operator"
+    ],
+    "not_run": [
+      "test_ur5e_sync_worker_stops_after_episode_budget[False-True]",
+      "test_ur5e_sync_worker_stops_after_episode_budget[True-False]",
+      "test_ur5e_sync_worker_stops_after_episode_budget[True-True]"
+    ],
+    "blocking_reason": "Async evaluation waits did not finish; own test processes interrupted after stack inspection. No production worker/exit code changed."
+  },
+  "checks": {
+    "ruff": "passed",
+    "docs_en_warnings": 0,
+    "docs_zh_warnings": 0,
+    "diff_check": "passed"
+  },
+  "physical_hardware_tested": false,
+  "migration": "Custom old profiles must divide both rotational gains by their old configured frequency. No automatic reinterpretation of old saved configs."
+}

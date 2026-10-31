@@ -23,7 +23,7 @@ import torch
 
 from rlinf.algorithms.registry import calculate_adv_and_returns, policy_loss
 from rlinf.algorithms.utils import compute_entropy_loss
-from rlinf.config import SupportedModel
+from rlinf.config import SupportedModel, get_episode_step_limit
 from rlinf.data.schema.embodied_types import Trajectory
 from rlinf.data.storage.replay import PriorityStore
 from rlinf.scheduler import Worker
@@ -433,7 +433,7 @@ class AsyncPPOEmbodiedFSDPActor(EmbodiedFSDPActor):
                         "huber_delta": self.cfg.algorithm.get("huber_delta", None),
                         "loss_mask": loss_mask,
                         "loss_mask_sum": loss_mask_sum,
-                        "max_episode_steps": self.cfg.env.train.max_episode_steps,
+                        "max_episode_steps": get_episode_step_limit(self.cfg.env.train),
                         "task_type": self.cfg.runner.task_type,
                         "critic_warmup": self.optimizer_steps
                         < self.critic_warmup_steps,

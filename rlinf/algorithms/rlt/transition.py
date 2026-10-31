@@ -23,8 +23,8 @@ RLT_OBS_KEYS = ("z_rl", "proprio", "ref_chunk")
 RLT_TRANSITION_PREFIX = "rlt_transition_"
 
 
-def use_simulator_transition_replay(cfg: Any) -> bool:
-    """Return True for envs that store one replay row per env step."""
+def use_maniskill_rlt_env(cfg: Any) -> bool:
+    """Return whether the training environment uses the ManiSkill RLT route."""
     train_env_cfg = cfg.env.get("train", None)
     if train_env_cfg is None:
         return False
@@ -35,6 +35,14 @@ def use_simulator_transition_replay(cfg: Any) -> bool:
         )
     except ValueError:
         return False
+
+
+def use_simulator_transition_replay(cfg: Any) -> bool:
+    """Return whether RLT splits and filters rollout rows before replay."""
+    replay_override = cfg.algorithm.get("rlt_transition_replay", None)
+    if replay_override is not None:
+        return bool(replay_override)
+    return use_maniskill_rlt_env(cfg)
 
 
 def extract_rlt_obs_from_forward_inputs(

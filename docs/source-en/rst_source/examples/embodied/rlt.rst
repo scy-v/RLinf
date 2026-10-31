@@ -78,6 +78,90 @@ Provided Configuration Files
      - ``examples/embodiment/config/maniskill_rlt_stage2_td3_mlp.yaml``
      - Run the simulated TD3-MLP variant with the same frozen Stage 1 feature model and replay route.
 
+UR Stage 2 force control
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+``examples/embodiment/config/ur_rlt_stage2_ac_mlp.yaml`` loads the models before
+asking for Enter to allow the first reset, then another Enter to start the first
+episode. Later episodes reset automatically and wait for Enter before starting.
+``impedance.start_paused: true`` keeps force control paused during these waits.
+The first action starts control; success, timeout, reset, an action error or close
+stops it. Remaining actions in a finished chunk are skipped until reset.
+
+The UR training configuration enables
+``env.train.flush_replay_on_episode_end: true``. Success and timeout both stop
+force control and reuse the environment's pre-reset terminal observation to
+complete the last transition's RLT features before submitting the episode. Reset starts after the actor confirms
+replay ingestion, including episodes with no critical transitions. Only critical
+transitions enter replay. This mode requires one UR environment, one rollout
+worker and one actor with ``rollout_epoch=1`` through the asynchronous launcher.
+
+Set ``env.train.max_episode_chunks`` for the episode limit (default 200). Episode
+replay accepts early success at any chunk and leaves the model, loss and continuous
+learner updates enabled. New data becomes available after the episode ends, so
+warmup readiness and MLP takeover may move to a later episode. Set
+``env.train.flush_replay_on_episode_end=false`` to use fixed rollout batches again;
+``env.train.max_chunks_per_rollout_epoch`` then controls their length (default 50).
+The terminal shows warmup
+update progress, online runner-round progress and the current replay size. The
+runner-round count includes warmup rounds and resumes from the checkpoint.
+
+``impedance.continuous_tracking: false`` computes and sends one wrench per
+action; the last wrench remains between calls during the episode. With
+``true``, a background controller reads state, recomputes the wrench, and calls
+``forceMode`` at ``impedance.frequency`` while holding the most recent absolute
+target between actions.
+
+``runner.timing_mode=basic`` is the default: it records Learner update sections and the
+major Rollout/Env modules. Set it to ``disabled`` to turn off additional timing, or
+``detailed`` to add submodules and diagnostics. Disabled mode reads no profiling clocks,
+starts no timing threads and emits no timing records; original RLinf logs and control
+pacing retain their behavior. Timing is controlled solely by ``runner.timing_mode``.
+Basic and detailed modes both display loading and inference-warmup progress; detailed
+mode additionally records startup substage diagnostics.
+
+Set ``runner.log_data=true`` to save the full VLA reference action chunk and
+Actor output for every real RLT prediction to
+``<runner.logger.log_path>/data.log``. The flag defaults to false
+and is independent of timing. Each prediction is a plain-text block with a readable
+UTC timestamp, inference index, mode, and policy version. Separate VLA and Actor
+sections show the batch/step/action dimensions and numbered actions, one per line,
+without truncation. Values use nine significant digits. The header identifies
+the worker rank. VLA values are decoded action-space references;
+Actor values are its sampled output in training or mean in evaluation, captured
+before routing chooses the controller. Synthetic startup warmup is excluded.
+Debug records go only to files. Disabled mode performs no diagnostic tensor copies,
+serialization, or file writes; enabling it adds device-to-host copies and disk I/O.
+
+Rollout modules cover post-receive input processing, inference, action sending and
+training-data submission. Env modules cover post-receive input processing, action
+execution and feedback publishing. Each worker's ``work_ms`` equals its major-module sum
+and excludes upstream input waiting, episode-end replay waits and reset. Detailed mode
+adds preprocessing, KV cache, z encoding, reference actions, MLP/output preparation, and
+Env action preparation, chunk execution, result processing, request construction,
+transition construction and sending. UR command processing, pacing, observation reads,
+action cadence and background PD are separate diagnostics; nested or background values
+must not be added again to major-module totals. With ``continuous_tracking=true``, PD
+runs concurrently and reports its own cadence.
+
+All additional timing uses worker-local host elapsed time without added device
+synchronization, cross-process barriers or waits. GPU operations can be asynchronous, so
+these values describe runtime delays rather than exact GPU kernel durations and are not
+directly comparable with earlier synchronized measurements. The run directory contains
+readable ``timing.log`` tables and raw ``timing.tsv`` records. ``work_hz`` is reciprocal
+duration; ``action_interval_hz`` and ``measured_hz`` report actual action/PD cadence.
+
+Each ``Learner update`` now includes ``sample_ms`` (replay sampling), ``prepare_ms``
+(batch preparation and device transfer), ``critic_ms`` and ``actor_ms`` (each
+forward, backward, clipping and optimizer update), ``target_ms`` (target update), and
+``other_ms`` (remaining work and measurement overhead). ``work_ms`` covers the
+complete call, rather than only critic plus actor. When ``actor_updated=false``,
+``actor_ms`` is empty because the actor was skipped; tasks with a learned temperature
+also report ``alpha_ms``. In detailed mode, ``Runner step`` records a complete round with its ``step``,
+actual ``critic_updates``, and ``actor_updates``, including update calls, weight-sync
+waits, and scheduled checkpoint/evaluation work; the first round may also wait for
+warmup data. Sections use local host elapsed time without added device synchronization.
+
 Installation
 ------------
 

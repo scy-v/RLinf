@@ -14,6 +14,7 @@
 
 """DH Robotics PGI/PGE grippers over a dedicated serial connection."""
 
+import threading
 from typing import Any
 
 import numpy as np
@@ -47,6 +48,7 @@ class PGIGripper(BaseGripper):
         max_position: int = 1000,
         force: int = 30,
         speed: int = 50,
+        background_io: bool = False,
     ) -> None:
         if not port or max_width <= 0 or not 0 <= min_position < max_position <= 1000:
             raise ValueError(
@@ -60,6 +62,7 @@ class PGIGripper(BaseGripper):
         self.max_position = max_position
         self.force = force
         self.speed = speed
+        self.background_io = background_io
         self._claim = DeviceClaim(f"pgi:{port}", type(self).__name__)
 
     def _open(self) -> Any:
@@ -87,6 +90,44 @@ class PGIGripper(BaseGripper):
         finally:
             self._claim.release()
 
+    def _opened(self) -> None:
+        if not self.background_io:
+            return
+        self._position = self._read_position()
+        self._target: int | None = None
+        self._io_error: BaseException | None = None
+        self._io_stop = threading.Event()
+        self._io_thread = threading.Thread(
+            target=self._run_io, name="ur-gripper-io", daemon=True
+        )
+        self._io_thread.start()
+
+    def _run_io(self) -> None:
+        previous = None
+        try:
+            while not self._io_stop.is_set():
+                target = self._target
+                if target is not None and target != previous:
+                    self._device.set_pos(val=target, blocking=False)
+                    previous = target
+                self._position = self._read_position()
+                self._io_stop.wait(0.01)
+        except BaseException as error:
+            self._io_error = error
+            self._io_stop.set()
+
+    def _closing(self) -> None:
+        if not self.background_io:
+            return
+        self._io_stop.set()
+        self._io_thread.join(timeout=2.0)
+        if self._io_thread.is_alive():
+            raise RuntimeError("Expected UR gripper I/O to stop within two seconds.")
+
+    def _check_io(self) -> None:
+        if self._io_error is not None:
+            raise RuntimeError("UR gripper background I/O failed.") from self._io_error
+
     @property
     def max_width(self) -> float:
         """Fully open width configured for the installed gripper."""
@@ -95,6 +136,12 @@ class PGIGripper(BaseGripper):
     @property
     def position(self) -> float:
         """Measured opening in metres, using the SDK's raw 0..1000 reading."""
+        if self.background_io:
+            self._check_io()
+            return self._position
+        return self._read_position()
+
+    def _read_position(self) -> float:
         raw = float(self._device.read_pos())
         if not np.isfinite(raw) or not 0 <= raw <= 1000:
             raise RuntimeError(f"Expected PGI position in [0, 1000], got {raw}.")
@@ -123,7 +170,11 @@ class PGIGripper(BaseGripper):
                 self.max_position,
             )
         )
-        self._device.set_pos(val=raw, blocking=False)
+        if self.background_io:
+            self._check_io()
+            self._target = raw
+        else:
+            self._device.set_pos(val=raw, blocking=False)
 
     def open(self, speed: float = 0.3) -> None:
         """Command the configured open position."""

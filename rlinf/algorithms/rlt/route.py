@@ -19,7 +19,7 @@ from typing import Any, Literal
 import torch
 
 from rlinf.algorithms.rlt.expert import predict_expert_actions
-from rlinf.algorithms.rlt.transition import use_simulator_transition_replay
+from rlinf.algorithms.rlt.transition import use_maniskill_rlt_env
 
 
 @dataclass(kw_only=True)
@@ -114,7 +114,11 @@ class RLTRoute(ABC):
 
 
 class RealworldRLTRoute(RLTRoute):
-    """Actor/ref routing for realworld RLT (keyboard or env switch flags)."""
+    """Record critical phases and gate actor control on synchronized warmup."""
+
+    def __init__(self, *, use_schedule: bool = False, warmup_updates: int = 0):
+        self.use_schedule = use_schedule
+        self.warmup_updates = warmup_updates
 
     def route(self, ctx: RLTRouteContext) -> RLTRouteOutput:
         actions = ctx.student_actions
@@ -124,13 +128,21 @@ class RealworldRLTRoute(RLTRoute):
             ctx.rlt_switch_flags,
             default=ctx.default_actor_switch,
         )
-        ref_actions = result["forward_inputs"]["ref_chunk"].to(
-            device=actions.device, dtype=actions.dtype
+        ready_for_online = (
+            not self.use_schedule or int(ctx.version) >= self.warmup_updates
+        )
+        actor_switch = rlt_switch_flags & ready_for_online
+        ref_actions = _base_ref_actions(
+            result["forward_inputs"]["ref_chunk"],
+            chunk_len=actions.shape[1],
+            action_dim=actions.shape[2],
+            device=actions.device,
+            dtype=actions.dtype,
         )
         routed_actions = torch.where(
-            rlt_switch_flags,
+            actor_switch,
             actions,
-            ref_actions[:, : actions.shape[1], : actions.shape[2]],
+            ref_actions,
         ).contiguous()
         result["forward_inputs"]["action"] = routed_actions.reshape(
             routed_actions.shape[0], -1
@@ -138,9 +150,9 @@ class RealworldRLTRoute(RLTRoute):
         result["forward_inputs"]["record_transition"] = rlt_switch_flags.reshape(
             actions.shape[0], -1
         )[:, :1].to(torch.bool)
-        result["forward_inputs"]["actor_switch"] = result["forward_inputs"][
-            "record_transition"
-        ]
+        result["forward_inputs"]["actor_switch"] = actor_switch.reshape(
+            actions.shape[0], -1
+        )[:, :1].to(torch.bool)
         return RLTRouteOutput(actions=routed_actions, result=result)
 
 
@@ -245,10 +257,13 @@ class SimulatorRLTRoute(RLTRoute):
 
 
 def build_rlt_route(cfg: Any) -> RLTRoute:
-    if use_simulator_transition_replay(cfg):
-        schedule_cfg = cfg.algorithm.get("rlt_schedule", {}) or {}
+    schedule_cfg = cfg.algorithm.get("rlt_schedule", {}) or {}
+    if use_maniskill_rlt_env(cfg):
         return SimulatorRLTRoute(
             use_schedule=bool(schedule_cfg.get("enable", False)),
             warmup_updates=int(schedule_cfg.get("warmup_post_collect_updates", 0)),
         )
-    return RealworldRLTRoute()
+    return RealworldRLTRoute(
+        use_schedule=bool(schedule_cfg.get("enable", False)),
+        warmup_updates=int(schedule_cfg.get("warmup_post_collect_updates", 0)),
+    )

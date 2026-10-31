@@ -3,6 +3,7 @@
 /outputs/
 /support/__pycache__/
 /support/audit-*/
+/support/migration-20261023/
 /support/versions.json
 /support/system-packages.json
 /support/ur-install.patch

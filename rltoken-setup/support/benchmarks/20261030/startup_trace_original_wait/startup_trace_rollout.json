@@ -1,0 +1,3332 @@
+[
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._get_object_info",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354612.7637396,
+    "end": 1793354612.763764,
+    "ms": 0.023968983441591263,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "rollout",
+    "name": "MultiChannelProcessGroup.init",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354612.769499,
+    "end": 1793354612.9489596,
+    "ms": 179.45879697799683,
+    "thread": "Thread-1 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354612.7640648,
+    "end": 1793354612.9489691,
+    "ms": 184.9043529946357,
+    "thread": "Thread-1 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_send",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354612.7640624,
+    "end": 1793354612.950546,
+    "ms": 186.48294312879443,
+    "thread": "Thread-1 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354612.9510355,
+    "end": 1793354612.9510434,
+    "ms": 0.007359776645898819,
+    "thread": "Thread-3 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354612.9527586,
+    "end": 1793354612.952763,
+    "ms": 0.004052883014082909,
+    "thread": "Thread-3 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._recv_tensor_list_via_ipc",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354612.9527664,
+    "end": 1793354612.9569168,
+    "ms": 4.149164073169231,
+    "thread": "Thread-3 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._recv_tensor_list_via_ipc",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354612.985874,
+    "end": 1793354612.9868805,
+    "ms": 1.00510916672647,
+    "thread": "Thread-3 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "MultiChannelProcessGroup.init",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354614.2635896,
+    "end": 1793354614.4336157,
+    "ms": 170.02527392469347,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354613.0173895,
+    "end": 1793354614.4336271,
+    "ms": 1416.2373598665,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._recv_tensor_list",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354614.4343045,
+    "end": 1793354614.4351194,
+    "ms": 0.814300961792469,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._recv_tensor_dataclass",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354614.4343035,
+    "end": 1793354614.4353335,
+    "ms": 1.0296748951077461,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354613.0173836,
+    "end": 1793354614.4353366,
+    "ms": 1417.9532758425921,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._get_object_info",
+    "group": "cg-Env:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354614.5368617,
+    "end": 1793354614.536877,
+    "ms": 0.015039928257465363,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._get_object_info",
+    "group": "cg-Actor:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354614.5379965,
+    "end": 1793354614.538069,
+    "ms": 0.07211300544440746,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354614.5405514,
+    "end": 1793354614.540557,
+    "ms": 0.004892004653811455,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "MultiChannelProcessGroup.init",
+    "group": "cg-Actor:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354614.545611,
+    "end": 1793354614.7284136,
+    "ms": 182.80174396932125,
+    "thread": "Thread-10 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-Actor:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354614.5384185,
+    "end": 1793354614.7284286,
+    "ms": 190.00978814437985,
+    "thread": "Thread-10 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_send",
+    "group": "cg-Actor:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354614.538417,
+    "end": 1793354614.7310536,
+    "ms": 192.63607799075544,
+    "thread": "Thread-10 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "MultiChannelProcessGroup.init",
+    "group": "cg-Env:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354614.5443835,
+    "end": 1793354614.7359598,
+    "ms": 191.57615094445646,
+    "thread": "Thread-7 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-Env:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354614.5371,
+    "end": 1793354614.7359662,
+    "ms": 198.86621995829046,
+    "thread": "Thread-7 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_send",
+    "group": "cg-Env:0-RolloutGroup:0",
+    "call": 1,
+    "start": 1793354614.5370972,
+    "end": 1793354614.737187,
+    "ms": 200.08943905122578,
+    "thread": "Thread-7 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._recv_tensor_list",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354615.00979,
+    "end": 1793354615.0110056,
+    "ms": 1.2154709547758102,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._recv_tensor_dataclass",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354615.0097883,
+    "end": 1793354615.0113268,
+    "ms": 1.5383949503302574,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354614.5405478,
+    "end": 1793354615.0113301,
+    "ms": 470.7821412011981,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._get_object_info",
+    "group": "cg-Env:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354615.0992918,
+    "end": 1793354615.0993042,
+    "ms": 0.011908123269677162,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-Env:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354615.099397,
+    "end": 1793354615.0994022,
+    "ms": 0.0050729140639305115,
+    "thread": "Thread-7 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._get_object_info",
+    "group": "cg-Actor:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354615.099551,
+    "end": 1793354615.0996082,
+    "ms": 0.056791119277477264,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-Actor:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354615.0996866,
+    "end": 1793354615.0996926,
+    "ms": 0.0055730342864990234,
+    "thread": "Thread-10 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._get_object_info",
+    "group": "cg-Actor:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354615.0999167,
+    "end": 1793354615.099971,
+    "ms": 0.054078176617622375,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_send",
+    "group": "cg-Env:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354615.099395,
+    "end": 1793354615.1007166,
+    "ms": 1.3214389327913523,
+    "thread": "Thread-7 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354615.1016626,
+    "end": 1793354615.1016662,
+    "ms": 0.0033350661396980286,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_send",
+    "group": "cg-Actor:0-RolloutGroup:0",
+    "call": 2,
+    "start": 1793354615.0996852,
+    "end": 1793354615.102186,
+    "ms": 2.5002239271998405,
+    "thread": "Thread-10 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-Actor:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354615.1022608,
+    "end": 1793354615.1022646,
+    "ms": 0.0035068951547145844,
+    "thread": "Thread-10 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_send",
+    "group": "cg-Actor:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354615.1022596,
+    "end": 1793354615.1047013,
+    "ms": 2.441165968775749,
+    "thread": "Thread-10 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._recv_tensor_list",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354615.1937313,
+    "end": 1793354615.195092,
+    "ms": 1.3598371297121048,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._recv_tensor_dataclass",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354615.1937299,
+    "end": 1793354615.1954918,
+    "ms": 1.761759864166379,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354615.1016583,
+    "end": 1793354615.1954985,
+    "ms": 93.83979113772511,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._get_object_info",
+    "group": "cg-Env:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354615.2723432,
+    "end": 1793354615.2723536,
+    "ms": 0.010299962013959885,
+    "thread": "AsyncIO Thread: default"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._init_process_group",
+    "group": "cg-Env:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354615.272496,
+    "end": 1793354615.272501,
+    "ms": 0.00499398447573185,
+    "thread": "Thread-7 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_send",
+    "group": "cg-Env:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354615.272494,
+    "end": 1793354615.2736537,
+    "ms": 1.1596409603953362,
+    "thread": "Thread-7 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 4,
+    "start": 1793354615.2741406,
+    "end": 1793354615.3582563,
+    "ms": 84.11507890559733,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 5,
+    "start": 1793354615.4346445,
+    "end": 1793354615.5194156,
+    "ms": 84.7706738859415,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 6,
+    "start": 1793354615.5961084,
+    "end": 1793354615.6784573,
+    "ms": 82.3483569547534,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 7,
+    "start": 1793354615.7541826,
+    "end": 1793354615.8371823,
+    "ms": 82.99890998750925,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 8,
+    "start": 1793354615.913398,
+    "end": 1793354615.9975362,
+    "ms": 84.13778687827289,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 9,
+    "start": 1793354616.0809705,
+    "end": 1793354616.1643581,
+    "ms": 83.38706404902041,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 10,
+    "start": 1793354616.2397707,
+    "end": 1793354616.3237023,
+    "ms": 83.9312409516424,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 11,
+    "start": 1793354616.4000473,
+    "end": 1793354616.4847336,
+    "ms": 84.68583994545043,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 12,
+    "start": 1793354616.5605588,
+    "end": 1793354616.6448424,
+    "ms": 84.28317797370255,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 13,
+    "start": 1793354616.7207885,
+    "end": 1793354616.8035915,
+    "ms": 82.80255389399827,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 14,
+    "start": 1793354616.881466,
+    "end": 1793354616.9633863,
+    "ms": 81.91990712657571,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 15,
+    "start": 1793354617.0396526,
+    "end": 1793354617.12416,
+    "ms": 84.50704999268055,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 16,
+    "start": 1793354617.2013345,
+    "end": 1793354617.285488,
+    "ms": 84.15301307104528,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 17,
+    "start": 1793354617.3608787,
+    "end": 1793354617.4440255,
+    "ms": 83.14631902612746,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 18,
+    "start": 1793354617.5204782,
+    "end": 1793354617.6044881,
+    "ms": 84.00936285033822,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 19,
+    "start": 1793354617.681133,
+    "end": 1793354617.765095,
+    "ms": 83.96141813136637,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 20,
+    "start": 1793354617.843418,
+    "end": 1793354617.9267864,
+    "ms": 83.36799684911966,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 21,
+    "start": 1793354618.0035188,
+    "end": 1793354618.0868316,
+    "ms": 83.31234403885901,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 22,
+    "start": 1793354618.169773,
+    "end": 1793354618.2542274,
+    "ms": 84.45375901646912,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 23,
+    "start": 1793354618.3317442,
+    "end": 1793354618.4156332,
+    "ms": 83.88842595741153,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 24,
+    "start": 1793354618.4939208,
+    "end": 1793354618.5780594,
+    "ms": 84.1381389182061,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 25,
+    "start": 1793354618.6567929,
+    "end": 1793354618.7410924,
+    "ms": 84.29900906048715,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 26,
+    "start": 1793354618.8194206,
+    "end": 1793354618.905174,
+    "ms": 85.75280709192157,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 27,
+    "start": 1793354618.9822896,
+    "end": 1793354619.0674121,
+    "ms": 85.12203791178763,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 28,
+    "start": 1793354619.1445072,
+    "end": 1793354619.2317035,
+    "ms": 87.19608304090798,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 29,
+    "start": 1793354619.3097813,
+    "end": 1793354619.3948486,
+    "ms": 85.06674598902464,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 30,
+    "start": 1793354619.4736922,
+    "end": 1793354619.5655546,
+    "ms": 91.86202101409435,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 31,
+    "start": 1793354619.6451488,
+    "end": 1793354619.7360885,
+    "ms": 90.93946707434952,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 32,
+    "start": 1793354619.8146045,
+    "end": 1793354619.9003177,
+    "ms": 85.71259886957705,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 33,
+    "start": 1793354619.9786432,
+    "end": 1793354620.064241,
+    "ms": 85.59732604771852,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 34,
+    "start": 1793354620.142819,
+    "end": 1793354620.2267377,
+    "ms": 83.91870302148163,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 35,
+    "start": 1793354620.3025334,
+    "end": 1793354620.3875694,
+    "ms": 85.03582305274904,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 36,
+    "start": 1793354620.4650514,
+    "end": 1793354620.5486274,
+    "ms": 83.57568481005728,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 37,
+    "start": 1793354620.624808,
+    "end": 1793354620.709221,
+    "ms": 84.41210421733558,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 38,
+    "start": 1793354620.785392,
+    "end": 1793354620.8738549,
+    "ms": 88.46239210106432,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 39,
+    "start": 1793354620.9522693,
+    "end": 1793354621.0406213,
+    "ms": 88.3517418988049,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 40,
+    "start": 1793354621.1207445,
+    "end": 1793354621.2065167,
+    "ms": 85.7717851176858,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 41,
+    "start": 1793354621.2828417,
+    "end": 1793354621.3679378,
+    "ms": 85.0957881193608,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 42,
+    "start": 1793354621.4443889,
+    "end": 1793354621.529505,
+    "ms": 85.11550608091056,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 43,
+    "start": 1793354621.6085954,
+    "end": 1793354621.6924503,
+    "ms": 83.85438122786582,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 44,
+    "start": 1793354621.7706046,
+    "end": 1793354621.8630965,
+    "ms": 92.49182092025876,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 45,
+    "start": 1793354621.9415743,
+    "end": 1793354622.0252967,
+    "ms": 83.72161188162863,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 46,
+    "start": 1793354622.1016188,
+    "end": 1793354622.185588,
+    "ms": 83.96892994642258,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 47,
+    "start": 1793354622.2612364,
+    "end": 1793354622.3447723,
+    "ms": 83.53552594780922,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 48,
+    "start": 1793354622.420923,
+    "end": 1793354622.5048091,
+    "ms": 83.88605294749141,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 49,
+    "start": 1793354622.5814128,
+    "end": 1793354622.6644676,
+    "ms": 83.05437001399696,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 50,
+    "start": 1793354622.740646,
+    "end": 1793354622.8250813,
+    "ms": 84.4351330306381,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 51,
+    "start": 1793354622.9019046,
+    "end": 1793354622.987157,
+    "ms": 85.2517259772867,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 52,
+    "start": 1793354623.062852,
+    "end": 1793354623.1470149,
+    "ms": 84.16288206353784,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 53,
+    "start": 1793354623.2225556,
+    "end": 1793354623.307594,
+    "ms": 85.03816486336291,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 54,
+    "start": 1793354623.3833027,
+    "end": 1793354623.4698064,
+    "ms": 86.50336787104607,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 55,
+    "start": 1793354623.5467749,
+    "end": 1793354623.629763,
+    "ms": 82.98771386034787,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 56,
+    "start": 1793354623.706557,
+    "end": 1793354623.7908268,
+    "ms": 84.26946704275906,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 57,
+    "start": 1793354623.8679633,
+    "end": 1793354623.9516716,
+    "ms": 83.70770001783967,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 58,
+    "start": 1793354624.0278804,
+    "end": 1793354624.1156158,
+    "ms": 87.7349697984755,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 59,
+    "start": 1793354624.1915765,
+    "end": 1793354624.2773895,
+    "ms": 85.81269788555801,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 60,
+    "start": 1793354624.3535454,
+    "end": 1793354624.4366982,
+    "ms": 83.15205899998546,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 61,
+    "start": 1793354624.513542,
+    "end": 1793354624.6017606,
+    "ms": 88.21795298717916,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 62,
+    "start": 1793354624.6785438,
+    "end": 1793354624.7634134,
+    "ms": 84.86883901059628,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 63,
+    "start": 1793354624.8414738,
+    "end": 1793354624.926575,
+    "ms": 85.1003690622747,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 64,
+    "start": 1793354625.0035133,
+    "end": 1793354625.0874007,
+    "ms": 83.88669090345502,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 65,
+    "start": 1793354625.16381,
+    "end": 1793354625.2468488,
+    "ms": 83.0381028354168,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 66,
+    "start": 1793354625.3227143,
+    "end": 1793354625.4083884,
+    "ms": 85.67320718429983,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 67,
+    "start": 1793354625.4897513,
+    "end": 1793354625.575473,
+    "ms": 85.7216150034219,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 68,
+    "start": 1793354625.6575525,
+    "end": 1793354625.7413735,
+    "ms": 83.82060285657644,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 69,
+    "start": 1793354625.8219824,
+    "end": 1793354625.904659,
+    "ms": 82.67616387456656,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 70,
+    "start": 1793354625.9898512,
+    "end": 1793354626.0738962,
+    "ms": 84.04443599283695,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 71,
+    "start": 1793354626.150899,
+    "end": 1793354626.234534,
+    "ms": 83.63473787903786,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 72,
+    "start": 1793354626.3228567,
+    "end": 1793354626.4142463,
+    "ms": 91.38912195339799,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 73,
+    "start": 1793354626.494262,
+    "end": 1793354626.5867994,
+    "ms": 92.53686596639454,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 74,
+    "start": 1793354626.663651,
+    "end": 1793354626.7474132,
+    "ms": 83.76169390976429,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 75,
+    "start": 1793354626.8305376,
+    "end": 1793354626.913544,
+    "ms": 83.00601504743099,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 76,
+    "start": 1793354626.9912813,
+    "end": 1793354627.0764992,
+    "ms": 85.21762187592685,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 77,
+    "start": 1793354627.155543,
+    "end": 1793354627.2396798,
+    "ms": 84.13589908741415,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 78,
+    "start": 1793354627.3206584,
+    "end": 1793354627.4054487,
+    "ms": 84.78993200697005,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 79,
+    "start": 1793354627.482419,
+    "end": 1793354627.5655057,
+    "ms": 83.08638003654778,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 80,
+    "start": 1793354627.6418157,
+    "end": 1793354627.7244234,
+    "ms": 82.60745904408395,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 81,
+    "start": 1793354627.8024065,
+    "end": 1793354627.886966,
+    "ms": 84.55898310057819,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 82,
+    "start": 1793354627.9644392,
+    "end": 1793354628.0481412,
+    "ms": 83.70171091519296,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 83,
+    "start": 1793354628.1267006,
+    "end": 1793354628.2103767,
+    "ms": 83.67554191499949,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 84,
+    "start": 1793354628.291349,
+    "end": 1793354628.3777528,
+    "ms": 86.40344510786235,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 85,
+    "start": 1793354628.4721937,
+    "end": 1793354628.5567558,
+    "ms": 84.56130302511156,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 86,
+    "start": 1793354628.6349778,
+    "end": 1793354628.720894,
+    "ms": 85.91600996442139,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 87,
+    "start": 1793354628.799964,
+    "end": 1793354628.883992,
+    "ms": 84.02734785340726,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 88,
+    "start": 1793354628.961774,
+    "end": 1793354629.0448534,
+    "ms": 83.07907404378057,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 89,
+    "start": 1793354629.1248875,
+    "end": 1793354629.2081895,
+    "ms": 83.30123196355999,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 90,
+    "start": 1793354629.2853665,
+    "end": 1793354629.3727114,
+    "ms": 87.34441199339926,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 91,
+    "start": 1793354629.4512653,
+    "end": 1793354629.5367804,
+    "ms": 85.51450609229505,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 92,
+    "start": 1793354629.6185126,
+    "end": 1793354629.7052712,
+    "ms": 86.75834303721786,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 93,
+    "start": 1793354629.7895494,
+    "end": 1793354629.8765767,
+    "ms": 87.02706592157483,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 94,
+    "start": 1793354629.9604485,
+    "end": 1793354630.0474958,
+    "ms": 87.04722905531526,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 95,
+    "start": 1793354630.128623,
+    "end": 1793354630.2140996,
+    "ms": 85.47606389038265,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 96,
+    "start": 1793354630.2922504,
+    "end": 1793354630.3784127,
+    "ms": 86.16201695986092,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 97,
+    "start": 1793354630.4589303,
+    "end": 1793354630.546622,
+    "ms": 87.69153780303895,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 98,
+    "start": 1793354630.6279664,
+    "end": 1793354630.7101238,
+    "ms": 82.15721882879734,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 99,
+    "start": 1793354630.7928367,
+    "end": 1793354630.876989,
+    "ms": 84.15169012732804,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 100,
+    "start": 1793354630.9543555,
+    "end": 1793354631.03772,
+    "ms": 83.36413302458823,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 101,
+    "start": 1793354631.1145325,
+    "end": 1793354631.198671,
+    "ms": 84.13811912760139,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 102,
+    "start": 1793354631.276373,
+    "end": 1793354631.3620389,
+    "ms": 85.6656210962683,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 103,
+    "start": 1793354631.440467,
+    "end": 1793354631.5254805,
+    "ms": 85.01324011012912,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 104,
+    "start": 1793354631.6045606,
+    "end": 1793354631.6918204,
+    "ms": 87.25926815532148,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 105,
+    "start": 1793354631.769605,
+    "end": 1793354631.860762,
+    "ms": 91.15626802667975,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 106,
+    "start": 1793354631.9480822,
+    "end": 1793354632.033127,
+    "ms": 85.04434511996806,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 107,
+    "start": 1793354632.115165,
+    "end": 1793354632.2012837,
+    "ms": 86.11815911717713,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 108,
+    "start": 1793354632.2800925,
+    "end": 1793354632.3659432,
+    "ms": 85.85042413324118,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 109,
+    "start": 1793354632.4433587,
+    "end": 1793354632.530104,
+    "ms": 86.74452919512987,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 110,
+    "start": 1793354632.6088214,
+    "end": 1793354632.6932836,
+    "ms": 84.46197491139174,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 111,
+    "start": 1793354632.7701418,
+    "end": 1793354632.854193,
+    "ms": 84.05034500174224,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 112,
+    "start": 1793354632.930354,
+    "end": 1793354633.0162292,
+    "ms": 85.8747879974544,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 113,
+    "start": 1793354633.0938551,
+    "end": 1793354633.1783926,
+    "ms": 84.53689492307603,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 114,
+    "start": 1793354633.2571096,
+    "end": 1793354633.3404925,
+    "ms": 83.38241092860699,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 115,
+    "start": 1793354633.422067,
+    "end": 1793354633.5055087,
+    "ms": 83.44118599779904,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 116,
+    "start": 1793354633.591692,
+    "end": 1793354633.6761453,
+    "ms": 84.45297391153872,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 117,
+    "start": 1793354633.755821,
+    "end": 1793354633.839206,
+    "ms": 83.38452014140785,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 118,
+    "start": 1793354633.921259,
+    "end": 1793354634.0050278,
+    "ms": 83.76832096837461,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 119,
+    "start": 1793354634.0849187,
+    "end": 1793354634.1686318,
+    "ms": 83.71249889023602,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 120,
+    "start": 1793354634.2509873,
+    "end": 1793354634.3358479,
+    "ms": 84.8603779450059,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 121,
+    "start": 1793354634.419413,
+    "end": 1793354634.5021083,
+    "ms": 82.69498497247696,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 122,
+    "start": 1793354634.581741,
+    "end": 1793354634.6655211,
+    "ms": 83.77950894646347,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 123,
+    "start": 1793354634.7597823,
+    "end": 1793354634.8439791,
+    "ms": 84.19607300311327,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 124,
+    "start": 1793354634.924499,
+    "end": 1793354635.0103393,
+    "ms": 85.83955583162606,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 125,
+    "start": 1793354635.1077032,
+    "end": 1793354635.1910453,
+    "ms": 83.34152586758137,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 126,
+    "start": 1793354635.2753036,
+    "end": 1793354635.3585558,
+    "ms": 83.25152611359954,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 127,
+    "start": 1793354635.4385695,
+    "end": 1793354635.5232153,
+    "ms": 84.64540890417993,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 128,
+    "start": 1793354635.604921,
+    "end": 1793354635.6902745,
+    "ms": 85.35281103104353,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 129,
+    "start": 1793354635.7679598,
+    "end": 1793354635.8534603,
+    "ms": 85.49992204643786,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 130,
+    "start": 1793354635.9322376,
+    "end": 1793354636.0169961,
+    "ms": 84.75788100622594,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 131,
+    "start": 1793354636.0956533,
+    "end": 1793354636.1789498,
+    "ms": 83.2961411215365,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 132,
+    "start": 1793354636.2600892,
+    "end": 1793354636.343986,
+    "ms": 83.89654196798801,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 133,
+    "start": 1793354636.4220147,
+    "end": 1793354636.508529,
+    "ms": 86.51354094035923,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_send",
+    "group": "cg-Actor:0-RolloutGroup:0",
+    "call": 265,
+    "start": 1793354636.5877185,
+    "end": 1793354636.6731708,
+    "ms": 85.45132097788155,
+    "thread": "Thread-10 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 134,
+    "start": 1793354636.5868623,
+    "end": 1793354636.6736987,
+    "ms": 86.83564397506416,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 135,
+    "start": 1793354636.7570078,
+    "end": 1793354636.8408785,
+    "ms": 83.87013501487672,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 136,
+    "start": 1793354636.9177375,
+    "end": 1793354637.0025666,
+    "ms": 84.82857304625213,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 137,
+    "start": 1793354637.0814219,
+    "end": 1793354637.1661592,
+    "ms": 84.73695092834532,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 138,
+    "start": 1793354637.2478771,
+    "end": 1793354637.332078,
+    "ms": 84.20055522583425,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 139,
+    "start": 1793354637.4150422,
+    "end": 1793354637.499937,
+    "ms": 84.89434700459242,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 140,
+    "start": 1793354637.578147,
+    "end": 1793354637.6627953,
+    "ms": 84.64829088188708,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 141,
+    "start": 1793354637.745773,
+    "end": 1793354637.8291411,
+    "ms": 83.36787414737046,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 142,
+    "start": 1793354637.906787,
+    "end": 1793354637.9926982,
+    "ms": 85.91071399860084,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 143,
+    "start": 1793354638.0767286,
+    "end": 1793354638.1637003,
+    "ms": 86.97106991894543,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 144,
+    "start": 1793354638.249353,
+    "end": 1793354638.3339543,
+    "ms": 84.6008281223476,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 145,
+    "start": 1793354638.4206057,
+    "end": 1793354638.513515,
+    "ms": 92.90874190628529,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 146,
+    "start": 1793354638.593379,
+    "end": 1793354638.6793003,
+    "ms": 85.92077507637441,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 147,
+    "start": 1793354638.758996,
+    "end": 1793354638.8523333,
+    "ms": 93.33679219707847,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 149,
+    "start": 1793354641.4944594,
+    "end": 1793354641.577328,
+    "ms": 82.86803006194532,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 150,
+    "start": 1793354641.6572692,
+    "end": 1793354641.7385442,
+    "ms": 81.2746079172939,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 151,
+    "start": 1793354641.8276858,
+    "end": 1793354641.9172974,
+    "ms": 89.61117709986866,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 152,
+    "start": 1793354642.0133872,
+    "end": 1793354642.095916,
+    "ms": 82.52830198034644,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 153,
+    "start": 1793354642.1723945,
+    "end": 1793354642.2548594,
+    "ms": 82.4646099936217,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 154,
+    "start": 1793354642.3316157,
+    "end": 1793354642.4155126,
+    "ms": 83.89669586904347,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 155,
+    "start": 1793354642.4939258,
+    "end": 1793354642.5779376,
+    "ms": 84.01126903481781,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 156,
+    "start": 1793354642.657675,
+    "end": 1793354642.73993,
+    "ms": 82.25448802113533,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 157,
+    "start": 1793354642.8256302,
+    "end": 1793354642.9086857,
+    "ms": 83.05501099675894,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 158,
+    "start": 1793354642.985491,
+    "end": 1793354643.0675988,
+    "ms": 82.10762892849743,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 159,
+    "start": 1793354643.1441667,
+    "end": 1793354643.2265725,
+    "ms": 82.40544889122248,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 160,
+    "start": 1793354643.3033178,
+    "end": 1793354643.389598,
+    "ms": 86.27992402762175,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 161,
+    "start": 1793354643.4658275,
+    "end": 1793354643.5511143,
+    "ms": 85.28647408820689,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 162,
+    "start": 1793354643.6289961,
+    "end": 1793354643.713392,
+    "ms": 84.3953920993954,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 163,
+    "start": 1793354643.7911212,
+    "end": 1793354643.8748531,
+    "ms": 83.73145898804069,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 164,
+    "start": 1793354643.9518628,
+    "end": 1793354644.0348141,
+    "ms": 82.95101602561772,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 165,
+    "start": 1793354644.1123874,
+    "end": 1793354644.1979606,
+    "ms": 85.57290793396533,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 166,
+    "start": 1793354644.2753966,
+    "end": 1793354644.3578658,
+    "ms": 82.46885309927166,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 167,
+    "start": 1793354644.435643,
+    "end": 1793354644.5183985,
+    "ms": 82.75517099536955,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 168,
+    "start": 1793354644.6054533,
+    "end": 1793354644.6873136,
+    "ms": 81.85991598293185,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 169,
+    "start": 1793354644.763545,
+    "end": 1793354644.847899,
+    "ms": 84.35351098887622,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 170,
+    "start": 1793354644.9244754,
+    "end": 1793354645.0076036,
+    "ms": 83.12791911885142,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 171,
+    "start": 1793354645.0849235,
+    "end": 1793354645.168154,
+    "ms": 83.23028404265642,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 172,
+    "start": 1793354645.24531,
+    "end": 1793354645.329732,
+    "ms": 84.42162186838686,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 173,
+    "start": 1793354645.4064178,
+    "end": 1793354645.4902332,
+    "ms": 83.81477114744484,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 174,
+    "start": 1793354645.5708928,
+    "end": 1793354645.6521382,
+    "ms": 81.24512410722673,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 175,
+    "start": 1793354645.7339032,
+    "end": 1793354645.814784,
+    "ms": 80.88030386716127,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 176,
+    "start": 1793354645.8917053,
+    "end": 1793354645.9729564,
+    "ms": 81.25066687352955,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 177,
+    "start": 1793354646.0557485,
+    "end": 1793354646.139274,
+    "ms": 83.52547301910818,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 178,
+    "start": 1793354646.22231,
+    "end": 1793354646.304503,
+    "ms": 82.19231991097331,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 179,
+    "start": 1793354646.3839953,
+    "end": 1793354646.4651847,
+    "ms": 81.18877490051091,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 180,
+    "start": 1793354646.5504763,
+    "end": 1793354646.6331997,
+    "ms": 82.72297005169094,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 181,
+    "start": 1793354646.7175105,
+    "end": 1793354646.8028555,
+    "ms": 85.34474321641028,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 182,
+    "start": 1793354646.8857868,
+    "end": 1793354646.9687765,
+    "ms": 82.98917789943516,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 183,
+    "start": 1793354647.0458338,
+    "end": 1793354647.1306381,
+    "ms": 84.80409998446703,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 184,
+    "start": 1793354647.2076414,
+    "end": 1793354647.29172,
+    "ms": 84.0783070307225,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 185,
+    "start": 1793354647.3692427,
+    "end": 1793354647.453898,
+    "ms": 84.65512306429446,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 186,
+    "start": 1793354647.5293612,
+    "end": 1793354647.6126049,
+    "ms": 83.24341895058751,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 187,
+    "start": 1793354647.6896484,
+    "end": 1793354647.7732587,
+    "ms": 83.61002686433494,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 188,
+    "start": 1793354647.850587,
+    "end": 1793354647.9343054,
+    "ms": 83.71825097128749,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 189,
+    "start": 1793354648.0104566,
+    "end": 1793354648.0949516,
+    "ms": 84.49471206404269,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 190,
+    "start": 1793354648.1718848,
+    "end": 1793354648.2546954,
+    "ms": 82.81012601219118,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 191,
+    "start": 1793354648.3319578,
+    "end": 1793354648.414592,
+    "ms": 82.63376401737332,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 192,
+    "start": 1793354648.4911697,
+    "end": 1793354648.5742733,
+    "ms": 83.10295012779534,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 193,
+    "start": 1793354648.6507368,
+    "end": 1793354648.7337186,
+    "ms": 82.9814609605819,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 194,
+    "start": 1793354648.8105333,
+    "end": 1793354648.894682,
+    "ms": 84.14801699109375,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 195,
+    "start": 1793354648.9713078,
+    "end": 1793354649.0550313,
+    "ms": 83.72295391745865,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 196,
+    "start": 1793354649.1312842,
+    "end": 1793354649.2186427,
+    "ms": 87.35802606679499,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 197,
+    "start": 1793354649.2947164,
+    "end": 1793354649.3791864,
+    "ms": 84.46980593726039,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 198,
+    "start": 1793354649.4558604,
+    "end": 1793354649.5411925,
+    "ms": 85.3317950386554,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 199,
+    "start": 1793354649.6184998,
+    "end": 1793354649.7031975,
+    "ms": 84.69730406068265,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 200,
+    "start": 1793354649.7797153,
+    "end": 1793354649.8681917,
+    "ms": 88.47599104046822,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 201,
+    "start": 1793354649.9448936,
+    "end": 1793354650.0318632,
+    "ms": 86.96925616823137,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 202,
+    "start": 1793354650.1261506,
+    "end": 1793354650.2101793,
+    "ms": 84.028396056965,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 203,
+    "start": 1793354650.287806,
+    "end": 1793354650.374718,
+    "ms": 86.91145689226687,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 204,
+    "start": 1793354650.4539492,
+    "end": 1793354650.539024,
+    "ms": 85.0739311426878,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 205,
+    "start": 1793354650.6178489,
+    "end": 1793354650.7037096,
+    "ms": 85.86016809567809,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 206,
+    "start": 1793354650.7823217,
+    "end": 1793354650.8659139,
+    "ms": 83.59184698201716,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 207,
+    "start": 1793354650.952152,
+    "end": 1793354651.039041,
+    "ms": 86.88816684298217,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 208,
+    "start": 1793354651.1249719,
+    "end": 1793354651.2091665,
+    "ms": 84.1941530816257,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 209,
+    "start": 1793354651.292002,
+    "end": 1793354651.377113,
+    "ms": 85.11063596233726,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 210,
+    "start": 1793354651.4650233,
+    "end": 1793354651.5505843,
+    "ms": 85.56063496507704,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 211,
+    "start": 1793354651.6359885,
+    "end": 1793354651.7204244,
+    "ms": 84.43571790121496,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 212,
+    "start": 1793354651.801256,
+    "end": 1793354651.889054,
+    "ms": 87.79775095172226,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 213,
+    "start": 1793354651.9666133,
+    "end": 1793354652.0591328,
+    "ms": 92.51934220083058,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 214,
+    "start": 1793354652.1359274,
+    "end": 1793354652.2198932,
+    "ms": 83.9655741583556,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 215,
+    "start": 1793354652.297764,
+    "end": 1793354652.3844047,
+    "ms": 86.64023294113576,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 216,
+    "start": 1793354652.4642973,
+    "end": 1793354652.5498662,
+    "ms": 85.56865900754929,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 217,
+    "start": 1793354652.6274338,
+    "end": 1793354652.7109387,
+    "ms": 83.50448310375214,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 218,
+    "start": 1793354652.799233,
+    "end": 1793354652.884032,
+    "ms": 84.798539057374,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 219,
+    "start": 1793354652.9623067,
+    "end": 1793354653.044763,
+    "ms": 82.45607791468501,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 220,
+    "start": 1793354653.1255505,
+    "end": 1793354653.2098553,
+    "ms": 84.30423308163881,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 221,
+    "start": 1793354653.2873743,
+    "end": 1793354653.3715763,
+    "ms": 84.2017421964556,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 222,
+    "start": 1793354653.4486272,
+    "end": 1793354653.5320852,
+    "ms": 83.45755096524954,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 223,
+    "start": 1793354653.6098192,
+    "end": 1793354653.6946478,
+    "ms": 84.8284310195595,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 224,
+    "start": 1793354653.7802658,
+    "end": 1793354653.8642676,
+    "ms": 84.00114788673818,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 225,
+    "start": 1793354653.941492,
+    "end": 1793354654.0253077,
+    "ms": 83.81541608832777,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 226,
+    "start": 1793354654.104618,
+    "end": 1793354654.1883216,
+    "ms": 83.70322920382023,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 227,
+    "start": 1793354654.265509,
+    "end": 1793354654.3502638,
+    "ms": 84.75445909425616,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 228,
+    "start": 1793354654.430685,
+    "end": 1793354654.5139916,
+    "ms": 83.30635004676878,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 229,
+    "start": 1793354654.5938988,
+    "end": 1793354654.6777654,
+    "ms": 83.86609819717705,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 230,
+    "start": 1793354654.76224,
+    "end": 1793354654.848953,
+    "ms": 86.71249216422439,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 231,
+    "start": 1793354654.930256,
+    "end": 1793354655.0127332,
+    "ms": 82.47668412514031,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 232,
+    "start": 1793354655.0919251,
+    "end": 1793354655.1759975,
+    "ms": 84.07172909937799,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 233,
+    "start": 1793354655.255074,
+    "end": 1793354655.3478897,
+    "ms": 92.81498612836003,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 234,
+    "start": 1793354655.4250813,
+    "end": 1793354655.5090113,
+    "ms": 83.92936596646905,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 235,
+    "start": 1793354655.591329,
+    "end": 1793354655.6748075,
+    "ms": 83.47811200655997,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 236,
+    "start": 1793354655.751049,
+    "end": 1793354655.8376045,
+    "ms": 86.5552220493555,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 237,
+    "start": 1793354655.915348,
+    "end": 1793354655.9979632,
+    "ms": 82.61489891447127,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 238,
+    "start": 1793354656.0797272,
+    "end": 1793354656.1635067,
+    "ms": 83.77922489307821,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 239,
+    "start": 1793354656.2406259,
+    "end": 1793354656.3230035,
+    "ms": 82.37736718729138,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 240,
+    "start": 1793354656.3984349,
+    "end": 1793354656.4820542,
+    "ms": 83.61880900338292,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 241,
+    "start": 1793354656.564006,
+    "end": 1793354656.6495357,
+    "ms": 85.52916604094207,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 242,
+    "start": 1793354656.7256684,
+    "end": 1793354656.8089502,
+    "ms": 83.2816669717431,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 243,
+    "start": 1793354656.8862076,
+    "end": 1793354656.9718366,
+    "ms": 85.62911697663367,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 244,
+    "start": 1793354657.0492814,
+    "end": 1793354657.1347194,
+    "ms": 85.43743984773755,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 245,
+    "start": 1793354657.2122643,
+    "end": 1793354657.2961357,
+    "ms": 83.87103420682251,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 246,
+    "start": 1793354657.3741949,
+    "end": 1793354657.4591663,
+    "ms": 84.97092686593533,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 247,
+    "start": 1793354657.5362332,
+    "end": 1793354657.620002,
+    "ms": 83.76831095665693,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 248,
+    "start": 1793354657.7059164,
+    "end": 1793354657.7927158,
+    "ms": 86.79911494255066,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 249,
+    "start": 1793354657.8815558,
+    "end": 1793354657.96567,
+    "ms": 84.11401696503162,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 250,
+    "start": 1793354658.0479505,
+    "end": 1793354658.1331968,
+    "ms": 85.24590800516307,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 251,
+    "start": 1793354658.2156038,
+    "end": 1793354658.299635,
+    "ms": 84.0303860604763,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 252,
+    "start": 1793354658.3796136,
+    "end": 1793354658.4659414,
+    "ms": 86.3273290451616,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 253,
+    "start": 1793354658.5486965,
+    "end": 1793354658.6315365,
+    "ms": 82.83962099812925,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 254,
+    "start": 1793354658.71495,
+    "end": 1793354658.8009603,
+    "ms": 86.00976085290313,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 255,
+    "start": 1793354658.8827899,
+    "end": 1793354658.9664845,
+    "ms": 83.69406289421022,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 256,
+    "start": 1793354659.051363,
+    "end": 1793354659.1406229,
+    "ms": 89.25940096378326,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 257,
+    "start": 1793354659.2369099,
+    "end": 1793354659.3201482,
+    "ms": 83.23817583732307,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 258,
+    "start": 1793354659.3962371,
+    "end": 1793354659.4791145,
+    "ms": 82.87711185403168,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 259,
+    "start": 1793354659.556727,
+    "end": 1793354659.6423168,
+    "ms": 85.58946591801941,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 260,
+    "start": 1793354659.7235155,
+    "end": 1793354659.807155,
+    "ms": 83.63913698121905,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 261,
+    "start": 1793354659.8878706,
+    "end": 1793354659.972654,
+    "ms": 84.78347607888281,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 262,
+    "start": 1793354660.0529356,
+    "end": 1793354660.1435492,
+    "ms": 90.6131078954786,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 263,
+    "start": 1793354660.221305,
+    "end": 1793354660.3052828,
+    "ms": 83.97736307233572,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 264,
+    "start": 1793354660.3897107,
+    "end": 1793354660.4738681,
+    "ms": 84.15677398443222,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 265,
+    "start": 1793354660.5544538,
+    "end": 1793354660.646315,
+    "ms": 91.8610580265522,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 266,
+    "start": 1793354660.7273998,
+    "end": 1793354660.8186028,
+    "ms": 91.20248607359827,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 267,
+    "start": 1793354660.9019208,
+    "end": 1793354660.9847636,
+    "ms": 82.84264989197254,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 268,
+    "start": 1793354661.0678513,
+    "end": 1793354661.1524382,
+    "ms": 84.58689297549427,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 269,
+    "start": 1793354661.2332718,
+    "end": 1793354661.317351,
+    "ms": 84.07901809550822,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 270,
+    "start": 1793354661.3940327,
+    "end": 1793354661.4783416,
+    "ms": 84.30877001956105,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 271,
+    "start": 1793354661.5556555,
+    "end": 1793354661.639247,
+    "ms": 83.59108492732048,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 272,
+    "start": 1793354661.7161133,
+    "end": 1793354661.7978842,
+    "ms": 81.77028293721378,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 273,
+    "start": 1793354661.8881826,
+    "end": 1793354661.9774358,
+    "ms": 89.25303514115512,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 274,
+    "start": 1793354662.0579326,
+    "end": 1793354662.1419537,
+    "ms": 84.02071986347437,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 275,
+    "start": 1793354662.2240448,
+    "end": 1793354662.308322,
+    "ms": 84.27684009075165,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 276,
+    "start": 1793354662.3908086,
+    "end": 1793354662.4752014,
+    "ms": 84.39222793094814,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 277,
+    "start": 1793354662.563787,
+    "end": 1793354662.6559834,
+    "ms": 92.19586895778775,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 278,
+    "start": 1793354662.7420697,
+    "end": 1793354662.8268719,
+    "ms": 84.80151300318539,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 279,
+    "start": 1793354662.9117377,
+    "end": 1793354662.9998262,
+    "ms": 88.08810007758439,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 280,
+    "start": 1793354663.0837288,
+    "end": 1793354663.1689606,
+    "ms": 85.23107902146876,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 281,
+    "start": 1793354663.2474153,
+    "end": 1793354663.331202,
+    "ms": 83.78648315556347,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 282,
+    "start": 1793354663.408059,
+    "end": 1793354663.492305,
+    "ms": 84.2455739621073,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 283,
+    "start": 1793354663.574452,
+    "end": 1793354663.667663,
+    "ms": 93.21073698811233,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 284,
+    "start": 1793354663.7477405,
+    "end": 1793354663.8300636,
+    "ms": 82.32273906469345,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 285,
+    "start": 1793354663.9078622,
+    "end": 1793354663.9901128,
+    "ms": 82.25025003775954,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 286,
+    "start": 1793354664.0678828,
+    "end": 1793354664.1493526,
+    "ms": 81.4691879786551,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 287,
+    "start": 1793354664.227509,
+    "end": 1793354664.3161757,
+    "ms": 88.66621507331729,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 288,
+    "start": 1793354664.3930306,
+    "end": 1793354664.4748428,
+    "ms": 81.81188092567027,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 289,
+    "start": 1793354664.5535836,
+    "end": 1793354664.6362789,
+    "ms": 82.69471186213195,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 290,
+    "start": 1793354664.7177305,
+    "end": 1793354664.7990894,
+    "ms": 81.35847304947674,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 291,
+    "start": 1793354664.882124,
+    "end": 1793354664.9646502,
+    "ms": 82.52584701403975,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 292,
+    "start": 1793354665.0443375,
+    "end": 1793354665.1339228,
+    "ms": 89.58505000919104,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 293,
+    "start": 1793354665.2115154,
+    "end": 1793354665.294573,
+    "ms": 83.05708807893097,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._atomic_recv",
+    "group": "cg-Rollout:0-RolloutGroup:0",
+    "call": 294,
+    "start": 1793354665.3790762,
+    "end": 1793354665.4675481,
+    "ms": 88.4710131213069,
+    "thread": "Thread-5 (_run_queue)"
+  },
+  {
+    "role": "rollout",
+    "name": "CollectiveGroup._recv_tensor_list_via_ipc",
+    "group": "cg-ActorGroup:0-RolloutGroup:0",
+    "call": 3,
+    "start": 1793354666.7615478,
+    "end": 1793354666.762579,
+    "ms": 1.030605984851718,
+    "thread": "Thread-3 (_run_queue)"
+  }
+]

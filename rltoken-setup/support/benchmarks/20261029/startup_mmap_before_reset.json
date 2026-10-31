@@ -1,0 +1,16 @@
+{
+  "order": "before-reset",
+  "loader": "default",
+  "physical_hardware": false,
+  "initial_weight_sync": "passed",
+  "inference_ms": [
+    [
+      81.20776107534766,
+      74.38099500723183,
+      73.8874978851527,
+      74.10530420020223,
+      73.97248898632824
+    ]
+  ],
+  "status": "passed"
+}

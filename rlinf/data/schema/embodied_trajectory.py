@@ -34,9 +34,11 @@ import torch
 from omegaconf import DictConfig
 
 from rlinf.algorithms.registry import calculate_adv_and_returns
+from rlinf.config import get_episode_step_limit, get_rollout_chunk_count
 from rlinf.data.schema.embodied_types import (
     EnvPart,
     EnvTransition,
+    EpisodeReplay,
     LeRobotChunk,
     LeRobotFrame,
     LeRobotStep,
@@ -120,6 +122,15 @@ class RolloutGeometry:
         output_count = compute_split_num(source_count, actor_world_size) * (
             actor_world_size
         )
+        if cfg.env.train.get("flush_replay_on_episode_end", False) and (
+            source_count != 1
+            or actor_world_size != 1
+            or placement.get_world_size("rollout") != 1
+        ):
+            raise ValueError(
+                "flush_replay_on_episode_end requires one env source, one actor "
+                "and one rollout worker."
+            )
         if output_count % source_count:
             raise ValueError(
                 "Trajectory routing requires each rollout source to have an "
@@ -127,9 +138,8 @@ class RolloutGeometry:
             )
         return cls(
             source_count=source_count,
-            chunk_count=(
-                cfg.env.train.max_steps_per_rollout_epoch
-                // cfg.actor.model.num_action_chunks
+            chunk_count=get_rollout_chunk_count(
+                cfg.env.train, cfg.actor.model.num_action_chunks
             ),
             shards_per_source=output_count // source_count,
             actor_world_size=actor_world_size,
@@ -204,7 +214,10 @@ class TrajectoryCollector(Collector):
             TrajectoryMode.PIPELINE: PipelineOutput,
             TrajectoryMode.LEROBOT: LerobotOutput,
         }
-        self._output = output_types[self.plan.mode](ctx.cfg, self.plan.geometry)
+        output_type = output_types[self.plan.mode]
+        if ctx.cfg.env.train.get("flush_replay_on_episode_end", False):
+            output_type = EpisodeOutput
+        self._output = output_type(ctx.cfg, self.plan.geometry)
 
     def collect(self, item: Any, key: str) -> Iterable[CollectedItem]:
         """Accept one part and yield any actor outputs it completes."""
@@ -410,7 +423,7 @@ class AccumulatorOutput(TrajectoryOutput):
         accumulator = accumulators.setdefault(
             chunk.source,
             TrajectoryAccumulator(
-                max_episode_length=self._cfg.env.train.max_episode_steps
+                max_episode_length=get_episode_step_limit(self._cfg.env.train)
             ),
         )
         self._append_chunk(accumulator, chunk)
@@ -449,7 +462,11 @@ class AccumulatorOutput(TrajectoryOutput):
             collect_prev_infos=self._collect_prev_infos,
             collect_transitions=self._collect_transitions,
             enable_rlt=self._enable_rlt,
-            include_final_value=chunk.key.chunk_id == self._chunk_count - 1,
+            include_final_value=(
+                chunk.env.episode_end
+                if self._cfg.env.train.get("flush_replay_on_episode_end", False)
+                else chunk.key.chunk_id == self._chunk_count - 1
+            ),
         )
         accumulator.append(step)
         accumulator.assign_history_rewards(
@@ -513,6 +530,42 @@ class RolloutOutput(AccumulatorOutput):
         # Main emits one trajectory as soon as one env source completes. Do not
         # turn async/decoupled collection into a cross-source barrier.
         return (key.step_id, key.env_rank, key.stage_id)
+
+
+class EpisodeOutput(RolloutOutput):
+    """Emit an ordered, variable-length episode when its end chunk is complete."""
+
+    def __init__(self, cfg: DictConfig, geometry: RolloutGeometry) -> None:
+        super().__init__(cfg, geometry)
+        self._pending: dict[CollectionScope, dict[int, JoinedChunk]] = {}
+        self._ends: dict[CollectionScope, TrajectoryKey] = {}
+
+    def emit(self, chunk: JoinedChunk) -> Iterator[CollectedItem]:
+        if not chunk.policy.inferred:
+            raise ValueError("Episode replay requires inferred policy data.")
+        scope = self._scope(chunk.key)
+        pending = self._pending.setdefault(scope, {})
+        if chunk.key.chunk_id in pending:
+            raise ValueError(f"Received duplicate episode chunk {chunk.key}.")
+        pending[chunk.key.chunk_id] = chunk
+        if chunk.env.episode_end:
+            if scope in self._ends:
+                raise ValueError(f"Received multiple episode ends for {scope}.")
+            self._ends[scope] = chunk.key
+        end_key = self._ends.get(scope)
+        if end_key is None or len(pending) < end_key.chunk_id + 1:
+            return
+        if set(pending) != set(range(end_key.chunk_id + 1)):
+            raise ValueError(f"Expected contiguous episode chunks ending at {end_key}.")
+        accumulator = TrajectoryAccumulator(
+            max_episode_length=get_episode_step_limit(self._cfg.env.train)
+        )
+        for index in range(end_key.chunk_id + 1):
+            self._append_chunk(accumulator, pending[index])
+        episode = EpisodeReplay(trajectory=accumulator.to_trajectory(), end_key=end_key)
+        del self._pending[scope]
+        del self._ends[scope]
+        yield DEFAULT_KEY, episode
 
 
 class PipelineOutput(AccumulatorOutput):

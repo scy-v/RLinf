@@ -13,13 +13,16 @@
 # limitations under the License.
 
 import asyncio
+import threading
 from collections import defaultdict
+from contextlib import ExitStack
 from typing import Any
 
 import numpy as np
 import torch
 from omegaconf import DictConfig, OmegaConf
 
+from rlinf.config import get_rollout_chunk_count
 from rlinf.data.schema.embodied_types import (
     EnvOutput,
     EnvPart,
@@ -41,6 +44,12 @@ from rlinf.utils.nested_dict_process import (
 )
 from rlinf.utils.obs_compression import compress_obs, is_compression_enabled
 from rlinf.utils.placement import HybridComponentPlacement
+from rlinf.utils.progress import (
+    WorkerStepTiming,
+    current_worker_timing,
+    get_timing_mode,
+    timing_section,
+)
 
 
 class EnvWorker(Worker):
@@ -57,15 +66,21 @@ class EnvWorker(Worker):
         Worker.__init__(self)
 
         self.cfg = cfg
+        self.episode_replay = bool(
+            cfg.env.get("train", {}).get("flush_replay_on_episode_end", False)
+        )
         self.train_video_cnt = 0
         self.eval_video_cnt = 0
         self.should_stop = False
+        self._close_lock = threading.RLock()
+        self._envs_closed = False
 
         self.env_list = []
         self.eval_env_list = []
 
         self.last_obs_list = []
         self.last_intervened_info_list = []
+        self.last_rlt_switch_flags_list = []
         self._prefetched_train_bootstrap: list[EnvOutput] | None = None
         self._trajectory_step = 0
         self._component_placement = HybridComponentPlacement(cfg, Cluster())
@@ -159,15 +174,13 @@ class EnvWorker(Worker):
             self.eval_batch_size = self.cfg.env.eval.total_num_envs // self.stage_num
         self.n_train_chunk_steps = 0
         if self.enable_train:
-            self.n_train_chunk_steps = (
-                self.cfg.env.train.max_steps_per_rollout_epoch
-                // self.model_cfg.num_action_chunks
+            self.n_train_chunk_steps = get_rollout_chunk_count(
+                self.cfg.env.train, self.model_cfg.num_action_chunks
             )
         self.n_eval_chunk_steps = 0
         if self.enable_eval:
-            self.n_eval_chunk_steps = (
-                self.cfg.env.eval.max_steps_per_rollout_epoch
-                // self.model_cfg.num_action_chunks
+            self.n_eval_chunk_steps = get_rollout_chunk_count(
+                self.cfg.env.eval, self.model_cfg.num_action_chunks
             )
         if self.enable_train:
             self.train_prev_done: list[torch.Tensor] = [
@@ -214,41 +227,75 @@ class EnvWorker(Worker):
             groups=[(self._group_name, list(range(self._world_size)))],
         )
 
-        self.update_env_cfg()
+        try:
+            self.update_env_cfg()
 
-        if self.enable_train:
-            train_env_cls = get_env_cls(self.cfg.env.train.env_type, self.cfg.env.train)
-            self.env_list = self._setup_env_and_wrappers(
-                env_cls=train_env_cls,
-                env_cfg=self.cfg.env.train,
-                num_envs_per_stage=self.train_num_envs_per_stage,
-            )
-            if self.train_enable_offload:
-                assert all(
-                    callable(get_env_attr(env, "offload")) for env in self.env_list
-                ), "train envs must have an offload method to enable offload!"
+            if self.enable_train:
+                train_env_cls = get_env_cls(
+                    self.cfg.env.train.env_type, self.cfg.env.train
+                )
+                self.env_list = self._setup_env_and_wrappers(
+                    env_cls=train_env_cls,
+                    env_cfg=self.cfg.env.train,
+                    num_envs_per_stage=self.train_num_envs_per_stage,
+                )
+                if self.train_enable_offload:
+                    assert all(
+                        callable(get_env_attr(env, "offload")) for env in self.env_list
+                    ), "train envs must have an offload method to enable offload!"
 
-        if self.enable_eval:
-            eval_env_cls = get_env_cls(self.cfg.env.eval.env_type, self.cfg.env.eval)
-            self.eval_env_list = self._setup_env_and_wrappers(
-                env_cls=eval_env_cls,
-                env_cfg=self.cfg.env.eval,
-                num_envs_per_stage=self.eval_num_envs_per_stage,
-            )
-            if self.eval_enable_offload:
-                assert all(
-                    callable(get_env_attr(env, "offload")) for env in self.eval_env_list
-                ), "eval envs must have an offload method to enable offload!"
+            if self.enable_eval:
+                eval_env_cls = get_env_cls(
+                    self.cfg.env.eval.env_type, self.cfg.env.eval
+                )
+                self.eval_env_list = self._setup_env_and_wrappers(
+                    env_cls=eval_env_cls,
+                    env_cfg=self.cfg.env.eval,
+                    num_envs_per_stage=self.eval_num_envs_per_stage,
+                )
+                if self.eval_enable_offload:
+                    assert all(
+                        callable(get_env_attr(env, "offload"))
+                        for env in self.eval_env_list
+                    ), "eval envs must have an offload method to enable offload!"
 
-        if self.enable_train:
-            if self.reward_mode == "history_buffer":
-                self.train_history_managers = [
-                    HistoryManager(self.cfg.reward, self.train_num_envs_per_stage)
-                    for _ in range(self.stage_num)
-                ]
-                self.history_lengths = [{} for _ in range(self.stage_num)]
+            if self.enable_train:
+                if self.reward_mode == "history_buffer":
+                    self.train_history_managers = [
+                        HistoryManager(self.cfg.reward, self.train_num_envs_per_stage)
+                        for _ in range(self.stage_num)
+                    ]
+                    self.history_lengths = [{} for _ in range(self.stage_num)]
 
-        self._init_env()
+            self._init_env()
+        except BaseException:
+            self.close()
+            raise
+
+    def close(self) -> None:
+        """Stop interaction and release every environment, even after partial setup."""
+        if not hasattr(self, "_close_lock"):
+            self._close_lock = threading.RLock()
+        with self._close_lock:
+            if getattr(self, "_envs_closed", False):
+                return
+            self._envs_closed = True
+            self.should_stop = True
+            errors = []
+            seen = set()
+            for env in (
+                *getattr(self, "env_list", ()),
+                *getattr(self, "eval_env_list", ()),
+            ):
+                if id(env) in seen:
+                    continue
+                seen.add(id(env))
+                try:
+                    env.close()
+                except BaseException as error:
+                    errors.append(error)
+            if errors:
+                raise errors[0]
 
     def update_env_cfg(self):
         if self.enable_train:
@@ -328,54 +375,62 @@ class EnvWorker(Worker):
     def _setup_env_and_wrappers(self, env_cls, env_cfg, num_envs_per_stage: int):
         env_list = []
 
-        for stage_id in range(self.stage_num):
-            env = env_cls(
-                cfg=env_cfg,
-                num_envs=num_envs_per_stage,
-                seed_offset=self._rank * self.stage_num + stage_id,
-                total_num_processes=self._world_size * self.stage_num,
-                worker_info=self.worker_info,
-            )
-            if (
-                self.cfg.env.get("delay_sampler", None)
-                and env_cfg is not self.cfg.env.eval
-            ):
-                env = InsertDelay(env, self.cfg.env.delay_sampler)
-            if env_cfg.video_cfg.save_video:
-                env = RecordVideo(env, env_cfg.video_cfg)
-            if env_cfg.get("data_collection", None) and getattr(
-                env_cfg.data_collection, "enabled", False
-            ):
-                from rlinf.envs.wrappers import CollectEpisode
-
-                env = CollectEpisode(
-                    env,
-                    save_dir=env_cfg.data_collection.save_dir,
-                    rank=self._rank,
+        with ExitStack() as cleanup:
+            for stage_id in range(self.stage_num):
+                env = env_cls(
+                    cfg=env_cfg,
                     num_envs=num_envs_per_stage,
-                    export_format=getattr(
-                        env_cfg.data_collection, "export_format", "pickle_episode"
-                    ),
-                    robot_type=getattr(env_cfg.data_collection, "robot_type", "panda"),
-                    fps=getattr(env_cfg.data_collection, "fps", 10),
-                    only_success=getattr(
-                        env_cfg.data_collection, "only_success", False
-                    ),
-                    finalize_interval=getattr(
-                        env_cfg.data_collection, "finalize_interval", 100
-                    ),
-                    streaming=getattr(env_cfg.data_collection, "streaming", False),
+                    seed_offset=self._rank * self.stage_num + stage_id,
+                    total_num_processes=self._world_size * self.stage_num,
+                    worker_info=self.worker_info,
                 )
-            env_list.append(env)
+                cleanup.callback(env.close)
+                if (
+                    self.cfg.env.get("delay_sampler", None)
+                    and env_cfg is not self.cfg.env.eval
+                ):
+                    env = InsertDelay(env, self.cfg.env.delay_sampler)
+                if env_cfg.video_cfg.save_video:
+                    env = RecordVideo(env, env_cfg.video_cfg)
+                if env_cfg.get("data_collection", None) and getattr(
+                    env_cfg.data_collection, "enabled", False
+                ):
+                    from rlinf.envs.wrappers import CollectEpisode
+
+                    env = CollectEpisode(
+                        env,
+                        save_dir=env_cfg.data_collection.save_dir,
+                        rank=getattr(self, "_rank", 0),
+                        num_envs=num_envs_per_stage,
+                        export_format=getattr(
+                            env_cfg.data_collection, "export_format", "pickle_episode"
+                        ),
+                        robot_type=getattr(
+                            env_cfg.data_collection, "robot_type", "panda"
+                        ),
+                        fps=getattr(env_cfg.data_collection, "fps", 10),
+                        only_success=getattr(
+                            env_cfg.data_collection, "only_success", False
+                        ),
+                        finalize_interval=getattr(
+                            env_cfg.data_collection, "finalize_interval", 100
+                        ),
+                        streaming=getattr(env_cfg.data_collection, "streaming", False),
+                    )
+                env_list.append(env)
+            cleanup.pop_all()
         return env_list
 
     def _init_env(self):
         for i in range(self.stage_num):
             if self.enable_train:
                 if self.cfg.env.train.auto_reset:
-                    extracted_obs, _ = self.env_list[i].reset()
+                    extracted_obs, infos = self.env_list[i].reset()
                     self.last_obs_list.append(extracted_obs)
                     self.last_intervened_info_list.append((None, None))
+                    self.last_rlt_switch_flags_list.append(
+                        infos.get("rlt_switch_flags")
+                    )
                 if self.train_enable_offload and self.cfg.env.train.get(
                     "enable_init_offload", True
                 ):
@@ -404,101 +459,112 @@ class EnvWorker(Worker):
         ``obs_list`` in the payload stays post-action. The caller prepends the
         observation from before this chunk when a valid-action mask is present.
         """
-        exec_actions = prepare_actions(
-            raw_chunk_actions=chunk_actions["raw_actions"]
-            if isinstance(chunk_actions, dict)
-            else chunk_actions,
-            env_type=self.cfg.env.train.env_type,
-            model_type=self.model_cfg.model_type,
-            num_action_chunks=self.model_cfg.num_action_chunks,
-            action_dim=self.model_cfg.action_dim,
-            policy=self.model_cfg.get("policy_setup", None),
-            wm_env_type=self.cfg.env.train.get("wm_env_type", None),
-            env_cfg=self.cfg.env.train,
-        )
-        if isinstance(chunk_actions, dict):
-            chunk_actions["actions"] = exec_actions
-        else:
-            chunk_actions = exec_actions
-        env_info = {}
-
-        obs_list, chunk_rewards, chunk_terminations, chunk_truncations, infos_list = (
-            self.env_list[stage_id].chunk_step(chunk_actions)
-        )
-        extracted_obs = obs_list
-        infos = infos_list
-        if isinstance(obs_list, (list, tuple)):
-            extracted_obs = obs_list[-1] if obs_list else None
-        if isinstance(infos_list, (list, tuple)):
-            infos = infos_list[-1] if infos_list else None
-        infos = infos or {}
-        valid_action_mask = None
-        if self.enable_online_lerobot and isinstance(infos, dict):
-            # The train env publishes this after auto-reset. Removing it keeps
-            # the mask out of the stored step metadata.
-            valid_action_mask = infos.pop("valid_action_mask", None)
-        chunk_dones = torch.logical_or(chunk_terminations, chunk_truncations)
-        final_obs = (
-            self._build_chunk_final_obs(obs_list, infos_list)
-            if self.use_external_reward_model
-            else (
-                infos["final_observation"]
-                if isinstance(infos, dict) and "final_observation" in infos
-                else None
+        with timing_section("action_prepare", major=False):
+            exec_actions = prepare_actions(
+                raw_chunk_actions=chunk_actions["raw_actions"]
+                if isinstance(chunk_actions, dict)
+                else chunk_actions,
+                env_type=self.cfg.env.train.env_type,
+                model_type=self.model_cfg.model_type,
+                num_action_chunks=self.model_cfg.num_action_chunks,
+                action_dim=self.model_cfg.action_dim,
+                policy=self.model_cfg.get("policy_setup", None),
+                wm_env_type=self.cfg.env.train.get("wm_env_type", None),
+                env_cfg=self.cfg.env.train,
             )
-        )
-        if not self.cfg.env.train.auto_reset:
-            if self.cfg.env.train.ignore_terminations:
-                if chunk_truncations[:, -1].any():
-                    assert chunk_truncations[:, -1].all()
+            if isinstance(chunk_actions, dict):
+                chunk_actions["actions"] = exec_actions
+            else:
+                chunk_actions = exec_actions
+            env_info = {}
+
+        with timing_section("action_execution", major=False):
+            (
+                obs_list,
+                chunk_rewards,
+                chunk_terminations,
+                chunk_truncations,
+                infos_list,
+            ) = self.env_list[stage_id].chunk_step(chunk_actions)
+        with timing_section("chunk_result", major=False):
+            extracted_obs = obs_list
+            infos = infos_list
+            if isinstance(obs_list, (list, tuple)):
+                extracted_obs = obs_list[-1] if obs_list else None
+            if isinstance(infos_list, (list, tuple)):
+                infos = infos_list[-1] if infos_list else None
+            infos = infos or {}
+            valid_action_mask = None
+            if self.enable_online_lerobot and isinstance(infos, dict):
+                # The train env publishes this after auto-reset. Removing it keeps
+                # the mask out of the stored step metadata.
+                valid_action_mask = infos.pop("valid_action_mask", None)
+            chunk_dones = torch.logical_or(chunk_terminations, chunk_truncations)
+            final_obs = (
+                self._build_chunk_final_obs(obs_list, infos_list)
+                if self.use_external_reward_model
+                else (
+                    infos["final_observation"]
+                    if isinstance(infos, dict) and "final_observation" in infos
+                    else None
+                )
+            )
+            if not self.cfg.env.train.auto_reset:
+                if self.cfg.env.train.ignore_terminations:
+                    if chunk_truncations[:, -1].any():
+                        assert chunk_truncations[:, -1].all()
+                        if "episode" in infos:
+                            for key in infos["episode"]:
+                                env_info[key] = infos["episode"][key].cpu()
+                else:
                     if "episode" in infos:
                         for key in infos["episode"]:
                             env_info[key] = infos["episode"][key].cpu()
-            else:
-                if "episode" in infos:
-                    for key in infos["episode"]:
-                        env_info[key] = infos["episode"][key].cpu()
-        elif chunk_dones.any():
-            if "final_info" in infos:
-                final_info = infos["final_info"]
-                for key in final_info["episode"]:
-                    env_info[key] = final_info["episode"][key][chunk_dones[:, -1]].cpu()
+            elif chunk_dones.any():
+                if "final_info" in infos:
+                    final_info = infos["final_info"]
+                    for key in final_info["episode"]:
+                        env_info[key] = final_info["episode"][key][
+                            chunk_dones[:, -1]
+                        ].cpu()
 
-        intervene_actions = (
-            infos["intervene_action"] if "intervene_action" in infos else None
-        )
-        intervene_flags = infos["intervene_flag"] if "intervene_flag" in infos else None
-        rlt_switch_flags = (
-            infos["rlt_switch_flags"] if "rlt_switch_flags" in infos else None
-        )
-        if self.cfg.env.train.auto_reset and chunk_dones.any():
-            if "intervene_action" in infos["final_info"]:
-                intervene_actions = infos["final_info"]["intervene_action"]
-                intervene_flags = infos["final_info"]["intervene_flag"]
+            intervene_actions = (
+                infos["intervene_action"] if "intervene_action" in infos else None
+            )
+            intervene_flags = (
+                infos["intervene_flag"] if "intervene_flag" in infos else None
+            )
+            rlt_switch_flags = (
+                infos["rlt_switch_flags"] if "rlt_switch_flags" in infos else None
+            )
+            if self.cfg.env.train.auto_reset and chunk_dones.any():
+                if "intervene_action" in infos["final_info"]:
+                    intervene_actions = infos["final_info"]["intervene_action"]
+                    intervene_flags = infos["final_info"]["intervene_flag"]
 
-        env_output = EnvOutput(
-            obs=extracted_obs,
-            final_obs=final_obs,
-            env_infos=infos if isinstance(infos, dict) else None,
-            transition=EnvTransition(
-                rewards=chunk_rewards,
-                dones=chunk_dones,
-                terminations=chunk_terminations,
-                truncations=chunk_truncations,
-                intervene_actions=intervene_actions,
-                intervene_flags=intervene_flags,
-                rlt_switch_flags=rlt_switch_flags,
-            ),
-        )
-        chunk_step_payload = {
-            "chunk_actions": exec_actions,
-            "obs_list": obs_list,
-            "terminations": chunk_terminations,
-            "truncations": chunk_truncations,
-            "infos_list": infos_list,
-            "valid_action_mask": valid_action_mask,
-        }
-        return env_output, env_info, chunk_step_payload
+            env_output = EnvOutput(
+                obs=extracted_obs,
+                final_obs=final_obs,
+                env_infos=infos if isinstance(infos, dict) else None,
+                transition=EnvTransition(
+                    rewards=chunk_rewards,
+                    dones=chunk_dones,
+                    terminations=chunk_terminations,
+                    truncations=chunk_truncations,
+                    intervene_actions=intervene_actions,
+                    intervene_flags=intervene_flags,
+                    rlt_switch_flags=rlt_switch_flags,
+                ),
+            )
+            chunk_step_payload = {
+                "chunk_actions": exec_actions,
+                "obs_list": obs_list,
+                "terminations": chunk_terminations,
+                "truncations": chunk_truncations,
+                "infos_list": infos_list,
+                "valid_action_mask": valid_action_mask,
+            }
+            return env_output, env_info, chunk_step_payload
 
     def env_evaluate_step(
         self, raw_actions: torch.Tensor, stage_id: int
@@ -778,6 +844,7 @@ class EnvWorker(Worker):
                         dones=dones,
                         terminations=terminations,
                         truncations=truncations,
+                        rlt_switch_flags=infos.get("rlt_switch_flags"),
                     ),
                     final_obs=(
                         infos["final_observation"]
@@ -801,6 +868,7 @@ class EnvWorker(Worker):
                         truncations=truncations,
                         intervene_actions=self.last_intervened_info_list[stage_id][0],
                         intervene_flags=self.last_intervened_info_list[stage_id][1],
+                        rlt_switch_flags=self.last_rlt_switch_flags_list[stage_id],
                     ),
                 )
                 env_outputs.append(env_output)
@@ -873,7 +941,11 @@ class EnvWorker(Worker):
             channel=rollout_channel,
             data=policy_input,
             mode="train",
-            tag="policy_final" if policy_input.is_last else "policy",
+            tag=(
+                "policy_final"
+                if policy_input.is_last and not getattr(self, "episode_replay", False)
+                else "policy"
+            ),
             route_key=stage_id if not self.env_decoupled_mode else None,
             batch_size=self.train_batch_size,
             split_fn=self._policy_input_split_fn or PolicyInput.split,
@@ -901,9 +973,12 @@ class EnvWorker(Worker):
         has_terminal_state = env_output.dones is not None and bool(
             env_output.dones.any()
         )
+        episode_replay = getattr(self, "episode_replay", False)
+        if episode_replay:
+            is_last = has_terminal_state
         # A terminal forward pass supplies value/transition data, not actions.
         needs_terminal = (
-            self.collect_final_values
+            (self.collect_final_values or episode_replay)
             and not self.enable_online_lerobot
             and (is_last or has_terminal_state)
         )
@@ -924,46 +999,50 @@ class EnvWorker(Worker):
                 stage_id,
                 chunk_id + 1,
             )
-        continue_smooth = self.smooth_intervene.on_chunk_done(
-            stage_id, env_output.intervene_flags, env_output.dones
-        )
-        if continue_smooth and not is_last:
-            policy_input = self.smooth_intervene.build_external_policy_input(
-                stage_id,
-                env=self.env_list[stage_id],
-                obs=env_output.prepare_observations(env_output.obs),
+        with timing_section("request", major=False):
+            continue_smooth = self.smooth_intervene.on_chunk_done(
+                stage_id, env_output.intervene_flags, env_output.dones
             )
-        else:
-            policy_input = self._build_policy_input(env_output)
-        # Piggyback the completed transition on the next policy request so
-        # Rollout remains the Actor channel's only producer.
-        env_part = EnvPart(
-            sources=[source],
-            transition=self._build_env_transition(
-                env_output,
-                stage_id=stage_id,
-                reward_model_output=reward_model_output,
-                chunk_step_data=chunk_step_data,
-            ),
-            next_obs=(
-                env_output.prepare_observations(next_obs_override)
-                if next_obs_override is not None
-                else None
-            ),
-            requires_inference=needs_terminal,
-            # Only chunk zero owns the boundary before the first action.
-            initial_transition=initial_transition if chunk_id == 0 else None,
-        )
-        policy_input.env_parts = [env_part]
-        policy_input.is_last = is_last
-        if is_last and self.env_decoupled_mode:
-            return env_part
-        self._send_policy_input(
-            rollout_channel,
-            policy_input,
-            stage_id,
-            next_key,
-        )
+            if continue_smooth and not is_last:
+                policy_input = self.smooth_intervene.build_external_policy_input(
+                    stage_id,
+                    env=self.env_list[stage_id],
+                    obs=env_output.prepare_observations(env_output.obs),
+                )
+            else:
+                policy_input = self._build_policy_input(env_output)
+        with timing_section("transition", major=False):
+            # Piggyback the completed transition on the next policy request so
+            # Rollout remains the Actor channel's only producer.
+            env_part = EnvPart(
+                sources=[source],
+                transition=self._build_env_transition(
+                    env_output,
+                    stage_id=stage_id,
+                    reward_model_output=reward_model_output,
+                    chunk_step_data=chunk_step_data,
+                ),
+                next_obs=(
+                    env_output.prepare_observations(next_obs_override)
+                    if next_obs_override is not None
+                    else None
+                ),
+                requires_inference=needs_terminal,
+                # Only chunk zero owns the boundary before the first action.
+                initial_transition=initial_transition if chunk_id == 0 else None,
+                episode_end=episode_replay and is_last,
+            )
+            policy_input.env_parts = [env_part]
+            policy_input.is_last = is_last
+            if is_last and self.env_decoupled_mode:
+                return env_part
+        with timing_section("send", major=False):
+            self._send_policy_input(
+                rollout_channel,
+                policy_input,
+                stage_id,
+                next_key,
+            )
         return None
 
     def _split_and_compress_obs(
@@ -1079,14 +1158,29 @@ class EnvWorker(Worker):
             (env_output.intervene_actions, env_output.intervene_flags)
             for env_output in env_output_list
         ]
+        self.last_rlt_switch_flags_list = [
+            env_output.rlt_switch_flags for env_output in env_output_list
+        ]
 
     @staticmethod
     def _infer_action_batch_size(actions: torch.Tensor) -> int:
         """Infer the batch dimension of a policy response."""
         return int(actions.shape[0])
 
-    def _recv_actions(self, input_channel: Channel, stage_id: int) -> torch.Tensor:
+    def _recv_actions(
+        self, input_channel: Channel, stage_id: int, *, async_op: bool = False
+    ) -> Any:
         """Receive actions using the route paired with the policy request."""
+        measurement = current_worker_timing()
+        options = {}
+        if measurement is not None:
+            from rlinf.scheduler.worker.routing import merge_batches
+
+            def merge(items):
+                with measurement.section("input", major=True):
+                    return items[0] if len(items) == 1 else merge_batches(items)
+
+            options["merge_fn"] = merge
         return self.recv_from(
             group_name=self.cfg.rollout.group_name,
             channel=input_channel,
@@ -1094,7 +1188,9 @@ class EnvWorker(Worker):
             route_key=stage_id if not self.env_decoupled_mode else None,
             batch_size=self.train_batch_size,
             infer_batch_size_fn=self._infer_action_batch_size,
+            async_op=async_op,
             decoupled_mode=self.env_decoupled_mode,
+            **options,
         )
 
     @Worker.timer("run_interact_once")
@@ -1108,6 +1204,14 @@ class EnvWorker(Worker):
     ) -> dict[str, torch.Tensor]:
         env_metrics = defaultdict(list)
         final_env_parts: dict[int, EnvPart] = {}
+        episode_replay = getattr(self, "episode_replay", False)
+        if episode_replay and (
+            not cooperative_yield or getattr(self, "_replay_ack_channel", None) is None
+        ):
+            raise ValueError(
+                "flush_replay_on_episode_end requires AsyncEmbodiedRunner "
+                "with a replay acknowledgement channel."
+            )
 
         for epoch in range(self.rollout_epoch):
             if epoch == 0 and self._prefetched_train_bootstrap is not None:
@@ -1134,76 +1238,118 @@ class EnvWorker(Worker):
                     if cooperative_yield:
                         await asyncio.sleep(0)
 
-                    actions = self._recv_actions(input_channel, stage_id)
-                    self.smooth_intervene.remember_actions(stage_id, actions)
-
-                    env_output, env_info, chunk_step_data = self.env_interact_step(
-                        actions,
-                        stage_id,
-                    )
-
-                    # LeRobot stores the observation from before each action.
-                    # The env returns the frame after each action, so prepend the
-                    # frame sent to the policy and drop the last post-action frame.
-                    if (
-                        self.enable_online_lerobot
-                        and chunk_step_data.get("valid_action_mask") is not None
+                    with WorkerStepTiming(
+                        get_timing_mode(getattr(self, "cfg", {})),
+                        "Env step",
+                        self.log_info,
+                        rank=getattr(self, "_rank", 0),
+                        episode=self._trajectory_step + 1,
+                        chunk=chunk_step_idx + 1,
+                        stage_id=stage_id,
+                        phase="normal",
                     ):
-                        post_action_obs = chunk_step_data["obs_list"]
-                        if not isinstance(post_action_obs, (list, tuple)):
-                            post_action_obs = [post_action_obs]
-                        chunk_step_data["obs_list"] = [
-                            env_outputs[stage_id].obs,
-                            *post_action_obs[:-1],
-                        ]
+                        if cooperative_yield:
+                            actions = await self._recv_actions(
+                                input_channel, stage_id, async_op=True
+                            ).async_wait()
+                        else:
+                            actions = self._recv_actions(input_channel, stage_id)
+                        with timing_section("input", major=True):
+                            if self.should_stop:
+                                raise asyncio.CancelledError
+                            self.smooth_intervene.remember_actions(stage_id, actions)
 
-                    # Delay the next observation without blocking other worker tasks.
-                    await self._maybe_wait_env_delay(stage_id)
-
-                    reward_model_output = None
-                    if reward_channel is not None:
-                        reward_model_output = self.get_reward_model_output(
-                            env_output,
-                            send_channel=reward_channel,
-                            recv_channel=input_channel,
-                            stage_id=stage_id,
-                            last_run=(
-                                epoch == self.rollout_epoch - 1
-                                and chunk_step_idx == self.n_train_chunk_steps - 1
-                            ),
-                        )
-                        if reward_model_output is not None:
-                            env_metrics["reward_model_output"].append(
-                                reward_model_output.detach().float().reshape(-1).cpu()
+                        with timing_section("execute", major=True):
+                            env_output, env_info, chunk_step_data = (
+                                self.env_interact_step(
+                                    actions,
+                                    stage_id,
+                                )
                             )
 
-                    env_part = self._publish_step(
-                        rollout_channel,
-                        env_output,
-                        initial_transitions[stage_id],
-                        reward_model_output,
-                        chunk_step_data,
-                        epoch,
-                        chunk_step_idx,
-                        stage_id,
+                            # LeRobot stores the observation from before each action.
+                            # The env returns the frame after each action, so prepend the
+                            # frame sent to the policy and drop the last post-action frame.
+                            if (
+                                self.enable_online_lerobot
+                                and chunk_step_data.get("valid_action_mask") is not None
+                            ):
+                                post_action_obs = chunk_step_data["obs_list"]
+                                if not isinstance(post_action_obs, (list, tuple)):
+                                    post_action_obs = [post_action_obs]
+                                chunk_step_data["obs_list"] = [
+                                    env_outputs[stage_id].obs,
+                                    *post_action_obs[:-1],
+                                ]
+
+                        # Delay the next observation without blocking other worker tasks.
+                        await self._maybe_wait_env_delay(stage_id)
+
+                        with timing_section("publish", major=True):
+                            reward_model_output = None
+                            if reward_channel is not None:
+                                reward_model_output = self.get_reward_model_output(
+                                    env_output,
+                                    send_channel=reward_channel,
+                                    recv_channel=input_channel,
+                                    stage_id=stage_id,
+                                    last_run=(
+                                        epoch == self.rollout_epoch - 1
+                                        and chunk_step_idx
+                                        == self.n_train_chunk_steps - 1
+                                    ),
+                                )
+                                if reward_model_output is not None:
+                                    env_metrics["reward_model_output"].append(
+                                        reward_model_output.detach()
+                                        .float()
+                                        .reshape(-1)
+                                        .cpu()
+                                    )
+
+                            env_part = self._publish_step(
+                                rollout_channel,
+                                env_output,
+                                initial_transitions[stage_id],
+                                reward_model_output,
+                                chunk_step_data,
+                                epoch,
+                                chunk_step_idx,
+                                stage_id,
+                            )
+                            if env_part is not None:
+                                final_env_parts[stage_id] = env_part
+                            if (
+                                get_env_attr(
+                                    self.env_list[stage_id], "insert_delay_metrics"
+                                )
+                                is not None
+                            ):
+                                env_metrics["time/interact_delay"].append(
+                                    self.env_list[stage_id].insert_delay_metrics()
+                                )
+                            env_outputs[stage_id] = env_output
+                            should_record = (
+                                self.cfg.env.train.auto_reset
+                                or self.cfg.env.train.ignore_terminations
+                                or chunk_step_idx == self.n_train_chunk_steps - 1
+                            )
+                            if should_record:
+                                self.record_env_metrics(env_metrics, env_info)
+                if episode_replay and bool(env_output.dones.any()):
+                    break
+
+            if episode_replay:
+                if not bool(env_output.dones.any()):
+                    raise RuntimeError(
+                        "Expected episode termination within max_episode_chunks."
                     )
-                    if env_part is not None:
-                        final_env_parts[stage_id] = env_part
-                    if (
-                        get_env_attr(self.env_list[stage_id], "insert_delay_metrics")
-                        is not None
-                    ):
-                        env_metrics["time/interact_delay"].append(
-                            self.env_list[stage_id].insert_delay_metrics()
-                        )
-                    env_outputs[stage_id] = env_output
-                    should_record = (
-                        self.cfg.env.train.auto_reset
-                        or self.cfg.env.train.ignore_terminations
-                        or chunk_step_idx == self.n_train_chunk_steps - 1
-                    )
-                    if should_record:
-                        self.record_env_metrics(env_metrics, env_info)
+                end_key = TrajectoryKey(
+                    self._trajectory_step, epoch, self._rank, 0, chunk_step_idx
+                )
+                env_outputs[0] = await self._reset_after_episode_replay(
+                    end_key, env_output
+                )
 
             self.store_last_obs_and_intervened_info(env_outputs)
             self.finish_rollout()
@@ -1220,6 +1366,34 @@ class EnvWorker(Worker):
             env_metrics[key] = torch.cat(value, dim=0).contiguous().cpu()
 
         return env_metrics
+
+    async def _reset_after_episode_replay(
+        self, end_key: TrajectoryKey, env_output: EnvOutput
+    ) -> EnvOutput:
+        """Wait for actor ingestion before moving the stopped robot to reset."""
+        receipt = await self._replay_ack_channel.get(async_op=True).async_wait()
+        if receipt != end_key:
+            raise RuntimeError(
+                f"Expected replay receipt for {end_key}, got {receipt!r}."
+            )
+        if self.should_stop:
+            raise asyncio.CancelledError
+        self.log_info(
+            f"[REPLAY] Episode committed before reset: "
+            f"episode={end_key.step_id + 1}, chunks={end_key.chunk_id + 1}."
+        )
+        obs, infos = self.env_list[0].reset()
+        dones = torch.zeros_like(env_output.dones)
+        return EnvOutput(
+            obs=obs,
+            transition=EnvTransition(
+                dones=dones,
+                terminations=dones.clone(),
+                truncations=dones.clone(),
+                rlt_switch_flags=infos.get("rlt_switch_flags"),
+            ),
+            env_infos=infos,
+        )
 
     @Worker.timer("interact")
     async def interact(

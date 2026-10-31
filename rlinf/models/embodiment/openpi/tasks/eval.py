@@ -24,6 +24,8 @@ from rlinf.models.embodiment.openpi.modules.model import preprocess_observation
 from rlinf.models.embodiment.openpi.pi0 import Pi0
 from rlinf.models.embodiment.openpi.pi0_config import Pi0Config
 from rlinf.models.embodiment.openpi.rlt_config import OpenPiPytorchRLTConfig
+from rlinf.utils.progress import timing_section
+from rlinf.utils.startup_timing import startup_section
 
 
 class Pi0Eval(EnvIO, Pi0):
@@ -55,6 +57,26 @@ class Pi0Eval(EnvIO, Pi0):
         self.rtc_enabled = rtc_enabled
         self.rtc_guidance_mode = rtc_guidance_mode
         self.rtc_guidance_clip = rtc_guidance_clip
+        self._rlt_compile_mode: str | None = None
+
+    def enable_rlt_torch_compile(self, mode: str = "max-autotune") -> None:
+        """Compile only reference-action denoising in the frozen RLT model."""
+        self._require_rlt()
+        if self.training or any(param.requires_grad for param in self.parameters()):
+            raise ValueError(
+                "RLT feature compilation requires an eval-mode frozen model."
+            )
+        if self._rlt_compile_mode is not None:
+            if self._rlt_compile_mode != mode:
+                raise ValueError(
+                    f"RLT features already compiled with {self._rlt_compile_mode!r}, "
+                    f"cannot switch to {mode!r}."
+                )
+            return
+        self._sample_actions_from_prefix_cache = torch.compile(
+            self._sample_actions_from_prefix_cache, mode=mode
+        )
+        self._rlt_compile_mode = mode
 
     @torch.no_grad()
     def predict_action_batch(
@@ -97,16 +119,18 @@ class Pi0Eval(EnvIO, Pi0):
             sample_actions_with_rtc_guidance,
         )
 
-        model_actions = sample_actions_with_rtc_guidance(
-            self,
-            observation,
-            rtc_context,
-            num_steps=self.num_steps,
-            noise=noise,
-            rng=rng,
-            guidance_clip=self.rtc_guidance_clip,
-        )
-        actions = self.decode_actions(model_actions, observation.state)
+        with startup_section("inference.rtc_sample", num_steps=self.num_steps):
+            model_actions = sample_actions_with_rtc_guidance(
+                self,
+                observation,
+                rtc_context,
+                num_steps=self.num_steps,
+                noise=noise,
+                rng=rng,
+                guidance_clip=self.rtc_guidance_clip,
+            )
+        with startup_section("inference.decode"):
+            actions = self.decode_actions(model_actions, observation.state)
         B = actions.shape[0]
         return actions, {
             "prev_logprobs": None,
@@ -119,49 +143,69 @@ class Pi0Eval(EnvIO, Pi0):
         }
 
     @torch.no_grad()
-    def extract_rlt_obs(self, env_obs: dict[str, Any]) -> dict[str, torch.Tensor]:
+    def extract_rlt_obs(
+        self, env_obs: dict[str, Any], *, noise: torch.Tensor | None = None
+    ) -> dict[str, torch.Tensor]:
         """Extract the frozen Stage1 features consumed by the Stage2 RLT head."""
+        if self._rlt_compile_mode is None:
+            return self._extract_rlt_obs(env_obs, noise=noise)
+        torch.compiler.cudagraph_mark_step_begin()
+        with torch.inference_mode():
+            features = self._extract_rlt_obs(env_obs, noise=noise)
+        # Replay owns ordinary tensors, independent of reusable CUDA graph outputs.
+        with torch.inference_mode(False), torch.no_grad(), timing_section("decision"):
+            return {key: value.clone() for key, value in features.items()}
+
+    def _extract_rlt_obs(
+        self, env_obs: dict[str, Any], *, noise: torch.Tensor | None = None
+    ) -> dict[str, torch.Tensor]:
         self._require_rlt()
-        observation = self.env_obs_to_observation(env_obs)
+        with timing_section("preprocess"), startup_section("rlt.preprocess"):
+            observation = self.env_obs_to_observation(env_obs)
 
-        prepared_observation = preprocess_observation(observation, train=False)
-        prefix_output, prefix_mask, kv_cache = self.build_prefix_cache(
-            prepared_observation
-        )
-        rlt_prefix_output, rlt_prefix_mask = self._select_rlt_prefix_embeddings(
-            prefix_output, prefix_mask, prepared_observation.tokenized_prompt
-        )
-        z_rl = self._encode_rlt_flat(rlt_prefix_output, rlt_prefix_mask).to(
-            dtype=torch.float32
-        )
-
-        model_actions = self._sample_actions_from_prefix_cache(
-            prepared_observation,
-            prefix_mask,
-            kv_cache,
-        )
-        ref_chunk = self.output_transform(
-            {"actions": model_actions, "state": observation.state}
-        )["actions"]
-
-        raw_proprio = self._select_proprio(env_obs["states"])
-        if "maniskill" in self.config_name.lower():
-            state_dim = (
-                raw_proprio.shape[-1]
-                if hasattr(raw_proprio, "shape")
-                else np.asarray(raw_proprio).shape[-1]
+            prepared_observation = preprocess_observation(observation, train=False)
+        with timing_section("prefix"), startup_section("rlt.prefix"):
+            prefix_output, prefix_mask, kv_cache = self.build_prefix_cache(
+                prepared_observation
             )
-            proprio = observation.state[..., :state_dim]
-        else:
-            proprio = raw_proprio
-        if not torch.is_tensor(proprio):
-            proprio = torch.as_tensor(proprio)
+        with timing_section("z_encode"), startup_section("rlt.token"):
+            rlt_prefix_output, rlt_prefix_mask = self._select_rlt_prefix_embeddings(
+                prefix_output, prefix_mask, prepared_observation.tokenized_prompt
+            )
+            z_rl = self._encode_rlt_flat(rlt_prefix_output, rlt_prefix_mask).to(
+                dtype=torch.float32
+            )
 
-        return {
-            "z_rl": z_rl,
-            "proprio": proprio.to(device=z_rl.device, dtype=torch.float32),
-            "ref_chunk": ref_chunk.to(device=z_rl.device, dtype=torch.float32),
-        }
+        with timing_section("reference"), startup_section("rlt.reference"):
+            model_actions = self._sample_actions_from_prefix_cache(
+                prepared_observation,
+                prefix_mask,
+                kv_cache,
+                noise=noise,
+            )
+            ref_chunk = self.output_transform(
+                {"actions": model_actions, "state": observation.state}
+            )["actions"]
+
+        with timing_section("decision"), startup_section("rlt.output"):
+            raw_proprio = self._select_proprio(env_obs["states"])
+            if "maniskill" in self.config_name.lower():
+                state_dim = (
+                    raw_proprio.shape[-1]
+                    if hasattr(raw_proprio, "shape")
+                    else np.asarray(raw_proprio).shape[-1]
+                )
+                proprio = observation.state[..., :state_dim]
+            else:
+                proprio = raw_proprio
+            if not torch.is_tensor(proprio):
+                proprio = torch.as_tensor(proprio)
+
+            return {
+                "z_rl": z_rl,
+                "proprio": proprio.to(device=z_rl.device, dtype=torch.float32),
+                "ref_chunk": ref_chunk.to(device=z_rl.device, dtype=torch.float32),
+            }
 
     def _sample_actions_from_prefix_cache(
         self,

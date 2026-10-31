@@ -46,6 +46,7 @@ class KeyboardListener:
         self.latest_data = {"key": None}
         # Queue press edges so short taps are not lost between polls.
         self._press_events: deque[tuple[str, float]] = deque()
+        self._pressed_keys: set[str] = set()
         self._closed = threading.Event()
         self.device = self._open_keyboard_device()
 
@@ -170,12 +171,14 @@ class KeyboardListener:
                         # Enqueue the initial press only, not key-repeat events.
                         with self.state_lock:
                             self.latest_data["key"] = key
+                            self._pressed_keys.add(key)
                             self._press_events.append((key, event.timestamp()))
                     elif event.value == 2:
                         with self.state_lock:
                             self.latest_data["key"] = key
                     elif event.value == 0:
                         with self.state_lock:
+                            self._pressed_keys.discard(key)
                             if self.latest_data["key"] == key:
                                 self.latest_data["key"] = None
             except (OSError, ValueError) as exc:
@@ -193,6 +196,7 @@ class KeyboardListener:
                 )
                 with self.state_lock:
                     self.latest_data["key"] = None
+                    self._pressed_keys.clear()
                 try:
                     self.device.close()
                 except Exception:
@@ -221,6 +225,11 @@ class KeyboardListener:
                 return normalized_key
             return f"Key.{normalized_key}"
         return key_name.lower()
+
+    def get_pressed_keys(self) -> frozenset[str]:
+        """Return all currently held keys, excluding released keys and repeats."""
+        with self.state_lock:
+            return frozenset(self._pressed_keys)
 
     def get_key(self) -> str | None:
         """Return the currently held key, or ``None``.

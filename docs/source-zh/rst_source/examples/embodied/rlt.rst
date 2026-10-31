@@ -70,6 +70,27 @@ RLT 将表示学习和在线 RL 控制拆开。
      - ``examples/embodiment/config/maniskill_rlt_stage2_td3_mlp.yaml``
      - 使用相同的冻结 Stage 1 特征模型和 replay 路径运行仿真 TD3-MLP 变体。
 
+UR 第二阶段力控
+~~~~~~~~~~~~~~~
+
+``examples/embodiment/config/ur_rlt_stage2_ac_mlp.yaml`` 在模型加载完成后等待回车，允许首次复位；复位后再按回车开始第一轮。后续每轮结束后自动复位，等待回车后开始下一轮。``impedance.start_paused: true`` 让力控在这些等待期间保持暂停。第一条 action 启动力控；成功、超时、复位、action 执行异常或关闭环境时停止。结束后的 chunk 剩余动作会被跳过，直到复位。
+
+UR 训练配置默认开启 ``env.train.flush_replay_on_episode_end: true``。成功和超时统一停止力控，使用环境返回的复位前终止观测补齐末条 transition 的 RLT 特征后提交本轮数据；actor 确认入库后才复位，没有关键阶段数据的 episode 也会正常确认。只有关键阶段 transition 进入 replay。此模式通过异步入口运行，要求一个 UR 环境、一个 rollout worker、一个 actor 和 ``rollout_epoch=1``。
+
+用 ``env.train.max_episode_chunks`` 设置 episode 上限（默认 200），提前成功时按实际 chunk 数提交。模型、损失和持续训练保持原有设置；本轮新数据在 episode 结束后参与训练，因此首次预热和 MLP 接管可能推迟到后续 episode。设为 ``env.train.flush_replay_on_episode_end=false`` 可恢复固定批次提交，此时由 ``env.train.max_chunks_per_rollout_epoch`` 控制批次长度（默认 50）。终端显示预热更新进度、正式训练的 runner 轮次进度和当前 buffer 数量；runner 轮次包含预热轮次，resume 时延续 checkpoint 中的计数。
+
+``impedance.continuous_tracking: false`` 为每条 action 计算并发送一次力，episode 内两次调用之间保留上一条力指令。设为 ``true`` 时，后台控制器按 ``impedance.frequency`` 读取状态、重算力并调用 ``forceMode``，两条 action 之间保持最近的绝对目标。
+
+默认 ``runner.timing_mode=basic``：记录 Learner 更新分段，以及 Rollout、Env 的大模块时间。可设为 ``disabled`` 关闭新增计时，或 ``detailed`` 增加细分与诊断指标；关闭时不读取计时时钟、不启动计时线程，也不生成计时记录，RLinf 原有日志和控制节拍不受影响。计时模式统一由 ``runner.timing_mode`` 控制。basic 和 detailed 均显示加载与推理预热的阶段进度，启动细分诊断仅在 detailed 下记录。
+
+设置 ``runner.log_data=true``，将每次真实 RLT 推理的完整 VLA 参考动作和 Actor 输出保存到 ``<runner.logger.log_path>/data.log``。该开关默认 false，与计时模式独立。每次推理保存为一个纯文本块，首行包含可读的 UTC 时间、推理序号、模式和模型版本；下方分别列出 VLA 与 Actor 的 batch／步数／动作维度及带序号的完整动作，每个动作一行，数值采用九位有效数字。首行同时标识 worker rank。VLA 数值是解码到动作空间的参考动作；Actor 数值是训练时的采样输出或评估时的均值，在路由选择控制来源之前记录。合成观测启动预热不写入此文件。调试记录只写文件；关闭时不进行调试张量复制、序列化或写盘，开启时会增加设备到主机的复制和磁盘 I/O。
+
+Rollout 大模块为接收后的输入处理、推理、动作发送、训练数据提交；Env 为接收后的输入处理、动作执行、反馈发布。每条 ``work_ms`` 等于该 worker 大模块之和，不计上游输入等待、episode 收尾入库等待和复位。``detailed`` 进一步记录预处理、KV cache、z 编码、参考动作、MLP 与输出整理，以及 Env 的动作准备、chunk 执行、结果整理、请求构建、transition 构建、发送；UR 指令处理、节拍等待、观测、动作间隔和后台 PD 另作诊断，子项和后台记录不能重复加到大模块。``continuous_tracking=true`` 时后台 PD 与主线程并行，独立记录其频率。
+
+新增计时统一采用 worker 本地的主机经过时间，不添加设备同步、跨进程 barrier 或等待。GPU 操作可能异步，因此字段用于定位运行延迟，不代表精确的 GPU kernel 时间，也不能直接与旧版同步计时数值比较。计时写入运行目录的 ``timing.log`` 分组表格和 ``timing.tsv`` 原始记录；``work_hz`` 为耗时倒数，实际动作／PD 频率看 ``action_interval_hz``／``measured_hz``。
+
+每条 ``Learner update`` 记录新增 ``sample_ms``（采样）、``prepare_ms``（batch 整理和设备搬运）、``critic_ms``（critic 前向、反向、梯度裁剪和优化器更新）、``actor_ms``（actor 的同类更新）、``target_ms``（target 更新）及 ``other_ms``（其余工作和测量开销）。``work_ms`` 是整次调用总耗时，不等于单独 critic 与 actor 的和。``actor_updated=false`` 时 ``actor_ms`` 留空，表示本次跳过 actor；可学习温度参数的任务另有 ``alpha_ms``。``detailed`` 模式另有 ``Runner step`` 记录整轮耗时，附带 ``step``、实际 ``critic_updates`` 和 ``actor_updates``；它包含多次更新、权重同步等待及当轮触发的 checkpoint／eval，首次还可能包含等待采集预热数据的时间。分段使用本地主机经过时间，不增加设备同步。
+
 安装
 ----
 
@@ -220,7 +241,7 @@ Franka 真机配置中，``keyboard_reward_wrapper: rlt_policy_switch`` 会提�
 ``ref_chunk``；按下 ``b`` 之后，实际执行 Stage 2 actor 的动作。
 
 ManiSkill joint 配置中，``env.*.rlt_policy_switch`` 使用任务信息自动产生
-``rlt_switch_flags``（actor/ref 阶段）和 ``intervene_flag``（expert 接管请求）。
+``rlt_switch_flags`` （actor/ref 阶段）和 ``intervene_flag`` （expert 接管请求）。
 HF rollout route 根据这些标记在整 chunk 级别选择 actor action、VLA
 ``ref_chunk`` 或 expert action，并把 ``record_transition``、``actor_switch`` 和
 ``intervention_requested`` 写入 ``forward_inputs``，供 replay 和监控使用。

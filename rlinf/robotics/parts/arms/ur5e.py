@@ -16,7 +16,7 @@
 
 import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -48,19 +48,75 @@ class UR5eRobotState:
         return asdict(self)
 
 
+@dataclass
+class _ControlTiming:
+    target_hz: float
+    samples: int = 0
+    intervals: int = 0
+    interval_sum: float = 0.0
+    interval_min: float = float("inf")
+    interval_max: float = 0.0
+    work_sum: float = 0.0
+    send_sum: float = 0.0
+    overruns: int = 0
+    held_target_samples: int = 0
+    last_sent: float | None = None
+    last_sequence: int | None = None
+
+    def record(self, sent: float, sequence: int, work: float, send: float) -> None:
+        self.samples += 1
+        self.work_sum += work
+        self.send_sum += send
+        self.overruns += work > 1.0 / self.target_hz
+        self.held_target_samples += sequence == self.last_sequence
+        if self.last_sent is not None:
+            interval = sent - self.last_sent
+            self.intervals += 1
+            self.interval_sum += interval
+            self.interval_min = min(self.interval_min, interval)
+            self.interval_max = max(self.interval_max, interval)
+        self.last_sent = sent
+        self.last_sequence = sequence
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "target_hz": self.target_hz,
+            "samples": self.samples,
+            "intervals": self.intervals,
+            "active_interval_sec": self.interval_sum,
+            "measured_hz": self.intervals / self.interval_sum
+            if self.interval_sum > 0
+            else None,
+            "send_interval_sec_mean": self.interval_sum / self.intervals
+            if self.intervals
+            else None,
+            "send_interval_sec_min": self.interval_min if self.intervals else None,
+            "send_interval_sec_max": self.interval_max if self.intervals else None,
+            "cycle_work_sec_mean": self.work_sum / self.samples,
+            "force_mode_sec_mean": self.send_sum / self.samples,
+            "work_overruns": self.overruns,
+            "held_target_samples": self.held_target_samples,
+        }
+
+
 @dataclass(frozen=True)
 class UR5eImpedanceConfig:
     """UR force-mode gains and clipping, matching VLA-Precision's running controller.
 
     Position errors are metres; velocity errors are m/s. Rotation-error
-    clipping is degrees. The reference divides rotational PD torque by Hz.
+    clipping is degrees. Rotational gains apply directly to torque.
+    Frequency sets only the continuous controller rate.
+    SDK connections use the robot-dependent default communication frequency.
     """
 
     frequency: float = 100.0
+    continuous_tracking: bool = True
+    # Require start_motion() after connection and each reset.
+    start_paused: bool = False
     kp: float = 1200.0
     kd: float = 600.0
-    kp_rotation: float = 2000.0
-    kd_rotation: float = 400.0
+    kp_rotation: float = 20.0
+    kd_rotation: float = 4.0
     position_error_clip: float = 0.048
     velocity_error_clip: float = 4.0
     rotation_error_clip_degrees: float | None = None
@@ -124,10 +180,10 @@ class UR5eImpedanceConfig:
 
 @Arm.register("ur_rtde")
 class UR5eArm(BaseArm):
-    """Track absolute TCP targets with a continuously running UR force-mode loop.
+    """Apply absolute TCP targets through per-action or continuous UR force mode.
 
-    The environment owns delta composition. The driver holds the most recent
-    target between policy calls and reports controller failures to callers.
+    The environment owns delta composition. Per-action PD holds the commanded
+    wrench between calls; continuous tracking recomputes it from measured state.
     """
 
     STATE_FIELDS = (
@@ -170,6 +226,8 @@ class UR5eArm(BaseArm):
         self._io_lock = threading.RLock()
         self._command_lock = threading.Lock()
         self._condition = threading.Condition()
+        self._control_timing = _ControlTiming(self.impedance.frequency)
+        self._control_timing_enabled = True
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._loop_error: BaseException | None = None
@@ -185,12 +243,8 @@ class UR5eArm(BaseArm):
             *Rotation.from_matrix(self._control_rotation).as_rotvec().tolist(),
         ]
         try:
-            receive = rtde_receive.RTDEReceiveInterface(
-                self.robot_ip, self.impedance.frequency
-            )
-            control = rtde_control.RTDEControlInterface(
-                self.robot_ip, self.impedance.frequency
-            )
+            receive = rtde_receive.RTDEReceiveInterface(self.robot_ip)
+            control = rtde_control.RTDEControlInterface(self.robot_ip)
             if not control.isConnected() or not receive.isConnected():
                 raise ConnectionError(
                     f"Expected connected RTDE interfaces at {self.robot_ip}."
@@ -228,14 +282,29 @@ class UR5eArm(BaseArm):
             raise RuntimeError(f"UR5e {operation} did not complete successfully.")
 
     def _opened(self) -> None:
-        self._start_loop()
+        self._prepare_controller()
+
+    def _prepare_controller(self) -> None:
+        if self.impedance.start_paused:
+            self._motion_stopped = True
+            self._stop_event.set()
+        else:
+            self._start_loop()
 
     def _start_loop(self) -> None:
+        self._motion_stopped = False
         self._stop_event.clear()
         self._loop_error = None
         self._sequence = 0
         self._applied_sequence = -1
         self._target = self._read_state().tcp_pose
+        self._thread = None
+        with self._condition:
+            # Reset and homing pauses do not belong to the force-update interval.
+            self._control_timing.last_sent = None
+            self._control_timing.last_sequence = None
+        if not self.impedance.continuous_tracking:
+            return
         self._thread = threading.Thread(
             target=self._run_controller, name="UR5e-force-mode", daemon=True
         )
@@ -259,12 +328,14 @@ class UR5eArm(BaseArm):
                 "UR5e force-mode controller did not apply the target before command_timeout."
             )
 
-    def _check_controller(self) -> None:
+    def _check_controller(self, *, allow_stopped: bool = False) -> None:
+        if self._device is None:
+            raise RuntimeError("Expected a connected UR5e force-mode controller.")
         if self._loop_error is not None:
             raise RuntimeError(
                 "UR5e force-mode controller failed."
             ) from self._loop_error
-        if self._stop_event.is_set():
+        if self._stop_event.is_set() and not (allow_stopped and self._motion_stopped):
             raise RuntimeError(
                 "Expected a running UR5e force-mode controller, found stopped."
             )
@@ -294,7 +365,7 @@ class UR5eArm(BaseArm):
         angular_velocity_error = -current.tcp_vel[3:]
         torque = (
             cfg.kp_rotation * rotation_error + cfg.kd_rotation * angular_velocity_error
-        ) / cfg.frequency
+        )
         return np.concatenate(
             (self._control_rotation.T @ force, self._control_rotation.T @ torque)
         )
@@ -304,11 +375,13 @@ class UR5eArm(BaseArm):
         try:
             while not self._stop_event.is_set():
                 cycle_start = time.monotonic()
+                measure_control = self._control_timing_enabled
                 with self._condition:
                     target, sequence = self._target.copy(), self._sequence
                 with self._io_lock:
                     state = self._read_state()
                     wrench = self._compute_wrench(target, state)
+                    send_started = time.monotonic() if measure_control else 0.0
                     self._require_success(
                         control.forceMode(
                             self._task_frame,
@@ -319,7 +392,12 @@ class UR5eArm(BaseArm):
                         ),
                         "forceMode",
                     )
+                    sent = time.monotonic() if measure_control else 0.0
                 with self._condition:
+                    if measure_control and self._control_timing_enabled:
+                        self._control_timing.record(
+                            sent, sequence, sent - cycle_start, sent - send_started
+                        )
                     self._applied_sequence = sequence
                     self._condition.notify_all()
                 self._stop_event.wait(
@@ -353,6 +431,23 @@ class UR5eArm(BaseArm):
                 raise RuntimeError(
                     "UR5e force-mode thread did not stop before command_timeout."
                 )
+        else:
+            control, _ = self._device
+            with self._io_lock:
+                self._require_success(control.forceModeStop(), "forceModeStop")
+
+    def stop_motion(self) -> None:
+        """Leave force mode without moving the robot or closing its connection."""
+        with self._command_lock:
+            self._stop_loop()
+            self._motion_stopped = True
+
+    def start_motion(self) -> None:
+        """Enable force control from the measured pose after an explicit start."""
+        with self._command_lock:
+            self._check_controller(allow_stopped=True)
+            if self._motion_stopped:
+                self._start_loop()
 
     def _release(self, device: Any) -> None:
         control, receive = device
@@ -401,12 +496,59 @@ class UR5eArm(BaseArm):
         )
 
     def get_state(self) -> UR5eRobotState:
-        """Read measured state and surface background control failures."""
-        self._check_controller()
+        """Read measured state and surface controller failures."""
+        self._check_controller(allow_stopped=True)
         return self._read_state()
 
+    def set_control_timing_enabled(self, enabled: bool) -> None:
+        """Enable measurement without changing force control or target acknowledgement."""
+        with self._condition:
+            self._control_timing_enabled = enabled
+            self._control_timing = _ControlTiming(self.impedance.frequency)
+
+    def drain_control_timing(self) -> dict[str, Any] | None:
+        """Return and clear successful background force-send timing statistics.
+
+        Frequency uses intervals between successful SDK call completions.
+        Reset pauses are excluded; RTDE packet freshness is not measured.
+        """
+        with self._condition:
+            timing = self._control_timing
+            if not timing.samples:
+                return None
+            summary = timing.summary()
+            self._control_timing = _ControlTiming(
+                self.impedance.frequency,
+                last_sent=timing.last_sent,
+                last_sequence=timing.last_sequence,
+            )
+        return summary
+
     def send_action(self, action: Action) -> Action:
-        """Replace the held TCP target and wait for its first force-mode update."""
+        """Apply a Cartesian target using per-action PD or continuous tracking."""
+        return self._send_action(action)
+
+    def send_action_from_state(
+        self,
+        action: Action,
+        state: UR5eRobotState,
+        *,
+        before_send: Callable[[], None] | None = None,
+    ) -> Action:
+        """Use the delta-composition snapshot for per-action impedance control.
+
+        Continuous tracking keeps reading measured state in its control loop.
+        before_send runs immediately before force submission or target publication.
+        """
+        return self._send_action(action, state, before_send=before_send)
+
+    def _send_action(
+        self,
+        action: Action,
+        state: UR5eRobotState | None = None,
+        *,
+        before_send: Callable[[], None] | None = None,
+    ) -> Action:
         if set(action) != {"tcp_pose"}:
             raise KeyError(f"Expected only tcp_pose, got {sorted(action)}.")
         pose = np.asarray(action["tcp_pose"], dtype=np.float64)
@@ -423,6 +565,29 @@ class UR5eArm(BaseArm):
                     raise ValueError(
                         f"UR5e TCP target is outside robot safety limits: {target}."
                     )
+                if not self.impedance.continuous_tracking:
+                    wrench = self._compute_wrench(
+                        pose, state if state is not None else self._read_state()
+                    )
+                    if before_send is not None:
+                        before_send()
+                    try:
+                        self._require_success(
+                            control.forceMode(
+                                self._task_frame,
+                                list(self.impedance.selection_vector),
+                                wrench.tolist(),
+                                self.impedance.force_type,
+                                list(self.impedance.force_limits),
+                            ),
+                            "forceMode",
+                        )
+                    except BaseException as error:
+                        self._loop_error = error
+                        raise
+                    return {"tcp_pose": pose.astype(np.float32)}
+            if before_send is not None:
+                before_send()
             with self._condition:
                 self._target = pose.copy()
                 self._sequence += 1
@@ -430,12 +595,12 @@ class UR5eArm(BaseArm):
         return {"tcp_pose": pose.astype(np.float32)}
 
     def reset_joint(self, positions: list[float]) -> None:
-        """Leave force mode, reset six joints, then hold the measured TCP pose."""
+        """Leave force mode, reset six joints and prepare the configured controller."""
         joints = np.asarray(positions, dtype=float)
         if joints.shape != (6,) or not np.isfinite(joints).all():
             raise ValueError(f"Expected six finite UR5e joint angles, got {joints}.")
         with self._command_lock:
-            self._check_controller()
+            self._check_controller(allow_stopped=True)
             self._stop_loop()
             control, _ = self._device
             with self._io_lock:
@@ -443,11 +608,11 @@ class UR5eArm(BaseArm):
                     control.moveJ(joints.tolist(), self.speed, self.acceleration),
                     "moveJ",
                 )
-            self._start_loop()
+            self._prepare_controller()
 
     def get_tcp_offset(self) -> np.ndarray:
         """Read the tool offset as XYZ + XYZW under the controller I/O lock."""
-        self._check_controller()
+        self._check_controller(allow_stopped=True)
         control, _ = self._device
         with self._io_lock:
             offset = np.asarray(control.getTCPOffset(), dtype=np.float64)
@@ -461,7 +626,7 @@ class UR5eArm(BaseArm):
         payload_settle_seconds: float = 0.25,
         ft_zero_settle_seconds: float = 0.5,
     ) -> None:
-        """Pause impedance tracking, moveL home, zero F/T and resume tracking."""
+        """Stop force mode, moveL home, zero F/T and prepare the controller."""
         pose = np.asarray(pose, dtype=np.float64)
         if pose.shape != (7,) or not np.isfinite(pose).all():
             raise ValueError("Expected a finite XYZ + XYZW reset pose.")
@@ -470,7 +635,7 @@ class UR5eArm(BaseArm):
                 raise ValueError("Expected finite nonnegative reset settle times.")
         target = np.r_[pose[:3], Rotation.from_quat(pose[3:]).as_rotvec()].tolist()
         with self._command_lock:
-            self._check_controller()
+            self._check_controller(allow_stopped=True)
             control, _ = self._device
             with self._io_lock:
                 if not control.isPoseWithinSafetyLimits(target):
@@ -479,6 +644,10 @@ class UR5eArm(BaseArm):
                     )
             self._stop_loop()
             try:
+                if self._loop_error is not None:
+                    raise RuntimeError(
+                        "UR5e force-mode controller failed while stopping before TCP reset."
+                    ) from self._loop_error
                 with self._io_lock:
                     self._require_success(control.servoStop(), "servoStop")
                     self._require_success(
@@ -498,4 +667,4 @@ class UR5eArm(BaseArm):
             except BaseException as error:
                 self._loop_error = error
                 raise
-            self._start_loop()
+            self._prepare_controller()

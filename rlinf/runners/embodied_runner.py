@@ -176,17 +176,21 @@ class EmbodiedRunner:
     def init_workers(self):
         # create worker in order to decrease the maximum memory usage
         rollout_handle = self.rollout.init_worker()
-        env_handle = self.env.init_worker()
+        defer_env = bool(self.cfg.runner.get("env_init_after_models", False))
+        env_handle = None if defer_env else self.env.init_worker()
 
         if self.reward is not None:
             self.reward.init_worker().wait()
 
         rollout_handle.wait()
-        env_handle.wait()
+        if env_handle is not None:
+            env_handle.wait()
         self.actor.init_worker().wait()
 
         resume_dir = self.cfg.runner.get("resume_dir", None)
         if resume_dir is None:
+            if defer_env:
+                self.env.init_worker().wait()
             return
 
         self.logger.info(f"Resuming training from checkpoint directory {resume_dir}.")
@@ -196,6 +200,8 @@ class EmbodiedRunner:
             f"resume_dir {actor_checkpoint_path} does not exist."
         )
         self.actor.load_checkpoint(actor_checkpoint_path).wait()
+        if defer_env:
+            self.env.init_worker().wait()
 
     def update_rollout_weights(self):
         rollout_handle: Handle = self.rollout.sync_model_from_actor()

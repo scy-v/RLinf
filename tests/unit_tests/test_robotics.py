@@ -24,6 +24,7 @@ import re
 import runpy
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass, fields
@@ -6699,6 +6700,61 @@ def test_ur5e_force_mode_holds_target_and_pauses_for_joint_reset():
             arm.disconnect()
 
 
+@pytest.mark.parametrize("send_delay", [0.0, 0.025])
+@pytest.mark.parametrize("timing_enabled", [False, True])
+def test_ur5e_control_timing_measures_successful_sends_and_held_targets(
+    send_delay, timing_enabled
+):
+    from robot_mocks import mocked_sdks
+
+    from rlinf.robotics.parts.arms.ur5e import UR5eArm
+
+    with mocked_sdks() as sdks:
+        control_cls = sdks["rtde_control"].RTDEControlInterface
+        send = control_cls.forceMode
+        completed = []
+
+        def force_mode(self, *args):
+            time.sleep(send_delay)
+            result = send(self, *args)
+            completed.append(time.monotonic())
+            return result
+
+        control_cls.forceMode = force_mode
+        arm = UR5eArm("192.0.2.93", impedance={"continuous_tracking": True})
+        arm.connect()
+        if not timing_enabled:
+            arm.set_control_timing_enabled(False)
+        try:
+            deadline = time.monotonic() + 2.0
+            while len(completed) < 6 and time.monotonic() < deadline:
+                time.sleep(0.005)
+            arm.stop_motion()
+            assert len(completed) >= 6
+            timing = arm.drain_control_timing()
+            if not timing_enabled:
+                assert timing is None
+                return
+            assert timing["samples"] == len(completed)
+            assert timing["intervals"] == len(completed) - 1
+            intervals = np.diff(completed)
+            assert timing["measured_hz"] == pytest.approx(
+                1.0 / intervals.mean(), rel=0.02
+            )
+            assert timing["send_interval_sec_max"] == pytest.approx(
+                intervals.max(), rel=0.02
+            )
+            assert timing["held_target_samples"] == len(completed) - 1
+            assert timing["target_hz"] == 100.0
+            if send_delay:
+                assert timing["measured_hz"] < 50.0
+                assert timing["work_overruns"] == len(completed)
+                assert timing["force_mode_sec_mean"] >= send_delay
+            assert arm.drain_control_timing() is None
+        finally:
+            arm.disconnect()
+
+
 def test_pgi_gripper_measured_state_and_absolute_commands():
     from robot_mocks import mocked_sdks
 
@@ -6847,6 +6903,356 @@ def test_ur5e_rotational_pd_is_unclipped_by_default():
                     - 400 * np.array([0.1, 0.2, 0.3])
                 )
                 / 100,
+            )
+        finally:
+            arm.disconnect()
+
+
+def test_ur5e_per_action_pd_matches_vla_precision_and_holds_wrench():
+    from robot_mocks import mocked_sdks
+
+    from rlinf.robotics.parts.arms.ur5e import UR5eArm
+
+    with mocked_sdks() as sdks:
+        arm = UR5eArm(
+            "192.0.2.23",
+            impedance={"continuous_tracking": False},
+        )
+        arm.connect()
+        state = sdks["rtde_control"].states["192.0.2.23"]
+        try:
+            assert state["control_frequency"] == -1.0
+            assert state["receive_frequency"] == -1.0
+            assert not state["forces"]
+            state["speed"] = [0.1, -0.2, 0.3, -0.4, 0.5, -0.6]
+            target = np.array([0.4, 0.0, 0.3, 0.0, 0.0, 0.0, 1.0])
+            arm.send_action({"tcp_pose": target})
+            np.testing.assert_allclose(
+                state["forces"][-1][2], [-60, 120, -180, 1.6, -2, 2.4]
+            )
+            state["speed"] = [0.0] * 6
+            time.sleep(0.04)
+            assert len(state["forces"]) == 1
+            arm.send_action({"tcp_pose": target})
+            assert len(state["forces"]) == 2
+            assert arm.drain_control_timing() is None
+            np.testing.assert_allclose(state["forces"][-1][2], np.zeros(6))
+            arm.reset_tcp(target, 0.0, 0.0)
+            assert len(state["forces"]) == 2
+            assert "forceModeStop" in state["events"]
+            assert "zeroFtSensor" in state["events"]
+        finally:
+            arm.disconnect()
+
+
+def test_pgi_gripper_background_io_keeps_serial_work_off_action_caller():
+    from robot_mocks import mocked_sdks
+
+    from rlinf.robotics.parts.end_effectors.grippers.pgi import PGIGripper
+
+    with mocked_sdks() as sdks:
+        gripper = PGIGripper("/tmp/ur5e-background-gripper", background_io=True)
+        gripper.connect()
+        device = sdks["pyDHgripper"].PGE.instances[-1]
+        read_entered, resume = threading.Event(), threading.Event()
+        original = device.read_pos
+
+        def read():
+            read_entered.set()
+            assert resume.wait(2), "Serial test read was not released"
+            return original()
+
+        device.read_pos = read
+        try:
+            assert read_entered.wait(2)
+            gripper.close()
+            assert gripper.position == pytest.approx(gripper.max_width)
+            resume.set()
+            deadline = time.monotonic() + 2
+            while gripper.position == gripper.max_width and time.monotonic() < deadline:
+                time.sleep(0.005)
+            assert gripper.position == pytest.approx(0.08 * gripper.max_width)
+            assert device.commands[-1]["val"] == 80
+        finally:
+            resume.set()
+            gripper.disconnect()
+        assert device.closed
+        assert not gripper._io_thread.is_alive()
+
+
+@pytest.fixture
+def keyboard_teleop(monkeypatch):
+    from robot_mocks.teleop import keyboard
+
+    from rlinf.robotics.parts.teleop import Keyboard
+
+    sdk = keyboard()
+    monkeypatch.setitem(sys.modules, "evdev", sdk)
+    monkeypatch.setenv("RLINF_KEYBOARD_DEVICE", "/dev/input/event-fake")
+    monkeypatch.delenv("RLINF_FAKE_KEYS", raising=False)
+    device = Keyboard(0.03, 0.05, step_size_pos_alt=0.006, step_size_rot_alt=0.03)
+    device.connect()
+    context = {
+        "policy_action": np.r_[np.zeros(6), 1.0],
+        "keyboard_action_transform": lambda action: action,
+    }
+    try:
+        yield device, sdk.devices[-1], context
+    finally:
+        device.disconnect()
+    assert sdk.devices[-1].closed
+
+
+@pytest.mark.parametrize(
+    "keys, expected, gripper, active",
+    [
+        (["s"], [0.03, 0, 0, 0, 0, 0], 1, True),
+        (["w"], [-0.03, 0, 0, 0, 0, 0], 1, True),
+        (["d"], [0, 0.03, 0, 0, 0, 0], 1, True),
+        (["a"], [0, -0.03, 0, 0, 0, 0], 1, True),
+        (["q"], [0, 0, 0.03, 0, 0, 0], 1, True),
+        (["e"], [0, 0, -0.03, 0, 0, 0], 1, True),
+        (["r"], [0, 0, 0, 0.05, 0, 0], 1, True),
+        (["t"], [0, 0, 0, -0.05, 0, 0], 1, True),
+        (["g"], [0, 0, 0, 0, 0.05, 0], 1, True),
+        (["f"], [0, 0, 0, 0, -0.05, 0], 1, True),
+        (["b"], [0, 0, 0, 0, 0, 0.05], 1, True),
+        (["v"], [0, 0, 0, 0, 0, -0.05], 1, True),
+        (["l"], [0] * 6, 0, True),
+        (["o"], [0] * 6, 1, True),
+        (["s", "leftbrace"], [0] * 6, 1, True),
+        (["s", "w", "l", "o"], [-0.03, 0, 0, 0, 0, 0], 0, True),
+        (["z"], [0] * 6, 1, False),
+    ],
+)
+def test_keyboard_teleop_matches_vla_precision_keys(
+    keyboard_teleop, keys, expected, gripper, active
+):
+    device, reader, context = keyboard_teleop
+    assert reader.emit(*[(key, 1) for key in keys]).wait(2)
+    sample = device.drive(context)
+    assert sample.driving == active
+    if active:
+        np.testing.assert_allclose(sample.parts["arm"], expected, atol=1e-7)
+        np.testing.assert_array_equal(sample.parts["end_effector"], [gripper])
+    else:
+        assert not sample.parts
+
+
+def test_keyboard_teleop_can_take_over_and_release_within_a_chunk(keyboard_teleop):
+    device, reader, context = keyboard_teleop
+    assert not device.drive(context).driving
+    assert reader.emit(("s", 1)).wait(2)
+    sample = device.drive(context)
+    assert sample.driving
+    np.testing.assert_allclose(sample.parts["arm"], [0.03, 0, 0, 0, 0, 0])
+    assert reader.emit(("s", 0)).wait(2)
+    released = device.drive(context)
+    assert not released.driving
+    assert not released.parts
+    assert reader.emit(("d", 1)).wait(2)
+    sample = device.drive(context)
+    assert sample.driving
+    np.testing.assert_allclose(sample.parts["arm"], [0, 0.03, 0, 0, 0, 0])
+    assert reader.emit(("d", 0)).wait(2)
+    assert not device.drive(context).driving
+
+
+def test_keyboard_intervention_preserves_unmodified_actions_in_a_chunk(keyboard_teleop):
+    import gymnasium as gym
+
+    from rlinf.envs.real.wrappers.teleop import TeleopIntervention
+    from rlinf.envs.real.wrappers.teleop.composed import ComposedTeleop
+    from rlinf.robotics.parts.teleop import TeleopEntry, TeleopGroup
+
+    device, reader, _ = keyboard_teleop
+
+    class RecordingEnv(gym.Env):
+        def get_keyboard_action_transform(self):
+            return lambda action: action
+
+        def step(self, action):
+            return {}, 0.0, False, False, {"executed_action": action.copy()}
+
+    teleop = ComposedTeleop(
+        TeleopGroup([TeleopEntry(device)]),
+        {"arm": slice(0, 6), "end_effector": slice(6, 7)},
+    )
+    env = TeleopIntervention(RecordingEnv(), teleop, mark_flag=True)
+    chunk = np.arange(70, dtype=np.float64).reshape(10, 7) / 1000
+    chunk[:, -1] = 1.0
+    original = chunk.copy()
+    events = {1: ("s", 1), 6: ("s", 0), 8: ("d", 1), 9: ("d", 0)}
+    env.on_action_chunk_begin()
+    for index, action in enumerate(chunk):
+        if index in events:
+            assert reader.emit(events[index]).wait(2)
+        _, _, _, _, info = env.step(action)
+        expected = action.copy()
+        if 1 <= index <= 5:
+            expected = np.array([0.03, 0, 0, 0, 0, 0, 1])
+        elif index == 8:
+            expected = np.array([0, 0.03, 0, 0, 0, 0, 1])
+        overridden = 1 <= index <= 5 or index == 8
+        np.testing.assert_allclose(info["executed_action"], expected)
+        assert ("intervene_action" in info) == overridden
+        if overridden:
+            np.testing.assert_allclose(info["intervene_action"], expected)
+            np.testing.assert_array_equal(info["intervene_flag"], [1])
+    np.testing.assert_array_equal(chunk, original)
+
+
+@pytest.mark.parametrize("policy_gripper", [0.49, 0.5, 0.6])
+def test_keyboard_motion_takeover_preserves_policy_gripper(
+    keyboard_teleop, policy_gripper
+):
+    device, reader, context = keyboard_teleop
+    context["policy_action"][-1] = policy_gripper
+    assert not device.drive(context).driving
+    device.on_action_chunk_begin()
+    assert reader.emit(("s", 1)).wait(2)
+    sample = device.drive(context)
+    assert sample.driving
+    np.testing.assert_array_equal(
+        sample.parts["end_effector"], [float(policy_gripper > 0.5)]
+    )
+
+
+def test_keyboard_teleop_step_toggle_ignores_repeats_and_resets(keyboard_teleop):
+    device, reader, context = keyboard_teleop
+    assert reader.emit(("s", 1), ("slash", 1)).wait(2)
+    np.testing.assert_allclose(
+        device.drive(context).parts["arm"], [0.006, 0, 0, 0, 0, 0]
+    )
+    assert reader.emit(("slash", 2)).wait(2)
+    np.testing.assert_allclose(
+        device.drive(context).parts["arm"], [0.006, 0, 0, 0, 0, 0]
+    )
+    device.on_reset(context)
+    np.testing.assert_allclose(
+        device.drive(context).parts["arm"], [0.03, 0, 0, 0, 0, 0]
+    )
+
+
+@pytest.mark.parametrize("continuous", [False, True])
+def test_ur5e_stopped_arm_rejects_actions(continuous):
+    from robot_mocks import mocked_sdks
+
+    from rlinf.robotics.parts.arms.ur5e import UR5eArm
+
+    with mocked_sdks():
+        arm = UR5eArm("192.0.2.57", impedance={"continuous_tracking": continuous})
+        arm.connect()
+        try:
+            pose = arm.get_state().tcp_pose
+            arm.stop_motion()
+            control, _ = arm._device
+            assert "forceModeStop" in control.state["events"]
+            with pytest.raises(RuntimeError, match="stopped"):
+                arm.send_action({"tcp_pose": pose})
+            arm.reset_tcp(pose, payload_settle_seconds=0, ft_zero_settle_seconds=0)
+            arm.send_action({"tcp_pose": pose})
+        finally:
+            arm.disconnect()
+
+
+@pytest.mark.parametrize("continuous", [False, True])
+def test_ur5e_failed_force_stop_prevents_homing_and_sensor_zero(
+    monkeypatch, continuous
+):
+    from robot_mocks import mocked_sdks
+
+    from rlinf.robotics.parts.arms.ur5e import UR5eArm
+
+    with mocked_sdks() as sdks:
+        arm = UR5eArm("192.0.2.99", impedance={"continuous_tracking": continuous})
+        arm.connect()
+        state = sdks["rtde_control"].states["192.0.2.99"]
+        try:
+            pose = arm.get_state().tcp_pose
+            state["events"].clear()
+            with monkeypatch.context() as patch:
+                patch.setattr(
+                    sdks["rtde_control"].RTDEControlInterface,
+                    "forceModeStop",
+                    lambda self: False,
+                )
+                with pytest.raises(RuntimeError, match="UR5e"):
+                    arm.reset_tcp(pose, 0.0, 0.0)
+            assert "moveL" not in state["events"]
+            assert "setPayload" not in state["events"]
+            assert "zeroFtSensor" not in state["events"]
+        finally:
+            arm.disconnect()
+
+
+@pytest.mark.parametrize("continuous", [False, True])
+def test_ur5e_start_paused_requires_explicit_start_after_connection_and_reset(
+    continuous,
+):
+    from robot_mocks import mocked_sdks
+
+    from rlinf.robotics.parts.arms.ur5e import UR5eArm
+
+    with mocked_sdks() as sdks:
+        arm = UR5eArm(
+            "192.0.2.96",
+            impedance={"continuous_tracking": continuous, "start_paused": True},
+        )
+        arm.connect()
+        state = sdks["rtde_control"].states["192.0.2.96"]
+        try:
+            pose = arm.get_state().tcp_pose
+            time.sleep(0.025)
+            assert not state["forces"]
+            with pytest.raises(RuntimeError, match="stopped"):
+                arm.send_action({"tcp_pose": pose})
+            for _ in range(2):
+                before = len(state["forces"])
+                arm.reset_tcp(pose, payload_settle_seconds=0, ft_zero_settle_seconds=0)
+                time.sleep(0.025)
+                assert len(state["forces"]) == before
+                arm.start_motion()
+                arm.start_motion()
+                arm.send_action({"tcp_pose": pose})
+                assert len(state["forces"]) > before
+                arm.stop_motion()
+                after = len(state["forces"])
+                time.sleep(0.025)
+                assert len(state["forces"]) == after
+        finally:
+            arm.disconnect()
+
+
+@pytest.mark.parametrize("frequency", [50.0, 100.0, 200.0])
+@pytest.mark.parametrize("continuous", [False, True])
+def test_ur5e_rotational_gains_preserve_wrench_across_controller_rates(
+    frequency, continuous
+):
+    from robot_mocks import mocked_sdks
+    from scipy.spatial.transform import Rotation as R
+
+    from rlinf.robotics.parts.arms.ur5e import UR5eArm
+
+    with mocked_sdks() as sdks:
+        arm = UR5eArm(
+            "192.0.2.41",
+            impedance={
+                "frequency": frequency,
+                "continuous_tracking": continuous,
+                "start_paused": True,
+            },
+        )
+        arm.connect()
+        state = sdks["rtde_control"].states["192.0.2.41"]
+        state["speed"] = [0.1, -0.2, 0.3, 0.1, 0.2, 0.3]
+        target = np.r_[[0.41, -0.02, 0.33], R.from_rotvec([0.1, -0.2, 0.3]).as_quat()]
+        try:
+            arm.start_motion()
+            arm.send_action({"tcp_pose": target})
+            # Legacy 2000/400 at 100 Hz produces this same wrench.
+            np.testing.assert_allclose(
+                state["forces"][-1][2], [-48, 96, -144, 1.6, -4.8, 4.8], atol=1e-10
             )
         finally:
             arm.disconnect()

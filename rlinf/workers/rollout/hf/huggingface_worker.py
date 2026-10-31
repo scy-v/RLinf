@@ -16,6 +16,7 @@ import asyncio
 import copy
 import gc
 import time
+from contextlib import nullcontext
 from typing import Any, Callable, Literal, Optional
 
 import numpy as np
@@ -28,8 +29,9 @@ from rlinf.algorithms.rlt import (
     build_rlt_route,
     predict_rlt_actions,
 )
+from rlinf.algorithms.rlt.rollout import RLTDataLogger
 from rlinf.algorithms.rlt.transition import extract_rlt_obs_from_forward_inputs
-from rlinf.config import SupportedModel
+from rlinf.config import SupportedModel, get_rollout_chunk_count
 from rlinf.data.schema.embodied_types import (
     EnvPart,
     PolicyInput,
@@ -43,6 +45,23 @@ from rlinf.models.embodiment.base_policy import BasePolicy
 from rlinf.scheduler import Channel, Cluster, Worker, split_channel_message
 from rlinf.utils.obs_compression import decompress_obs, infer_obs_batch_size
 from rlinf.utils.placement import HybridComponentPlacement
+from rlinf.utils.progress import (
+    ElapsedTime,
+    StageTiming,
+    WorkerStepTiming,
+    current_worker_timing,
+    get_timing_mode,
+    timing_active,
+    timing_detailed,
+    timing_section,
+)
+from rlinf.utils.startup_timing import (
+    StartupTiming,
+    record_worker_startup,
+    startup_scope,
+    startup_section,
+    synchronize_startup_device,
+)
 
 
 class MultiStepRolloutWorker(Worker):
@@ -50,6 +69,14 @@ class MultiStepRolloutWorker(Worker):
         Worker.__init__(self)
 
         self.cfg = cfg
+        self.episode_replay = bool(
+            cfg.env.get("train", {}).get("flush_replay_on_episode_end", False)
+        )
+        self._inference_timing = StageTiming(
+            "Rollout inference",
+            timing_detailed(cfg),
+            self.log_info,
+        )
         self.should_stop = False
 
         self.only_eval = cfg.runner.get("only_eval", False)
@@ -110,16 +137,14 @@ class MultiStepRolloutWorker(Worker):
         self.enable_cuda_graph = cfg.rollout.get("enable_cuda_graph", False)
 
         self.n_train_chunk_steps = (
-            cfg.env.train.max_steps_per_rollout_epoch
-            // self.model_cfg.num_action_chunks
+            get_rollout_chunk_count(cfg.env.train, self.model_cfg.num_action_chunks)
             if self.enable_train
             else 0
         )
         self.n_eval_chunk_steps = 0
         if self.enable_eval:
-            self.n_eval_chunk_steps = (
-                cfg.env.eval.max_steps_per_rollout_epoch
-                // self.model_cfg.num_action_chunks
+            self.n_eval_chunk_steps = get_rollout_chunk_count(
+                cfg.env.eval, self.model_cfg.num_action_chunks
             )
         self.collect_prev_infos = self.cfg.rollout.get("collect_prev_infos", True)
         self.collect_final_values = self.cfg.rollout.get("collect_final_values", True)
@@ -158,7 +183,27 @@ class MultiStepRolloutWorker(Worker):
         # (path, precision, and nested inference knobs). Eval-only is a no-op merge.
         rollout_model_config = OmegaConf.merge(self.model_cfg, self.cfg.rollout.model)
 
-        self.hf_model: BasePolicy = get_model(rollout_model_config)
+        with (
+            ElapsedTime(
+                "LOAD",
+                "Loading rollout policy",
+                log=self.log_info,
+                enabled=timing_active(self.cfg),
+            ),
+            startup_scope(
+                "load",
+                self.log_info,
+                record=lambda event, **fields: record_worker_startup(
+                    self, event, **fields
+                ),
+                synchronize=synchronize_startup_device,
+                enabled=timing_detailed(self.cfg),
+                component="rollout_policy",
+                rank=self._rank,
+            ),
+        ):
+            with startup_section("rollout.policy"):
+                self.hf_model: BasePolicy = get_model(rollout_model_config)
 
         if self.cfg.runner.get("ckpt_path", None):
             model_dict = torch.load(self.cfg.runner.ckpt_path)
@@ -168,10 +213,42 @@ class MultiStepRolloutWorker(Worker):
             self.cfg, "rollout.rlt_feature_model", default=None
         )
         if rlt_feature_model_config is not None:
-            self.rlt_feature_model = get_model(copy.deepcopy(rlt_feature_model_config))
+            with (
+                ElapsedTime(
+                    "LOAD",
+                    f"Loading frozen RLT feature model/checkpoint: {rlt_feature_model_config.model_path}",
+                    log=self.log_info,
+                    enabled=timing_active(self.cfg),
+                ),
+                startup_scope(
+                    "load",
+                    self.log_info,
+                    record=lambda event, **fields: record_worker_startup(
+                        self, event, **fields
+                    ),
+                    synchronize=synchronize_startup_device,
+                    enabled=timing_detailed(self.cfg),
+                    component="rlt_feature",
+                    rank=self._rank,
+                ),
+            ):
+                with startup_section("rollout.feature"):
+                    self.rlt_feature_model = get_model(
+                        copy.deepcopy(rlt_feature_model_config)
+                    )
             self.rlt_feature_model.eval()
             self.rlt_feature_model.requires_grad_(False)
+            feature_compile_mode = self.cfg.rollout.get("rlt_feature_compile_mode")
+            if feature_compile_mode is not None:
+                self.rlt_feature_model.enable_rlt_torch_compile(
+                    mode=feature_compile_mode
+                )
             self.rlt_route = build_rlt_route(self.cfg)
+            self._rlt_data_logger = RLTDataLogger(
+                self.cfg.runner.logger.log_path,
+                self._rank,
+                enabled=bool(self.cfg.runner.get("log_data", False)),
+            )
 
         if self.cfg.rollout.get("expert_model", None) and not self.enable_opd:
             expert_model_config = build_expert_model_config(
@@ -203,8 +280,86 @@ class MultiStepRolloutWorker(Worker):
             )
 
         self.setup_sample_params()
+        self.warmup_rlt_inference()
         if self.enable_offload:
             self.offload_model()
+
+    def warmup_rlt_inference(self) -> None:
+        """Warm RLT with synthetic observations; discard all actions and replay data."""
+        options = self.cfg.rollout.get("rlt_inference_warmup", {})
+        if not options.get("enabled", False):
+            return
+        if self.rlt_feature_model is None:
+            raise ValueError("RLT inference warmup requires rollout.rlt_feature_model.")
+        if not self.cfg.runner.get("env_init_after_models", False):
+            raise ValueError(
+                "RLT inference warmup requires runner.env_init_after_models=true "
+                "to finish before the environment's first reset."
+            )
+        iterations = int(options.get("iterations", 3))
+        image_size = int(options["image_size"])
+        state_dim = int(options["state_dim"])
+        if min(iterations, image_size, state_dim) <= 0:
+            raise ValueError(
+                "RLT inference warmup requires positive iterations, image_size "
+                f"and state_dim; got {iterations}, {image_size}, {state_dim}."
+            )
+        modes = []
+        if self.enable_train:
+            modes.append(("train", self.per_node_train_batch_size))
+        if self.enable_eval:
+            modes.append(("eval", self.per_node_eval_batch_size))
+        # Preserve the random sequence used by the first real rollout.
+        devices = [] if self.torch_device_type == "cpu" else [self.device]
+        with (
+            torch.random.fork_rng(devices=devices, device_type=self.torch_device_type),
+            ElapsedTime(
+                "INFER",
+                "RLT startup inference warmup (synthetic observations, no execution)",
+                log=self.log_info,
+                enabled=timing_active(self.cfg),
+            ),
+        ):
+            for mode, batch_size in modes:
+                env_cfg = self.cfg.env[mode]
+                task = env_cfg.get("override_cfg", {}).get("task_description", "")
+                env_obs = {
+                    "main_images": torch.zeros(
+                        batch_size, image_size, image_size, 3, dtype=torch.uint8
+                    ),
+                    "wrist_images": torch.zeros(
+                        batch_size, image_size, image_size, 3, dtype=torch.uint8
+                    ),
+                    "states": torch.zeros(batch_size, state_dim),
+                    "task_descriptions": [task] * batch_size,
+                }
+                for iteration in range(iterations):
+                    with StartupTiming(
+                        "warmup",
+                        self.log_info,
+                        record=lambda event, **fields: record_worker_startup(
+                            self, event, **fields
+                        ),
+                        synchronize=synchronize_startup_device,
+                        enabled=timing_detailed(self.cfg),
+                        component="rlt_rollout",
+                        rank=self._rank,
+                        iteration=iteration + 1,
+                        mode=mode,
+                    ):
+                        predict_rlt_actions(
+                            policy_model=self.hf_model,
+                            feature_model=self.rlt_feature_model,
+                            rlt_route=self.rlt_route,
+                            env_obs=env_obs,
+                            final_obs=None,
+                            mode=mode,
+                            version=self.version,
+                            expert_model=self.expert_model,
+                        )
+                    if self.torch_device_type != "cpu":
+                        self.torch_platform.synchronize()
+        self._rlt_first_prediction_complete = True
 
     def setup_sample_params(self):
         # sampling parameters for rollout
@@ -581,18 +736,61 @@ class MultiStepRolloutWorker(Worker):
         intervene_requested: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         if self.rlt_feature_model is not None:
-            return predict_rlt_actions(
-                policy_model=self.hf_model,
-                feature_model=self.rlt_feature_model,
-                rlt_route=self.rlt_route,
-                env_obs=env_obs,
-                final_obs=final_obs,
-                mode=mode,
-                version=self.version,
-                rlt_switch_flags=rlt_switch_flags,
-                intervene_requested=intervene_requested,
-                expert_model=self.expert_model,
+            first_prediction = not getattr(
+                self, "_rlt_first_prediction_complete", False
             )
+            with (
+                (
+                    self._inference_timing.measure(
+                        policy_version=int(self.version), rank=self._rank
+                    )
+                    if hasattr(self, "_inference_timing")
+                    else nullcontext()
+                ),
+                (
+                    ElapsedTime(
+                        "INFER",
+                        "First RLT inference / lazy initialization",
+                        log=self.log_info,
+                        enabled=timing_active(self.cfg),
+                    )
+                    if first_prediction
+                    else nullcontext()
+                ),
+                startup_scope(
+                    "warmup",
+                    self.log_info,
+                    record=lambda event, **fields: record_worker_startup(
+                        self, event, **fields
+                    ),
+                    synchronize=synchronize_startup_device,
+                    enabled=first_prediction and timing_detailed(self.cfg),
+                    component="rlt_first_prediction",
+                    rank=self._rank,
+                )
+                if first_prediction
+                else nullcontext(),
+            ):
+                prediction = predict_rlt_actions(
+                    policy_model=self.hf_model,
+                    feature_model=self.rlt_feature_model,
+                    rlt_route=self.rlt_route,
+                    env_obs=env_obs,
+                    final_obs=final_obs,
+                    mode=mode,
+                    version=self.version,
+                    rlt_switch_flags=rlt_switch_flags,
+                    intervene_requested=intervene_requested,
+                    expert_model=self.expert_model,
+                    data_recorder=(
+                        self._rlt_data_logger.record_actions
+                        if getattr(self, "_rlt_data_logger", None) is not None
+                        and self._rlt_data_logger.enabled
+                        else None
+                    ),
+                )
+            self._rlt_first_prediction_complete = True
+            return prediction
         return self.predict(env_obs, mode=mode)
 
     def _build_policy_output(
@@ -667,8 +865,9 @@ class MultiStepRolloutWorker(Worker):
         if hasattr(self.hf_model, "set_global_step"):
             self.hf_model.set_global_step(applied_version)
 
-        gc.collect()
-        self.torch_platform.empty_cache()
+        if self.cfg.rollout.get("cleanup_after_weight_sync", True):
+            gc.collect()
+            self.torch_platform.empty_cache()
 
     @classmethod
     def _infer_policy_input_batch_size(cls, policy_input: PolicyInput) -> int:
@@ -697,6 +896,14 @@ class MultiStepRolloutWorker(Worker):
         tag: str,
         stage_id: int,
     ) -> tuple[PolicyInput, list[int] | None]:
+        merge = self._merge_policy_inputs
+        measurement = current_worker_timing()
+        if measurement is not None:
+
+            def merge(items):
+                with measurement.section("input", major=True):
+                    return self._merge_policy_inputs(items)
+
         if self.env_decoupled_mode:
             (
                 policy_input,
@@ -706,7 +913,7 @@ class MultiStepRolloutWorker(Worker):
                 channel=channel,
                 tag=tag,
                 batch_size=self.train_batch_size,
-                merge_fn=self._merge_policy_inputs,
+                merge_fn=merge,
                 infer_batch_size_fn=self._infer_policy_input_batch_size,
                 timeout_time=0.02,
                 recv_queue_size=self.rollout_queue_size,
@@ -719,7 +926,7 @@ class MultiStepRolloutWorker(Worker):
             route_key=stage_id,
             async_op=True,
             batch_size=self.train_batch_size,
-            merge_fn=self._merge_policy_inputs,
+            merge_fn=merge,
             infer_batch_size_fn=self._infer_policy_input_batch_size,
         ).async_wait()
         return policy_input, None
@@ -847,53 +1054,87 @@ class MultiStepRolloutWorker(Worker):
         actor_channel: Channel,
     ) -> None:
         self.update_dagger_beta()
-        for _ in range(self.n_train_chunk_steps):
+        episode_replay = getattr(self, "episode_replay", False)
+        for _ in range(self.n_train_chunk_steps + int(episode_replay)):
             for stage_id in range(self.num_pipeline_stages):
-                policy_input, split_sizes = await self._receive_policy_input(
-                    input_channel, "policy", stage_id
-                )
-                if policy_input.is_last:
-                    raise ValueError("Received a final input in the policy stream.")
-                if not policy_input.requires_inference:
-                    actions = policy_input.external_actions
-                    forward_inputs = None
-                    policy_output = None
-                else:
-                    actions, result = self._predict_rollout_actions(
-                        policy_input.obs,
-                        rlt_switch_flags=policy_input.rlt_switch_flags,
-                        intervene_requested=policy_input.intervene_flags,
+                with WorkerStepTiming(
+                    get_timing_mode(getattr(self, "cfg", {})),
+                    "Rollout step",
+                    self.log_info,
+                    rank=getattr(self, "_rank", 0),
+                    stage_id=stage_id,
+                    phase="normal",
+                ) as measurement:
+                    policy_input, split_sizes = await self._receive_policy_input(
+                        input_channel, "policy", stage_id
                     )
-                    forward_inputs = result.get("forward_inputs")
-                    policy_output = self._build_policy_output(actions, result)
-                self._send_actions(
-                    output_channel,
-                    actions.contiguous(),
-                    stage_id,
-                    split_sizes,
-                )
-                # Omit raw observations when the collector does not consume them.
-                transition_obs = (
-                    policy_input.obs if self.collect_raw_transition_obs else {}
-                )
-                if not policy_input.requires_inference:
-                    trajectory_part = PolicyPart(
-                        sources=policy_input.sources,
-                        obs=transition_obs,
-                        external_actions=actions,
-                    )
-                else:
-                    trajectory_part = PolicyPart(
-                        sources=policy_input.sources,
-                        obs=transition_obs,
-                        output=policy_output,
-                    )
-                # Publish model-owned data immediately; its environment half
-                # arrives later through an EnvPart with the same key.
-                actor_channel.put(trajectory_part, async_op=True)
-                # Attached parts close previously executed chunks.
-                self._publish_env_parts(policy_input, forward_inputs, actor_channel)
+                    with timing_section("input", major=True):
+                        if measurement.enabled and policy_input.sources:
+                            key = policy_input.sources[0].key
+                            measurement.context.update(
+                                episode=key.step_id + 1, chunk=key.chunk_id + 1
+                            )
+                    if policy_input.is_last:
+                        if episode_replay:
+                            measurement.source = "Rollout terminal"
+                            measurement.emit = measurement.detailed
+                            measurement.context["phase"] = "terminal"
+                            with timing_section("data_submit", major=True):
+                                self._publish_env_parts(
+                                    policy_input, None, actor_channel
+                                )
+                            return
+                        raise ValueError("Received a final input in the policy stream.")
+                    with timing_section("inference", major=True):
+                        if not policy_input.requires_inference:
+                            actions = policy_input.external_actions
+                            forward_inputs = None
+                            policy_output = None
+                        else:
+                            actions, result = self._predict_rollout_actions(
+                                policy_input.obs,
+                                rlt_switch_flags=policy_input.rlt_switch_flags,
+                                intervene_requested=policy_input.intervene_flags,
+                            )
+                            forward_inputs = result.get("forward_inputs")
+                            with timing_section("decision"):
+                                policy_output = self._build_policy_output(
+                                    actions, result
+                                )
+                    with timing_section("action_send", major=True):
+                        self._send_actions(
+                            output_channel,
+                            actions.contiguous(),
+                            stage_id,
+                            split_sizes,
+                        )
+                    with timing_section("data_submit", major=True):
+                        # Omit raw observations when the collector does not consume them.
+                        transition_obs = (
+                            policy_input.obs if self.collect_raw_transition_obs else {}
+                        )
+                        if not policy_input.requires_inference:
+                            trajectory_part = PolicyPart(
+                                sources=policy_input.sources,
+                                obs=transition_obs,
+                                external_actions=actions,
+                            )
+                        else:
+                            trajectory_part = PolicyPart(
+                                sources=policy_input.sources,
+                                obs=transition_obs,
+                                output=policy_output,
+                            )
+                        # Publish model-owned data immediately; its environment half
+                        # arrives later through an EnvPart with the same key.
+                        actor_channel.put(trajectory_part, async_op=True)
+                        # Attached parts close previously executed chunks.
+                        self._publish_env_parts(
+                            policy_input, forward_inputs, actor_channel
+                        )
 
+        if episode_replay:
+            raise RuntimeError("Expected an episode end before another policy action.")
         if self.env_decoupled_mode:
             return
 

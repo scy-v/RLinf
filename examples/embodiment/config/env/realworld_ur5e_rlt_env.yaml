@@ -1,0 +1,96 @@
+# UR hardware observations and physical action conventions for RLT training.
+env_type: real
+
+total_num_envs: null
+
+auto_reset: true
+
+ignore_terminations: true
+
+reward_mode: raw
+
+wrap_obs_mode: simple
+
+seed: 0
+
+group_size: 1
+
+use_fixed_reset_state_ids: false
+
+max_chunks_per_rollout_epoch: 20
+
+max_episode_chunks: 200
+
+teleop: keyboard
+
+main_image_key: exterior_image
+
+video_cfg:
+  save_video: false
+  info_on_video: true
+  video_base_dir: ${runner.logger.log_path}/video/train
+
+init_params:
+  id: UR5eEnv-v1
+  num_envs: null
+
+wrist_image_key: wrist_image
+
+state_keys:
+  - tcp_pose
+  - tcp_vel
+  - tcp_force
+  - tcp_torque
+  - gripper_position
+
+use_relative_frame: false
+
+override_cfg:
+  is_dummy: false
+  reference_frame: tcp
+  action_idle_hold_enabled: true
+  action_idle_position_threshold: 0.0001
+  action_idle_rotation_threshold: 0.001
+  gripper_close_threshold: 0.5
+  payload_settle_seconds: 0.25
+  ft_zero_settle_seconds: 0.5
+  enable_camera_player: false
+  task_description: Insert the black rack into the blue slot
+  camera_names:
+    '348522072391': exterior_image
+    '944622073455': wrist_image
+  reset_ee_pose:
+    - 0.389694
+    - 0.107973
+    - 0.382018
+    - -3.14
+    - 0.0
+    - -1.57
+  ee_pose_limit_min:
+    - 0.0
+    - -0.45
+    - 0.0
+    - -3.663598775598
+    - -0.523598775598
+    - -3.140796326795
+  ee_pose_limit_max:
+    - 0.9
+    - 0.45
+    - 0.6
+    - -2.616401224402
+    - 0.523598775598
+    - 0.000796326795
+  step_frequency: 20.0
+  enable_random_reset: false
+  reset_pose_range:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+  action_scale:
+    - 1.0
+    - 1.0
+    - 1.0
+  compliance_param: {}

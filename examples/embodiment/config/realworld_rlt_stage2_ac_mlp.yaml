@@ -50,7 +50,7 @@ runner:
 
   only_eval: False
   val_check_interval: -1
-  save_interval: -1
+  save_interval: 1000
 
   # Resume a saved Stage2 training run from a full RLinf checkpoint directory.
   # Do not point this to the Stage1 OpenPI checkpoint.
@@ -61,6 +61,20 @@ runner:
 
 algorithm:
   update_epoch: 8
+  rlt_transition_replay: True
+  rlt_schedule:
+    enable: True
+    warmup_min_size: 150
+    warmup_post_collect_updates: 150
+    continuous_updates: True
+  actor_weight_schedule:
+    enable: True
+    warmup_updates: 150
+    ramp_updates: 0
+    warmup_bc_weight: 5.0
+    warmup_q_weight: 0.02
+    online_bc_weight: 5.0
+    online_q_weight: 0.1
   group_size: 1
   agg_q: min
   actor_agg_q: q1
@@ -93,9 +107,9 @@ algorithm:
 
   replay_buffer:
     enable_cache: True
-    cache_size: 200
+    cache_size: 2000
     min_buffer_size: 2
-    sample_window_size: 200
+    sample_window_size: 2000
     auto_save: False
 
   target_update_freq: 1

@@ -104,6 +104,8 @@ jobs:
               - 'rlinf/runners/*reward*.py'
               - 'examples/embodiment/*'
               - 'examples/embodiment/config/*/**'
+              - 'examples/embodiment/config/ur_rlt_stage2_ac_mlp.yaml'
+              - 'examples/embodiment/config/realworld_rlt_stage2_ac_mlp.yaml'
               - 'examples/diffusion/**'
               - 'examples/reward/**'
               - 'tests/e2e_tests/embodied/**'

@@ -1,0 +1,63 @@
+{
+  "scope": "Within an executing episode: adjacent chunks with recorded actions on both sides. Excludes first-chunk startup and terminal inference, replay commit, reset, and user waiting. Gap is previous chunk last action completion to next chunk first action start. Residual combines Env, Rollout, transport and scheduling; not a Rollout-only measurement.",
+  "groups": {
+    "before_learner": {
+      "inference_ms": {
+        "n": 333,
+        "mean_ms": 74.46618650357487,
+        "p95_ms": 83.07787892408668,
+        "max_ms": 92.95933693647385
+      },
+      "non_inference_gap_ms": {
+        "n": 333,
+        "mean_ms": 12.257121085936019,
+        "p95_ms": 16.461487440392375,
+        "max_ms": 18.981395987793803
+      },
+      "gap_ms": {
+        "n": 333,
+        "mean_ms": 86.7233075895109,
+        "p95_ms": 96.23847007751463,
+        "max_ms": 109.19356346130371
+      },
+      "start_to_start_ms": {
+        "n": 333,
+        "mean_ms": 159.5127195925326,
+        "p95_ms": 171.01812362670896,
+        "max_ms": 189.77022171020508
+      },
+      "previous_chunk_execution_ms": {
+        "mean_ms": 72.7894120030217
+      }
+    },
+    "with_learner": {
+      "inference_ms": {
+        "n": 973,
+        "mean_ms": 79.28845685770791,
+        "p95_ms": 89.05847715213895,
+        "max_ms": 98.82034501060843
+      },
+      "non_inference_gap_ms": {
+        "n": 973,
+        "mean_ms": 14.573065944270587,
+        "p95_ms": 20.55909000337124,
+        "max_ms": 30.04793100990355
+      },
+      "gap_ms": {
+        "n": 973,
+        "mean_ms": 93.8615228019785,
+        "p95_ms": 104.559326171875,
+        "max_ms": 122.72286415100098
+      },
+      "start_to_start_ms": {
+        "n": 973,
+        "mean_ms": 169.12007405358497,
+        "p95_ms": 182.7895164489746,
+        "max_ms": 204.23436164855957
+      },
+      "previous_chunk_execution_ms": {
+        "mean_ms": 75.25855125160648
+      }
+    }
+  }
+}

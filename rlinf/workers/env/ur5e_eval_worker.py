@@ -14,16 +14,137 @@
 
 """UR evaluation termination without changing generic sync or RTC workers."""
 
+import asyncio
+import time
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
 
-from rlinf.data.schema.embodied_types import EnvOutput
+from rlinf.data.schema.embodied_types import EnvOutput, RTCRequest
 from rlinf.scheduler import Channel
+from rlinf.utils.progress import ElapsedTime
+from rlinf.utils.startup_timing import (
+    StartupTiming,
+    startup_section,
+    synchronize_startup_device,
+)
+from rlinf.utils.ur_logging import append_record, prepare_run_logs
 from rlinf.workers.env.env_worker import EnvWorker
 from rlinf.workers.env.rtc_env_worker import RTCEnvWorker
 from rlinf.workers.rollout.hf.huggingface_worker import MultiStepRolloutWorker
+from rlinf.workers.rollout.hf.rtc_huggingface_worker import RTCMultiStepRolloutWorker
+
+
+def run_log_paths(worker: Any) -> tuple[Path, Path] | None:
+    """Resolve shared run files without creating output when saving is disabled."""
+    settings = (
+        getattr(worker, "cfg", {})
+        .get("env", {})
+        .get("eval", {})
+        .get("ur_evaluation", {})
+    )
+    if not settings.get("save_logs", True):
+        return None
+    log_path = (
+        getattr(worker, "cfg", {}).get("runner", {}).get("logger", {}).get("log_path")
+    )
+    if log_path is None:
+        return None
+    if not hasattr(worker, "_ur_run_log_paths"):
+        directory = Path(settings.get("log_dir") or Path(log_path) / "logs")
+        worker._ur_run_log_paths = prepare_run_logs(directory, Path(log_path).name)
+    return worker._ur_run_log_paths
+
+
+def record_prediction(
+    worker: Any, obs: dict, actions: Any, infer_index: int, **extra: Any
+) -> None:
+    """Save the model input state and predicted chunk under one inference ID."""
+    paths = run_log_paths(worker)
+    if paths is None:
+        return
+
+    def array(value: Any) -> np.ndarray:
+        if isinstance(value, torch.Tensor):
+            value = value.detach().cpu().numpy()
+        return np.asarray(value, dtype=np.float64)
+
+    chunk = array(actions).reshape(-1, 7)
+    state = array(obs["states"]).reshape(-1)
+    prompts = obs.get("task_descriptions", [""])
+    append_record(
+        paths[0],
+        {
+            **extra,
+            "infer_time": infer_index,
+            "infer_index": infer_index,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "prompt": prompts[0] if isinstance(prompts, list) else str(prompts),
+            "state": np.round(state, 6).tolist(),
+            "actions": np.round(chunk, 6).tolist(),
+            "actions_delta": np.round(
+                np.vstack((chunk[0, :6], np.diff(chunk[:, :6], axis=0))), 6
+            ).tolist(),
+        },
+    )
+
+
+def record_timing(worker: Any, component: str, event: str, **values: Any) -> None:
+    """Persist UR timings outside the action-control path."""
+    paths = run_log_paths(worker)
+    if paths is not None:
+        append_record(
+            paths[1],
+            {
+                "component": component,
+                "event": event,
+                "timestamp": time.time(),
+                **values,
+            },
+        )
+    now = time.monotonic()
+    previous = getattr(worker, "_ur_last_report", 0.0)
+    if event != "step" or now - previous >= 1.0:
+        worker.log_info(f"[TIMING] {component} {event}: {values}")
+        worker._ur_last_report = now
+
+
+class URRolloutTiming:
+    """Time UR model setup before any episode begins."""
+
+    def init_worker(self) -> None:
+        torch.set_num_threads(int(self.cfg.rollout.get("torch_num_threads", 4)))
+        with (
+            ElapsedTime(
+                "LOAD",
+                "Checkpoint / model / device setup",
+                self.log_info,
+            ) as timer,
+            StartupTiming(
+                "load",
+                self.log_info,
+                record=lambda event, **fields: record_timing(
+                    self, "rollout", event, **fields
+                ),
+                synchronize=synchronize_startup_device,
+                profile="rlinf_ur",
+            ),
+        ):
+            super().init_worker()
+            mode = self.cfg.rollout.get("sampler_compile_mode")
+            if mode is not None:
+                with startup_section("model.compile_setup"):
+                    self.hf_model.sample_actions = torch.compile(
+                        self.hf_model.sample_actions, mode=mode
+                    )
+        record_timing(self, "rollout", "load", duration_sec=timer.duration)
+
+    @torch.inference_mode()
+    def _predict_rollout_actions(self, env_obs: dict, **kwargs: Any) -> tuple:
+        return super()._predict_rollout_actions(env_obs, **kwargs)
 
 
 def evaluation_complete(env: Any) -> bool:
@@ -34,7 +155,11 @@ def evaluation_complete(env: Any) -> bool:
 class URSyncEnvWorker(EnvWorker):
     """Run the normal synchronous policy exchange until the UR episode budget ends."""
 
-    def evaluate(self, input_channel: Channel, rollout_channel: Channel) -> dict:
+    async def evaluate(self, input_channel: Channel, rollout_channel: Channel) -> dict:
+        # Keep close RPCs responsive while policy responses or operator input block.
+        return await asyncio.to_thread(self._evaluate, input_channel, rollout_channel)
+
+    def _evaluate(self, input_channel: Channel, rollout_channel: Channel) -> dict:
         if (
             self.stage_num != 1
             or self.cfg.env.eval.total_num_envs != 1
@@ -50,10 +175,36 @@ class URSyncEnvWorker(EnvWorker):
             self.eval_prev_done[0] = torch.zeros(
                 self.eval_num_envs_per_stage, dtype=torch.bool
             )
+            obs, infos = env.reset(options={"ur_eval_prepare": True})
+            self._send_ur_observation(
+                rollout_channel, EnvOutput(obs=obs, env_infos=infos), warmup=True
+            )
+            self.recv_from(
+                group_name=self.cfg.rollout.group_name,
+                channel=input_channel,
+                tag="eval_rollout_results",
+                route_key=0,
+                batch_size=self.eval_batch_size,
+            )
             obs, infos = env.reset()
             output = EnvOutput(obs=obs, env_infos=infos)
-            for _ in range(self.n_eval_chunk_steps):
-                self._send_ur_observation(rollout_channel, output)
+            previous_episode, episode_action_count = None, 0
+            for chunk_id in range(self.n_eval_chunk_steps):
+                started = time.perf_counter()
+                episode_index = (
+                    len(env.unwrapped.env.envs[0].get_wrapper_attr("results")) + 1
+                )
+                episode_action_count = (
+                    episode_action_count + 1 if previous_episode == episode_index else 1
+                )
+                previous_episode = episode_index
+                self._send_ur_observation(
+                    rollout_channel,
+                    output,
+                    infer_index=chunk_id + 1,
+                    episode_index=episode_index,
+                    episode_action_count=episode_action_count,
+                )
                 policy_output = self.recv_from(
                     group_name=self.cfg.rollout.group_name,
                     channel=input_channel,
@@ -68,7 +219,29 @@ class URSyncEnvWorker(EnvWorker):
                 )
                 if isinstance(actions, torch.Tensor):
                     actions = actions.detach().cpu().numpy()
+                received = time.perf_counter()
+                env.unwrapped.env.envs[0].get_wrapper_attr("begin_action_chunk")(
+                    actions.shape[1],
+                    infer_index=chunk_id + 1,
+                )
                 output, info = self.env_evaluate_step(actions, 0)
+                finished = time.perf_counter()
+                elapsed = finished - started
+                execution = finished - received
+                record_timing(
+                    self,
+                    "env",
+                    "step",
+                    chunk_id=chunk_id,
+                    infer_index=chunk_id + 1,
+                    loop_sec=elapsed,
+                    loop_hz=1.0 / elapsed,
+                    policy_wait_sec=received - started,
+                    action_and_obs_sec=execution,
+                    action_hz=actions.shape[1] / execution,
+                    action_steps=int(actions.shape[1]),
+                    episode_boundary=bool(info),
+                )
                 for key, value in info.items():
                     metrics[key].append(value)
                 if evaluation_complete(env):
@@ -76,17 +249,28 @@ class URSyncEnvWorker(EnvWorker):
             self._send_ur_observation(rollout_channel, output, stop=True)
             self.finish_rollout(mode="eval")
         finally:
-            env.close()
+            self.close()
         return {
             key: torch.cat(value, dim=0).contiguous().cpu()
             for key, value in metrics.items()
         }
 
     def _send_ur_observation(
-        self, channel: Channel, output: EnvOutput, stop: bool = False
+        self,
+        channel: Channel,
+        output: EnvOutput,
+        stop: bool = False,
+        warmup: bool = False,
+        infer_index: int = 0,
+        episode_index: int = 0,
+        episode_action_count: int = 0,
     ) -> None:
         data = self._build_rollout_input_data(output.to_dict())
         data["ur_eval_stop"] = torch.tensor([stop])
+        data["ur_eval_warmup"] = torch.tensor([warmup])
+        data["ur_infer_index"] = torch.tensor([infer_index])
+        data["ur_episode_index"] = torch.tensor([episode_index])
+        data["ur_episode_action_count"] = torch.tensor([episode_action_count])
         self.send_to(
             group_name=self.cfg.rollout.group_name,
             channel=channel,
@@ -98,18 +282,34 @@ class URSyncEnvWorker(EnvWorker):
         )
 
 
-class URSyncRolloutWorker(MultiStepRolloutWorker):
+class URSyncRolloutWorker(URRolloutTiming, MultiStepRolloutWorker):
     """Use the existing model predictor with an explicit UR stop message."""
 
     def _merge_obs_batches(self, obs_batches: list[dict[str, Any]]) -> dict[str, Any]:
         merged = super()._merge_obs_batches(obs_batches)
         if obs_batches:
+            for key in (
+                "ur_infer_index",
+                "ur_episode_index",
+                "ur_episode_action_count",
+            ):
+                merged[key] = torch.cat(
+                    [batch.get(key, torch.tensor([0])) for batch in obs_batches], dim=0
+                )
             merged["ur_eval_stop"] = torch.cat(
                 [batch["ur_eval_stop"] for batch in obs_batches], dim=0
+            )
+            merged["ur_eval_warmup"] = torch.cat(
+                [
+                    batch.get("ur_eval_warmup", torch.tensor([False]))
+                    for batch in obs_batches
+                ],
+                dim=0,
             )
         return merged
 
     async def evaluate(self, input_channel: Channel, output_channel: Channel) -> None:
+        infer_index = 0
         if self.enable_offload:
             self.reload_model()
         try:
@@ -126,13 +326,64 @@ class URSyncRolloutWorker(MultiStepRolloutWorker):
                 ).async_wait()
                 if bool(output["ur_eval_stop"].any()):
                     break
-                actions, _ = self._predict_rollout_actions(
-                    output["obs"],
-                    mode="eval",
-                    final_obs=output.get("final_obs"),
-                )
+                warmup = bool(output["ur_eval_warmup"].any())
+                started = time.perf_counter()
+                if warmup:
+                    with (
+                        ElapsedTime(
+                            "WARMUP",
+                            "First inference / compilation",
+                            self.log_info,
+                        ),
+                        StartupTiming(
+                            "warmup",
+                            self.log_info,
+                            record=lambda event, **fields: record_timing(
+                                self, "rollout", event, **fields
+                            ),
+                            synchronize=synchronize_startup_device,
+                            profile="rlinf_ur",
+                        ),
+                    ):
+                        actions, _ = self._predict_rollout_actions(
+                            output["obs"], mode="eval"
+                        )
+                        if isinstance(actions, torch.Tensor):
+                            actions = actions.detach().cpu().contiguous()
+                    record_timing(
+                        self,
+                        "rollout",
+                        "warmup",
+                        duration_sec=time.perf_counter() - started,
+                    )
+                else:
+                    actions, _ = self._predict_rollout_actions(
+                        output["obs"],
+                        mode="eval",
+                        final_obs=output.get("final_obs"),
+                    )
                 if isinstance(actions, torch.Tensor):
                     actions = actions.detach().cpu().contiguous()
+                if not warmup:
+                    elapsed = time.perf_counter() - started
+                    infer_index = int(output["ur_infer_index"][0]) or infer_index + 1
+                    record_prediction(
+                        self,
+                        output["obs"],
+                        actions,
+                        infer_index,
+                        episode_index=int(output["ur_episode_index"][0]),
+                        episode_action_count=int(output["ur_episode_action_count"][0]),
+                        action_horizon=int(actions.shape[1]),
+                    )
+                    record_timing(
+                        self,
+                        "rollout",
+                        "step",
+                        infer_index=infer_index,
+                        infer_sec=elapsed,
+                        infer_hz=1.0 / elapsed,
+                    )
                 self.send_to(
                     group_name=self.cfg.env.group_name,
                     channel=output_channel,
@@ -156,16 +407,93 @@ class URRTCEnvWorker(RTCEnvWorker):
             env.manual_episode_control_only = env.unwrapped.manual_episode_control_only
 
     def _evaluate_rtc_action(self, env_action: Any, stage_id: int) -> tuple:
+        started = time.perf_counter()
         output, info = super()._evaluate_rtc_action(env_action, stage_id)
         env = self.eval_env_list[stage_id]
+        now = time.perf_counter()
+        since = getattr(self, "_ur_rtc_since", started)
+        count = getattr(self, "_ur_rtc_count", 0) + 1
+        duration = getattr(self, "_ur_rtc_duration", 0.0) + now - started
+        if now - since >= 1.0 or evaluation_complete(env):
+            record_timing(
+                self,
+                "env",
+                "rtc_step",
+                action_steps=count,
+                action_sec=duration / count,
+                action_hz=count / (now - since),
+            )
+            since, count, duration = now, 0, 0.0
+        self._ur_rtc_since, self._ur_rtc_count, self._ur_rtc_duration = (
+            since,
+            count,
+            duration,
+        )
         if evaluation_complete(env):
             # The inherited RTC loop drains pending requests and sends its normal stop.
             env.manual_episode_control_only = False
         return output, info
 
-    def evaluate(self, input_channel: Channel, rollout_channel: Channel) -> dict:
+    async def evaluate(self, input_channel: Channel, rollout_channel: Channel) -> dict:
+        # Keep close RPCs responsive while policy responses or operator input block.
+        return await asyncio.to_thread(self._evaluate, input_channel, rollout_channel)
+
+    def _evaluate(self, input_channel: Channel, rollout_channel: Channel) -> dict:
         try:
+            obs, _ = self.eval_env_list[0].reset(options={"ur_eval_prepare": True})
+            self.send_rtc_request(
+                rollout_channel,
+                RTCRequest(obs=obs, request_type="warmup"),
+                mode="eval",
+            )
+            self.recv_rtc_response(input_channel, mode="eval", async_op=False)
             return super().evaluate(input_channel, rollout_channel)
         finally:
-            for env in self.eval_env_list:
-                env.close()
+            self.close()
+
+
+class URRTCRolloutWorker(URRolloutTiming, RTCMultiStepRolloutWorker):
+    """Keep RTC guidance while warming up before operator-controlled episodes."""
+
+    @torch.inference_mode()
+    def _predict_rtc(self, request: RTCRequest) -> Any:
+        started = time.perf_counter()
+        if request.request_type == "warmup":
+            with (
+                ElapsedTime(
+                    "WARMUP",
+                    "First inference / compilation",
+                    self.log_info,
+                ),
+                StartupTiming(
+                    "warmup",
+                    self.log_info,
+                    record=lambda event, **fields: record_timing(
+                        self, "rollout", event, **fields
+                    ),
+                    synchronize=synchronize_startup_device,
+                    profile="rlinf_ur_rtc",
+                ),
+            ):
+                response = super()._predict_rtc(request)
+            record_timing(
+                self, "rollout", "warmup", duration_sec=time.perf_counter() - started
+            )
+            return response
+        response = super()._predict_rtc(request)
+        elapsed = time.perf_counter() - started
+        infer_index = getattr(self, "_ur_infer_index", 0) + 1
+        self._ur_infer_index = infer_index
+        record_prediction(
+            self, request.obs, response.actions, infer_index, chunk_id=request.chunk_id
+        )
+        record_timing(
+            self,
+            "rollout",
+            "step",
+            infer_index=infer_index,
+            chunk_id=request.chunk_id,
+            infer_sec=elapsed,
+            infer_hz=1.0 / elapsed,
+        )
+        return response

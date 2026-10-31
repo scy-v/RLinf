@@ -21,7 +21,7 @@ import rlinf.algorithms  # noqa: F401
 from rlinf.algorithms.expert import build_expert_model_config
 from rlinf.algorithms.registry import calculate_adv_and_returns, policy_loss
 from rlinf.algorithms.utils import compute_entropy_loss
-from rlinf.config import SupportedModel
+from rlinf.config import SupportedModel, get_episode_step_limit
 from rlinf.data.schema.embodied_types import Trajectory
 from rlinf.data.storage.lerobot import resolve_lerobot_repo_id
 from rlinf.hybrid_engines.fsdp.fsdp_model_manager import FSDPModelManager
@@ -766,7 +766,7 @@ class EmbodiedFSDPActor(FSDPModelManager, Worker):
             "huber_delta": self.cfg.algorithm.get("huber_delta", None),
             "loss_mask": loss_mask,
             "loss_mask_sum": loss_mask_sum,
-            "max_episode_steps": self.cfg.env.train.max_episode_steps,
+            "max_episode_steps": get_episode_step_limit(self.cfg.env.train),
             "task_type": self.cfg.runner.task_type,
             "critic_warmup": self.optimizer_steps < self.critic_warmup_steps,
             "logprob_mask": output_dict.get("logprob_mask", None),

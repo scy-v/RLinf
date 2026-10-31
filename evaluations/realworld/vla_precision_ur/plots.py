@@ -49,6 +49,19 @@ def load_episode_summary(log_path: Path) -> dict[str, Any]:
     raise ValueError(f"No episode_summary found in {log_path}")
 
 
+def _default_log_path() -> Path:
+    """Locate the latest log using the standalone inference configuration."""
+    config_path = Path(__file__).resolve().parents[1] / "vla_precision_ur.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    return (
+        Path(config.get("output_root", "./results")).expanduser()
+        / config["experiment"]["name"]
+        / "openpi-native"
+        / "logs"
+        / "latest.yaml"
+    )
+
+
 def save_episode_plot(
     summary: dict[str, Any],
     log_path: Path | None = None,
@@ -70,13 +83,8 @@ def save_episode_plot(
     from matplotlib.ticker import MaxNLocator
 
     if output_path is None:
-        base_dir = Path(__file__).resolve().parent / "logs" / "ep_img"
-        if log_path is None:
-            stem = "episode_time"
-        else:
-            resolved_log = log_path.resolve() if log_path.exists() else log_path
-            stem = f"{resolved_log.stem}_episode_time"
-        output_path = base_dir / f"{stem}.png"
+        resolved_log = (log_path or _default_log_path()).resolve()
+        output_path = resolved_log.with_name(f"{resolved_log.stem}_episode_time.png")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     x_all = [ep["episode_index"] for ep in timed]
@@ -280,23 +288,17 @@ def main():
         "log_path",
         nargs="?",
         type=Path,
-        default=Path(__file__).resolve().parent / "logs" / "latest.yaml",
-        help="Path to a log yaml file. Defaults to scripts/logs/latest.yaml.",
+        default=None,
+        help="Log YAML path; defaults to the latest log in vla_precision_ur.yaml's output directory.",
     )
     parser.add_argument(
         "--output", "-o", type=Path, default=None, help="Optional output image path."
     )
     args = parser.parse_args()
 
-    summary = load_episode_summary(args.log_path)
-    output = args.output
-    if output is None:
-        base_dir = Path(__file__).resolve().parent / "logs" / "ep_img"
-        resolved_log = (
-            args.log_path.resolve() if args.log_path.exists() else args.log_path
-        )
-        output = base_dir / f"vis_{resolved_log.stem}_episode_time.png"
-    output = save_episode_plot(summary, log_path=args.log_path, output_path=output)
+    log_path = args.log_path or _default_log_path()
+    summary = load_episode_summary(log_path)
+    output = save_episode_plot(summary, log_path=log_path, output_path=args.output)
     if output is None:
         print("No timed episode data found; no plot generated.")
     else:

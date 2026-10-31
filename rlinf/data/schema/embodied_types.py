@@ -474,6 +474,8 @@ class EnvPart:
     final_prev_values: torch.Tensor | None = None
     # Pre-action boundary for chunk zero; tensors [B, C], otherwise ``None``.
     initial_transition: EnvTransition | None = None
+    # Close a variable-length episode scope before the environment resets.
+    episode_end: bool = False
 
     def __post_init__(self) -> None:
         """Move model-derived fields to CPU for transport."""
@@ -534,6 +536,7 @@ class EnvPart:
                 bootstrap_values=bootstrap_values[index],
                 final_prev_values=final_prev_values[index],
                 initial_transition=initial_transitions[index],
+                episode_end=self.episode_end,
             )
             for index in range(len(split_sizes))
         ]
@@ -552,6 +555,8 @@ class EnvPart:
         inference_modes = [fragment.requires_inference for fragment in fragments]
         if any(inference_modes) and not all(inference_modes):
             raise ValueError(f"Conflicting terminal-inference state for {source.key}.")
+        if len({fragment.episode_end for fragment in fragments}) != 1:
+            raise ValueError(f"Conflicting episode boundaries for {source.key}.")
         initial_transitions = [fragment.initial_transition for fragment in fragments]
         has_initial = [transition is not None for transition in initial_transitions]
         if any(has_initial) and not all(has_initial):
@@ -563,6 +568,7 @@ class EnvPart:
             ),
             next_obs=merge_batch_values([fragment.next_obs for fragment in fragments]),
             requires_inference=fragments[0].requires_inference,
+            episode_end=fragments[0].episode_end,
             next_rlt_obs=merge_batch_values(
                 [fragment.next_rlt_obs for fragment in fragments]
             ),
@@ -1718,6 +1724,14 @@ class EnvOutput:
 
 
 @dataclass(kw_only=True)
+class EpisodeReplay:
+    """Completed episode awaiting replay ingestion and an end-key receipt."""
+
+    trajectory: Trajectory
+    end_key: TrajectoryKey
+
+
+@dataclass(kw_only=True)
 class PolicyInput:
     """One routed policy request, optionally carrying completed env data."""
 
@@ -2029,6 +2043,7 @@ __all__ = [
     "TrajectoryPart",
     "TrajectoryStep",
     "Trajectory",
+    "EpisodeReplay",
     "LeRobotStep",
     "LeRobotChunk",
     "LeRobotFrame",

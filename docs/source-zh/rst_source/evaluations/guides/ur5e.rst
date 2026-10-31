@@ -36,12 +36,31 @@ UR5e 真机评估
    # 重叠执行动作和模型重新规划：
    bash evaluations/realworld/run_ur5e_eval.sh runner.rtc.enabled=true
 
-启动脚本在仓库内真实的 ``results/`` 目录下创建带时间戳的目录。若未设置 ``RAY_TMPDIR``，Ray 临时文件存放在 ``results/ray/`` 下。训练 checkpoint 继续保存在 ``logs/`` 下。同步模式执行完当前动作块后才请求下一次预测；RTC 沿用 RLinf 的引导采样和重新规划调度，UR worker 额外处理评估回合数结束。两种模式均使用 10 步去噪、预测 20 个动作、每块执行 3 个动作。模型推理期间，100 Hz 后台控制器持续跟踪最后一个绝对 TCP 目标。
+启动脚本在仓库内真实的 ``results/`` 目录下创建带时间戳的目录。若未设置 ``RAY_TMPDIR``，Ray 临时文件存放在 ``/tmp/ray/`` 下，使用短路径以避免 Unix domain socket 路径长度超限。训练 checkpoint 继续保存在 ``logs/`` 下。同步模式执行完当前动作块后才请求下一次预测；RTC 沿用 RLinf 的引导采样和重新规划调度，UR worker 额外处理评估回合数结束。两种模式均使用 10 步去噪、预测 20 个动作、每块执行 3 个动作。默认配置在回合运行期间启用持续 PD 跟踪。设置 ``cluster.node_groups[0].hardware.configs[0].impedance.continuous_tracking=false`` 后，每个动作计算并发送一次 PD 力，沿用独立 VLA-Precision 推理后端的更新方式。
+
+UR 评估和独立 VLA-Precision 入口均只传入机器人 IP 来创建 RTDE 连接，使用 SDK 根据机器人确定的默认通信频率（UR5e 为 500 Hz）。``impedance.frequency: 100.0`` 仅设置启用持续跟踪时的更新频率，不再缩放力矩，也不控制动作节奏。旋转增益直接作用于力矩，随附配置使用 ``kp_rotation: 20.0``、``kd_rotation: 4.0``，等效于原来的 2000/400 除以 100；独立入口对应名称为 ``kp_rot``、``kd_rot``。迁移自定义旧配置时，先将两个旋转增益分别除以原配置频率，之后调整更新频率时保持增益不变；独立入口省略增益参数时使用 32/6.4，保持原 4000/800 除以 125 的默认输出。动作节奏由 ``env.eval.override_cfg.step_frequency`` 控制。
+
+UR 逐动作控制使用同一次读取的位姿和速度计算目标及阻抗力。
+
+分布式评估配置通过 ``env.eval.override_cfg.enable_camera_player: true`` 默认开启相机预览，设为 ``false`` 可关闭窗口。模型图像使用 RGB；UR 预览将自己的图像副本转换成 BGR 后交给 OpenCV。预览随观测刷新而更新。
+
+查看启动耗时和循环频率
+----------------------
+
+分布式 UR 入口先加载模型、复位机器人，再使用真实观测完成一次预热推理，最后等待 Enter。预热动作会被丢弃，编译时间不占用首回合的超时预算。``[LOAD]`` 和 ``[WARMUP]`` 每秒报告累计耗时；加载、预热、推理、循环和回合的常规计时始终显示；当 ``env.eval.ur_evaluation.save_logs`` 为 true 时，也会保存加载、预热、推理和循环完成后的耗时。
+
+``env.eval.ur_evaluation.save_logs: true``\ （默认值）时，分布式入口会在 ``results/rlinf-ur/logs/all_logs`` 下写入与 VLA 相同形式的 YAML 推理记录，以及汇总计时 JSONL。上一层日志目录中的 ``latest.yaml`` 和 ``latest.jsonl`` 指向同一次运行。``env.eval.ur_evaluation.log_dir`` 可修改该目录；每次运行的配置、指标和原始执行记录仍保存在 ``results/rlinf-ur/runs`` 下。每条 YAML 推理记录包含输入 ``state``、``actions``、``actions_delta``、提示词、回合信息和全局 ``infer_index``；为兼容原有格式，``infer_time`` 保留相同编号。使用此编号关联环境和推理计时，``component`` 区分执行与推理来源。详细动作计时还包含块内的 ``action_index``。加载和预热是独立事件，不对应正式预测记录。``episode_boundary: true`` 标记可能包含复位和人工等待的环境样本。RTC 的预测记录另含 ``chunk_id``；``rtc_step`` 汇总覆盖一个时间窗口，不对应单次推理。终端循环摘要最多每秒输出一次，同步模式的块间推理等待仍会降低整体动作频率。
+
+设置 ``env.eval.ur_evaluation.action_timing_enabled=true`` 后，终端会打印逐动作详细计时；开启日志保存时，也会将这些字段写入汇总计时 JSONL 和每次运行的 ``ur5e-actions.jsonl``。其中 ``control_sec`` 和 ``control_hz`` 包含动作处理和补足等待，``observation_sec`` 则在之后单独测量。开关默认为 false，不影响常规计时。``save_logs: false`` 会关闭 UR 动作与状态、计时和回合结果文件的保存，但不影响终端输出；Ray 日志和录像有各自的控制方式。开启保存时，即使关闭详细动作计时，也会保存动作和状态记录。
+
+设置 ``continuous_tracking: true`` 后，``[PD]`` 消息会单独报告后台发力频率。评估 wrapper 在执行动作时约每秒收集一次统计，并在回合结束、复位和关闭时收集剩余数据。开启日志保存后，统计以 ``component: controller``、``event: force_mode`` 写入汇总计时 JSONL，独立于 ``action_timing_enabled``。``target_hz`` 是配置频率，``measured_hz`` 根据成功完成的 ``forceMode`` 调用间隔计算。``send_interval_sec_mean`` 和 ``send_interval_sec_max`` 分别表示平均和最长发送间隔；``work_overruns`` 统计读状态、算力和发送的耗时超过配置周期的次数；``held_target_samples`` 统计沿用上一次目标的更新次数。控制线程只累计计数，不写文件；回合运行期间的推理等待也会累计，在 wrapper 下一次收集时写出。预热和等待回车期间暂停力控，频率统计排除复位和等待期间的暂停时间。这些数据测量 SDK 调用时序，不代表 RTDE 数据包的新鲜度或硬实时保证。
 
 控制回合并读取结果
 ------------------
 
 每次复位后，在机器人控制机的实体键盘上按一次回车开始。0.5 秒内双击回车记录失败并复位，双击空格记录成功；每回合 60 秒超时。默认记录 20 个回合结果，最后一个结果记录后复位并退出。UR wrapper 会屏蔽已结束动作块中剩余的动作；RTC 会等待并丢弃旧预测，再开始新回合。
+
+评估配置设置了 ``impedance.start_paused: true``，连接和复位后保持力控暂停，模型预热和等待回车期间也不启动力控。按回车后才以当前实测位姿为起点启用力控；成功、失败或超时后，先停止力控，再记录结果和复位。后续每个回合都需要再次按回车，最后一次回零也保持力控暂停。初始化和回合复位仍按配置执行 ``moveL`` 回零动作。
 
 存在多个键盘设备时，在启动 Ray 前指定设备：
 
@@ -62,7 +81,7 @@ UR5e 真机评估
 
 局部 EE 动作使用 ``p_target = p + R * delta_p`` 和 ``R_target = R * EulerXYZ(delta_r)``。UR 自己处理该变换，外层只应用 Euler 观测 wrapper；``use_relative_frame`` 为 false，避免重复执行通用 adjoint 变换。微小动作保持在基坐标系逐轴判断位移阈值 0.0001 米，整体判断旋转阈值 0.001 弧度，将静止轴锁存在保持目标上。
 
-复位依次打开夹爪、停止 force mode、调用 ``servoStop`` 和 ``moveL``、重新设置负载、等待 0.25 秒、清零力传感器、再等待 0.50 秒，最后恢复目标跟踪。控制器保留 0.048 米位置误差限制和 4.0 m/s 速度误差限制，``rotation_error_clip_degrees: null`` 关闭旋转误差裁剪。这些行为均属于 UR 实现，Franka 的通用环境、变换和控制逻辑保持原样。
+复位依次打开夹爪、停止 force mode、调用 ``servoStop`` 和 ``moveL``、重新设置负载、等待 0.25 秒、清零力传感器、再等待 0.50 秒，最后允许接收下一个动作。控制器保留 0.048 米位置误差限制和 4.0 m/s 速度误差限制，``rotation_error_clip_degrees: null`` 关闭旋转误差裁剪。这些行为均属于 UR 实现，Franka 的通用环境、变换和控制逻辑保持原样。
 
 验证范围
 --------
@@ -74,11 +93,21 @@ UR5e 真机评估
 
 若需将机器人执行与上述 RLinf 分布式路径对照，可使用移植的 VLA-Precision 后端。``evaluations/realworld/vla_precision_ur/`` 包含从本机 VLA-Precision 复制的单臂 UR 主循环、记录、图像处理和 UR policy 变换。``provenance.json`` 记录来源版本、文件哈希和保留方法，文件哈希也包含来源工作区已有的修改；运行时不依赖原仓库。
 
-该路径使用独立配置 ``evaluations/realworld/vla_precision_ur.yaml``。硬件、相机、任务、力控和回合设置与来源 YAML 一致，输出目录为 ``results/vla-precision-ur``。``model.checkpoint_dir`` 指向给定的 RLinf actor checkpoint，``model.norm_stats_path`` 指向配套统计量；``model.network`` 记录训练网络结构，包括预测 20 步、32 维内部动作、7 维物理动作和启用 RLT。推理与分布式 UR 入口一样采用 BF16/FP32 混合精度，``precision`` 和 ``embed_dtype`` 均设为 ``bf16``。统计量包含 19 维 state 和补齐后的 32 维 action，机器人仅接收前 7 维动作。
+该路径使用独立配置 ``evaluations/realworld/vla_precision_ur.yaml``。硬件、相机、任务、力控和回合设置沿用本地部署配置。对比动作节奏时，应对齐 ``robot.action_fps`` 和 ``env.eval.override_cfg.step_frequency``。输出目录为 ``results/vla-precision-ur``。``model.checkpoint_dir`` 指向给定的 RLinf actor checkpoint，``model.norm_stats_path`` 指向配套统计量；``model.network`` 记录训练网络结构，包括预测 20 步、32 维内部动作、7 维物理动作和启用 RLT。推理与分布式 UR 入口一样采用 BF16/FP32 混合精度，``precision`` 和 ``embed_dtype`` 均设为 ``bf16``。统计量包含 19 维 state 和补齐后的 32 维 action，机器人仅接收前 7 维动作。
 
-移植的 UR 入口还支持通过 ``model.network.openpi.torch_compile`` 选择编译模式。设为 ``max-autotune`` 可参考 OpenPI 的 PyTorch 设置，用 ``torch.compile`` 包装完整的 ``sample_actions`` 方法。首次推理会在现有的回合前预热阶段完成编译。预热期间每秒原地更新累计耗时，完成或中断时输出最终时长。``--check-model`` 的首次推理也使用同一计时显示。输入形状变化可能触发重新编译，编译后的浮点输出也可能与原路径存在差异。多组输入的离线检查发现，编译后夹爪输出的最大差异约为 0.684，因此选择该模式时还需验证任务行为。布尔值保持原有含义：``false`` 关闭局部算子编译，``true`` 编译局部算子并保留 Python 采样循环。其他可选字符串为 ``default``、``reduce-overhead`` 和 ``max-autotune-no-cudagraphs``。该扩展仅作用于移植的 UR 入口；通用模型加载器和分布式 UR/RTC 入口保持原有设置。
+独立 policy 使用 RLinf 模型已安装的输入和输出变换。两条 UR 入口均调用共享的 RLinf 观测转换，包括 CPU 图像归一化、NHWC 图像布局及 float32 state。独立适配器直接返回 RLinf 解码后的动作块，不再重复转换观测或解码输出。两条入口均由 ``openpi.action_horizon`` 控制预测长度（默认 20），由 ``openpi.action_chunk`` 控制返回和执行长度（默认 3），``num_action_chunks`` 引用 ``openpi.action_chunk``。分布式入口修改 ``rollout.model.openpi.action_chunk``，独立入口修改 ``model.network.openpi.action_chunk``；机器人执行返回的整个动作块。
 
-激活现有环境后，先检查依赖和路径，再启动。可选的 GPU 检查使用合成观测和固定扩散噪声，对比 OpenPI 原生 policy 与 RLinf 模型输入输出；两个检查命令均不连接硬件：
+独立入口始终打印加载、预热和推理循环的常规计时，``record.save_logs: true``\ （默认值）时，还会将测量结果保存到实验目录下的 ``logs/all_logs/timing_<timestamp>.jsonl``。在独立 YAML 中设置 ``record.action_timing_enabled: true``，还会打印动作细分耗时，开启日志保存时也会写入文件：状态读取、目标转换（包括 TCP 偏移读取）、阻抗计算、指令发送、夹爪目标更新、其余处理和补足等待。文件中的耗时单位为秒，终端动作耗时单位为毫秒。动作诊断开关默认为 false，不影响常规终端计时。``record.save_logs: false`` 会关闭计时、动作与输入状态、回合记录和汇总图的文件保存，不影响终端输出和录像。
+
+独立入口的两个日志文件都有快捷链接：``logs/latest.yaml`` 指向输入状态、动作块和回合结果，``logs/latest.jsonl`` 指向计时。每轮计时的 ``infer_index`` 与 YAML 推理记录一致；详细动作计时还用 ``action_index`` 标识块内动作。常规循环计时在回合复位和人工等待之前保存。写入线程忙时，预测记录会排队，不会被丢弃。
+
+移植的 UR 入口还支持通过 ``model.network.openpi.torch_compile`` 选择编译模式。设为 ``max-autotune`` 可参考 OpenPI 的 PyTorch 设置，用 ``torch.compile`` 包装完整的 ``sample_actions`` 方法。首次推理会在现有的回合前预热阶段完成编译。加载和预热期间每秒原地更新累计耗时，完成或中断时输出最终时长。``--check-model`` 的首次推理也使用同一计时显示。输入形状变化可能触发重新编译，编译后的浮点输出也可能与原路径存在差异。多组输入的离线检查发现，编译后夹爪输出的最大差异约为 0.684，因此选择该模式时还需验证任务行为。布尔值保持原有含义：``false`` 关闭局部算子编译，``true`` 编译局部算子并保留 Python 采样循环。其他可选字符串为 ``default``、``reduce-overhead`` 和 ``max-autotune-no-cudagraphs``。分布式 UR 入口单独使用 ``rollout.sampler_compile_mode`` 选择完整采样器编译，当前同样设为 ``max-autotune``。设为 ``rollout.sampler_compile_mode=null`` 可仅保留原有局部算子编译设置。通用模型加载器保持原样。
+
+启动诊断保留原有 load 和 warmup 总耗时，并在同一计时 JSONL 文件中增加 ``startup_stage``、``startup_summary`` 和 ``startup_compile`` 记录。加载阶段分别统计模型构建、变换资源准备、checkpoint 映射、参数复制、精度转换和设备搬运，各阶段附带进程 CPU 时间、Linux 存储读取字节数和缺页次数。内存映射 checkpoint 的磁盘读取可能发生在 ``checkpoint.apply``，而非 ``checkpoint.read``；比较两次运行时需同时查看这两个阶段。读取字节增量为零表示该阶段没有计入本进程的存储读取，不能据此确定每个字节来自哪一级缓存。
+
+预热阶段分别统计输入处理、动作采样和输出解码。编译记录包含编译帧处理、运行时内核调优、CUDA graph 准备及可用的编译缓存命中计数；这些是采样调用内部的解释性指标，不能再加到采样总耗时上。完整编译的采样器作为一次调用计时，避免计时操作拆分编译图。在线 RLT 还分别统计前缀编码、RL token 提取、参考动作采样和 MLP 路由；``runner.timing_mode=detailed`` 时，各 worker 在 ``runner.logger.log_path`` 下写入 ``startup_timing/<component>_<rank>.jsonl``。启动计时在阶段边界同步已初始化的加速器；常规控制和训练迭代保留已有计时行为。未启用合成观测预热时，在线路径统计首次实际推理。
+
+激活现有环境后，先检查依赖和路径，再启动。可选的 GPU 检查使用合成观测和固定扩散噪声，对比独立适配器与 RLinf worker 的模型输入输出；两个检查命令均不连接硬件：
 
 .. code-block:: bash
 
@@ -92,6 +121,10 @@ UR5e 真机评估
 
 该入口在单进程内运行 OpenPI 原生 ``Policy.infer()``，通过适配层调用 RLinf 网络并加载其 checkpoint。RGB 相机读取、224 × 224 补边、state 拼接、位姿增量、夹爪线程、力控计算、终端键盘控制和退出保存视频提示均沿用 VLA-Precision。键盘输入来自当前终端，SSH 终端也可使用；双击 Enter 记录失败并复位，双击空格记录成功。默认仍为 20 回合，每回合最长 60 秒。
 
-VLA-Precision 预测完整动作序列，同步执行前 3 个动作。它在动作执行时发送力控指令，模型推理期间没有 Python 后台控制线程刷新目标，这与上文 RLinf 控制器不同。移植路径也保留来源代码未使用 RLinf 工作空间裁剪的行为，不开启 RTC。来源 YAML 中的 ``model.infer_fps`` 未被硬件主循环读取，因此此处省略。这些行为用于形成对照，不改变通用机器人代码。
+VLA-Precision 预测完整动作序列，同步执行前 3 个动作。独立入口默认设置 ``robot.force_mode.continuous_tracking: false``，每个动作发送一次力控指令。在 YAML 中将其设为 ``true``，即可启用本地后台控制器：前台按 ``robot.action_fps`` 更新绝对 TCP 目标，后台按 ``robot.force_mode.rtde_freq`` 读取当前状态、沿用原 PD 公式重算力并调用 ``forceMode``。每个目标首次发送成功后才确认接收，不等待机械臂实际到达目标。等待下一轮推理时，后台继续跟踪最后的绝对目标。
+
+独立后台控制器在按回车启动 episode 后才运行，成功、失败、超时、复位和关闭时停止。复位先等待线程退出，再回位、设置载荷和清零力传感器；预热和回合间等待期间力控保持关闭。控制器失败会中止执行，停止失败时不继续回位或清零。原有零输出过滤仍会为被过滤的动作禁用力控选择轴。``[PD]`` 日志及保存的 ``controller`` 计时事件记录成功发送的实际频率。持续跟踪模式下，逐动作的 ``send_ms`` 表示提交目标并等待确认的时间，PD 计算在后台完成。这个选项在移植后的独立推理后端内实现，不调用 RLinf 机器人控制器。
+
+分布式 UR 入口通过自身的 impedance 配置独立选择逐动作更新或持续跟踪。机械臂和夹爪控制机与 RLinf 环境位于同一节点时，连接直接位于环境进程内。夹爪串口 I/O 使用后台线程，同步动作块的完整相机观测在最后一个动作后刷新。移植路径也保留来源代码未使用 RLinf 工作空间裁剪的行为，不开启 RTC。来源 YAML 中的 ``model.infer_fps`` 未被硬件主循环读取，因此此处省略。
 
 固定合成输入下输出一致，只能验证模型输入输出适配；真机对照用于检查相机、控制和执行时序。两条路径仍共享 RLinf 网络实现，因此仅凭本次对照不能排除其与官方 OpenPI 模型之间的差异，也不能确定 checkpoint 本身的质量。Franka 及通用环境、控制器均未修改。

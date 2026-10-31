@@ -1,0 +1,22 @@
+{
+  "mode": "detailed",
+  "physical_hardware": false,
+  "episodes": [
+    [
+      1
+    ],
+    [
+      2
+    ]
+  ],
+  "updates": 16,
+  "records": {
+    "Rollout inference": 8,
+    "Rollout step": 6,
+    "Rollout terminal": 2,
+    "UR action": 18,
+    "Env step": 6,
+    "Learner update": 16
+  },
+  "status": "passed"
+}

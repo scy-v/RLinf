@@ -25,7 +25,7 @@ def modules() -> dict[str, types.ModuleType]:
     states: dict[str, dict[str, Any]] = {}
 
     class Receive:
-        def __init__(self, ip: str, *args):
+        def __init__(self, ip: str, frequency: float = -1.0, *args):
             self.state = states.setdefault(
                 ip,
                 {
@@ -36,6 +36,7 @@ def modules() -> dict[str, types.ModuleType]:
                     "events": [],
                 },
             )
+            self.state[f"{type(self).__name__.lower()}_frequency"] = frequency
             self.connected = True
 
         def isConnected(self):

@@ -116,6 +116,9 @@ class CartesianEnvConfig:
 
     # Target hand pose used for dense-reward success criteria (6-D).
     hand_target_state: np.ndarray = field(default_factory=lambda: np.zeros(6))
+    # Move to the reset pose during hardware initialization.
+    reset_on_init: bool = True
+
     # Default hand pose after ``reset()`` (6-D).
     hand_reset_state: np.ndarray = field(default_factory=lambda: np.zeros(6))
     # Hand action scale (for continuous hand control).
@@ -238,8 +241,9 @@ class CartesianEnv(gym.Env, ABC):
         self._open_cameras()
         self.camera_player = VideoPlayer(self.config.enable_camera_player)
 
-        self._interpolate_move(self._reset_pose)
-        time.sleep(1.0)
+        if self.config.reset_on_init:
+            self._interpolate_move(self._reset_pose)
+            time.sleep(1.0)
         self._robot_state = self._read_robot()
 
     @property

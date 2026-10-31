@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+from contextlib import ExitStack
 
 import hydra
 import torch.multiprocessing as mp
@@ -21,6 +22,7 @@ from omegaconf.omegaconf import OmegaConf
 from rlinf.config import validate_cfg
 from rlinf.scheduler import Cluster
 from rlinf.utils.placement import HybridComponentPlacement
+from rlinf.utils.robot_lifecycle import termination_signals
 from rlinf.workers.env.async_env_worker import AsyncEnvWorker
 from rlinf.workers.reward.reward_worker import EmbodiedRewardWorker
 from rlinf.workers.rollout.hf.async_huggingface_worker import (
@@ -78,41 +80,43 @@ def main(cfg) -> None:
             f"Unsupported loss type {cfg.algorithm.loss_type} for async embodied runner"
         )
 
-    actor_group = actor_worker_cls.create_group(cfg).launch(
-        cluster, name=cfg.actor.group_name, placement_strategy=actor_placement
-    )
-    # Create rollout worker group
-    rollout_placement = component_placement.get_strategy("rollout")
-    rollout_group = AsyncMultiStepRolloutWorker.create_group(cfg).launch(
-        cluster, name=cfg.rollout.group_name, placement_strategy=rollout_placement
-    )
-
-    # Create env worker group
-    env_placement = component_placement.get_strategy("env")
-    env_group = AsyncEnvWorker.create_group(cfg).launch(
-        cluster, name=cfg.env.group_name, placement_strategy=env_placement
-    )
-
-    reward_group = None
-    if cfg.get("reward", {}).get("use_reward_model", False) and not cfg.get(
-        "reward", {}
-    ).get("standalone_realworld", False):
-        # Create reward worker group
-        reward_placement = component_placement.get_strategy("reward")
-        reward_group = EmbodiedRewardWorker.create_group(cfg).launch(
-            cluster, name=cfg.reward.group_name, placement_strategy=reward_placement
+    with termination_signals(), ExitStack() as cleanup:
+        actor_group = actor_worker_cls.create_group(cfg).launch(
+            cluster, name=cfg.actor.group_name, placement_strategy=actor_placement
+        )
+        # Create rollout worker group
+        rollout_placement = component_placement.get_strategy("rollout")
+        rollout_group = AsyncMultiStepRolloutWorker.create_group(cfg).launch(
+            cluster, name=cfg.rollout.group_name, placement_strategy=rollout_placement
         )
 
-    runner = runner_cls(
-        cfg=cfg,
-        actor=actor_group,
-        rollout=rollout_group,
-        env=env_group,
-        reward=reward_group,
-    )
+        # Create env worker group
+        env_placement = component_placement.get_strategy("env")
+        env_group = AsyncEnvWorker.create_group(cfg).launch(
+            cluster, name=cfg.env.group_name, placement_strategy=env_placement
+        )
+        cleanup.callback(lambda: env_group.stop().wait())
 
-    runner.init_workers()
-    runner.run()
+        reward_group = None
+        if cfg.get("reward", {}).get("use_reward_model", False) and not cfg.get(
+            "reward", {}
+        ).get("standalone_realworld", False):
+            # Create reward worker group
+            reward_placement = component_placement.get_strategy("reward")
+            reward_group = EmbodiedRewardWorker.create_group(cfg).launch(
+                cluster, name=cfg.reward.group_name, placement_strategy=reward_placement
+            )
+
+        runner = runner_cls(
+            cfg=cfg,
+            actor=actor_group,
+            rollout=rollout_group,
+            env=env_group,
+            reward=reward_group,
+        )
+
+        runner.init_workers()
+        runner.run()
 
 
 if __name__ == "__main__":

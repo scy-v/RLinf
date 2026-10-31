@@ -25,6 +25,8 @@ from typing import Any
 import gymnasium as gym
 
 from rlinf.envs.real.wrappers.episode.session import KeyboardSession
+from rlinf.utils.progress import ElapsedTime
+from rlinf.utils.ur_logging import append_record, prepare_run_logs
 
 
 class UREvaluationWrapper(KeyboardSession):
@@ -40,6 +42,9 @@ class UREvaluationWrapper(KeyboardSession):
         double_press_interval: float = 0.5,
         wait_for_start: bool = True,
         output_path: str = "./results/ur5e-evaluation.json",
+        action_timing_enabled: bool = False,
+        save_logs: bool = True,
+        log_dir: str | None = None,
     ) -> None:
         if num_episodes < 1 or not all(
             math.isfinite(x) and x > 0
@@ -55,6 +60,7 @@ class UREvaluationWrapper(KeyboardSession):
         self.output_path = Path(output_path).expanduser()
         self.results: list[dict[str, Any]] = []
         self._stop = threading.Event()
+        self._evaluation_closed = False
         self._last_obs = None
         self._boundary: tuple[bool, bool, dict] | None = None
         self._first_press: dict[str, float] = {}
@@ -62,6 +68,22 @@ class UREvaluationWrapper(KeyboardSession):
         self._episode_started = 0.0
         self._steps = 0
         self._waiting_for_start = False
+        self._prepared = False
+        self.action_timing_enabled = action_timing_enabled
+        self.save_logs = save_logs
+        self._run_log_paths = (
+            prepare_run_logs(
+                Path(log_dir) if log_dir else self.output_path.parent / "logs",
+                self.output_path.parent.name,
+            )
+            if save_logs
+            else None
+        )
+        self._episode_timer: ElapsedTime | None = None
+        self._action_trace = None
+        self._last_action_report = 0.0
+        self._last_control_report = 0.0
+        self._summary_written = False
         super().__init__(env)
 
     @property
@@ -75,6 +97,10 @@ class UREvaluationWrapper(KeyboardSession):
         return self._waiting_for_start
 
     def _write_results(self) -> None:
+        if not self.save_logs:
+            return
+        if self._action_trace is not None:
+            self._action_trace.flush()
         successes = sum(result["completed"] for result in self.results)
         payload = {
             "evaluation": "ur5e-rlinf",
@@ -91,6 +117,11 @@ class UREvaluationWrapper(KeyboardSession):
         temporary.replace(self.output_path)
 
     def reset(self, **kwargs: Any) -> tuple[Any, dict]:
+        self.base_env().stop_motion()
+        self._record_control_timing(force=True)
+        if self._episode_timer is not None:
+            self._episode_timer.__exit__(None, None, None)
+            self._episode_timer = None
         if self.evaluation_complete:
             # No new episode is started after the last outcome; home once before exit.
             if self._boundary is not None:
@@ -98,17 +129,30 @@ class UREvaluationWrapper(KeyboardSession):
                 self._boundary = None
             return copy.deepcopy(self._last_obs), {"evaluation_complete": True}
         self.drain()
-        self._last_obs, info = self.env.reset(**kwargs)
+        if self._prepared:
+            self._last_obs = self.env.get_wrapper_attr("observe")()
+            info = {}
+        else:
+            self._last_obs, info = self.env.reset(**kwargs)
+        self._prepared = bool(
+            (kwargs.get("options") or {}).get("ur_eval_prepare", False)
+        )
         self._boundary = None
         self._first_press.clear()
         self._steps = 0
         self._accept_after = time.time()
         self.drain()
+        if self._prepared:
+            self.log("UR warmup prepared with force control paused.")
+            return copy.deepcopy(self._last_obs), info
         if self.wait_for_start:
             self._waiting_for_start = True
             try:
-                self.log("UR reset complete. Press Enter once to start.")
+                self.log(
+                    "UR reset complete. Force control paused; press Enter to start."
+                )
                 while not self._stop.is_set():
+                    self._record_control_timing()
                     events = self.listener.pop_pressed_events()
                     if any(
                         t >= self._accept_after and k in {"Key.enter", "Key.kpenter"}
@@ -123,11 +167,22 @@ class UREvaluationWrapper(KeyboardSession):
                 self._waiting_for_start = False
             self._accept_after = time.time()
             self.drain()
+        self.base_env().start_motion()
+        self.log("UR episode started; force control enabled.")
         self._episode_started = time.monotonic()
+        self._episode_timer = ElapsedTime(
+            "TIME", f"Episode {len(self.results) + 1}", log=self.log
+        )
+        self._episode_timer.__enter__()
         self._write_results()
         return copy.deepcopy(self._last_obs), info
 
     def _finish(self, status: str) -> tuple:
+        self.base_env().stop_motion()
+        self._record_control_timing(force=True)
+        if self._episode_timer is not None:
+            self._episode_timer.__exit__(None, None, None)
+            self._episode_timer = None
         completed = status == "manual_success"
         record = {
             "episode_index": len(self.results) + 1,
@@ -137,6 +192,8 @@ class UREvaluationWrapper(KeyboardSession):
             "action_steps": self._steps,
         }
         self.results.append(record)
+        if self._run_log_paths is not None:
+            append_record(self._run_log_paths[0], {"episode_result": record})
         self._write_results()
         info = {
             "eval_result": status,
@@ -153,6 +210,10 @@ class UREvaluationWrapper(KeyboardSession):
         )
 
     def step(self, action: Any) -> tuple:
+        if self._prepared:
+            raise RuntimeError(
+                "Expected evaluation start after UR warmup before stepping."
+            )
         if self._boundary is not None:
             terminated, truncated, info = self._boundary
             return copy.deepcopy(self._last_obs), 0.0, terminated, truncated, info
@@ -184,13 +245,131 @@ class UREvaluationWrapper(KeyboardSession):
                 )
         if time.monotonic() - self._episode_started >= self.episode_timeout_sec:
             return self._finish("timeout")
+        self._record_control_timing()
         self._last_obs, _, _, _, info = self.env.step(action)
         self._steps += 1
+        trace = info.pop("ur_action_trace", None)
+        if trace is not None and self.save_logs:
+            if self._action_trace is None:
+                self.output_path.parent.mkdir(parents=True, exist_ok=True)
+                self._action_trace = self.output_path.with_name(
+                    "ur5e-actions.jsonl"
+                ).open("a", encoding="utf-8")
+            self._action_trace.write(
+                json.dumps(
+                    dict(
+                        {
+                            key: value
+                            for key, value in trace.items()
+                            if self.action_timing_enabled
+                            or not key.endswith(("_sec", "_hz"))
+                        },
+                        episode_index=len(self.results) + 1,
+                        step=self._steps,
+                    )
+                )
+                + "\n"
+            )
+        if trace is not None and self.action_timing_enabled:
+            if self._run_log_paths is not None:
+                append_record(
+                    self._run_log_paths[1],
+                    {
+                        "event": "action",
+                        "component": "env",
+                        **trace,
+                        "episode_index": len(self.results) + 1,
+                        "step": self._steps,
+                    },
+                )
+            now = time.monotonic()
+            if now - self._last_action_report >= 1.0:
+                self.log(
+                    "[ACTION] target_hz=%.2f control_hz=%.2f "
+                    "control_sec=%.4f control_overrun_sec=%.4f "
+                    "command_sec=%.4f pace_wait_sec=%.4f "
+                    "observation_sec=%.4f action_interval_sec=%s target_interval_sec=%s"
+                    % (
+                        trace["target_hz"],
+                        trace["control_hz"],
+                        trace["control_sec"],
+                        trace["control_overrun_sec"],
+                        trace["command_sec"],
+                        trace["pace_wait_sec"],
+                        trace["observation_sec"],
+                        trace["action_interval_sec"],
+                        trace.get("target_interval_sec"),
+                    )
+                )
+                self._last_action_report = now
         return copy.deepcopy(self._last_obs), 0.0, False, False, info
 
+    def _record_control_timing(self, *, force: bool = False) -> None:
+        now = time.monotonic()
+        if not force and now - self._last_control_report < 1.0:
+            return
+        self._last_control_report = now
+        timing = self.base_env().drain_control_timing()
+        if timing is None:
+            return
+        if self._run_log_paths is not None:
+            append_record(
+                self._run_log_paths[1],
+                {
+                    "component": "controller",
+                    "event": "force_mode",
+                    "timestamp": time.time(),
+                    **timing,
+                },
+            )
+        measured = timing["measured_hz"]
+        rate = "pending" if measured is None else f"{measured:.2f}"
+        maximum = timing["send_interval_sec_max"]
+        gap = "pending" if maximum is None else f"{maximum * 1000:.2f}"
+        self.log(
+            "[PD] target_hz=%.2f measured_hz=%s samples=%d "
+            "max_send_interval_ms=%s work_overruns=%d held_target_samples=%d",
+            timing["target_hz"],
+            rate,
+            timing["samples"],
+            gap,
+            timing["work_overruns"],
+            timing["held_target_samples"],
+        )
+
     def close(self) -> None:
+        if self._evaluation_closed:
+            return
+        self._evaluation_closed = True
         self._stop.set()
         try:
+            self.base_env().stop_motion()
+            if self._episode_timer is not None:
+                self._episode_timer.__exit__(None, None, None)
+                self._episode_timer = None
+            self._record_control_timing(force=True)
             self._write_results()
+            if self._run_log_paths is not None and not self._summary_written:
+                successes = sum(record["completed"] for record in self.results)
+                append_record(
+                    self._run_log_paths[0],
+                    {
+                        "episode_summary": {
+                            "total_episodes": len(self.results),
+                            "completed_episodes": successes,
+                            "incomplete_episodes": len(self.results) - successes,
+                            "success_rate": successes / len(self.results)
+                            if self.results
+                            else 0.0,
+                            "episodes": self.results,
+                        }
+                    },
+                )
+                self._summary_written = True
         finally:
-            super().close()
+            try:
+                if self._action_trace is not None:
+                    self._action_trace.close()
+                    self._action_trace = None
+            finally:
+                super().close()

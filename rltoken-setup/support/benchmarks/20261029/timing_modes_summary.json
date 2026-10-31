@@ -1,0 +1,44 @@
+{
+  "hardware": "RTX 4090 D; actual Ray/FSDP/OpenPI; dummy UR env, synthetic critical-phase flags; no physical hardware",
+  "scope": "Each mode runs two episodes, three chunks per episode, 16 critic and 4 actor updates, replay ACK before reset, and weight synchronization. This is a functional test, not a latency benchmark.",
+  "modes": {
+    "disabled": {
+      "status": "passed",
+      "episodes": 2,
+      "critic_updates": 16,
+      "actor_updates": 4,
+      "timing_records": 0,
+      "sources": {},
+      "schema_and_render": "passed"
+    },
+    "basic": {
+      "status": "passed",
+      "episodes": 2,
+      "critic_updates": 16,
+      "actor_updates": 4,
+      "timing_records": 28,
+      "sources": {
+        "Learner update": 16,
+        "Env step": 6,
+        "Rollout step": 6
+      },
+      "schema_and_render": "passed"
+    },
+    "detailed": {
+      "status": "passed",
+      "episodes": 2,
+      "critic_updates": 16,
+      "actor_updates": 4,
+      "timing_records": 56,
+      "sources": {
+        "Rollout inference": 8,
+        "Rollout step": 6,
+        "Rollout terminal": 2,
+        "UR action": 18,
+        "Env step": 6,
+        "Learner update": 16
+      },
+      "schema_and_render": "passed"
+    }
+  }
+}

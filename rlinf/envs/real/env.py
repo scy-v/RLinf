@@ -27,11 +27,13 @@ from filelock import FileLock
 from omegaconf import DictConfig, OmegaConf
 from torch import Tensor
 
+from rlinf.config import get_episode_step_limit
 from rlinf.envs.real.venv import NoAutoResetSyncVectorEnv
 from rlinf.envs.real.wrappers import KEYBOARD_MODES
 from rlinf.envs.utils import to_tensor
 from rlinf.robotics.discovery import RobotInfo
 from rlinf.scheduler import WorkerInfo
+from rlinf.utils.logging import get_logger
 
 #: One batched observation, by the keys the runner reads: ``states``, the image
 #: keys a config names, and whatever a task adds.
@@ -95,6 +97,7 @@ class RealWorldEnv(gym.Env):
         self._is_start = True
         self._init_metrics()
         self._elapsed_steps = np.zeros(self.num_envs, dtype=np.int32)
+        self._episode_chunks = 0
         self._init_reset_state_ids()
 
     def _create_env(self, env_idx: int) -> gym.Env:
@@ -105,6 +108,8 @@ class RealWorldEnv(gym.Env):
             if isinstance(allocated, RobotInfo):
                 robot_info = allocated
         override_cfg = copy.deepcopy(self.override_cfg)
+        if self.cfg.get("max_episode_chunks") is not None:
+            override_cfg["max_num_steps"] = get_episode_step_limit(self.cfg)
         # A worker that was handed this class by value never ran the package
         # import that registers the task ids.
         from rlinf.envs.real import load_tasks
@@ -155,8 +160,8 @@ class RealWorldEnv(gym.Env):
         """Close the vector env and its physical robot/camera resources."""
         if getattr(self, "_closed", False):
             return
-        self.env.close()
         self._closed = True
+        self.env.close()
 
     def get_hold_actions(
         self, fallback_actions: np.ndarray | None = None
@@ -279,7 +284,13 @@ class RealWorldEnv(gym.Env):
         env_idx: Optional[np.ndarray] = None,
     ) -> tuple[Observation, EnvInfos]:
         # TODO(agent): Honor reset_state_ids for partial real-environment resets.
+        self._episode_chunks = 0
+        self._report_chunk_progress()
         raw_obs, infos = self.env.reset(seed=seed, options=options)
+        if "rlt_switch_flags" in infos:
+            infos["rlt_switch_flags"] = to_tensor(
+                np.asarray(infos["rlt_switch_flags"], dtype=bool)
+            )
 
         extracted_obs = self._wrap_obs(raw_obs)
         if env_idx is not None:
@@ -342,16 +353,18 @@ class RealWorldEnv(gym.Env):
         actions: Optional[Union[np.ndarray, torch.Tensor]] = None,
         auto_reset: bool = True,
     ) -> StepResult:
+        if getattr(self, "_closed", False):
+            raise RuntimeError("Cannot step a closed real-world environment.")
         if isinstance(actions, torch.Tensor):
             actions = actions.detach().cpu().numpy()
 
         self._elapsed_steps += 1
         raw_obs, _reward, terminations, truncations, infos = self.env.step(actions)
         # A null limit delegates episode boundaries to an external wrapper.
-        if self.cfg.max_episode_steps is None:
+        if get_episode_step_limit(self.cfg) is None:
             timeout_truncations = np.zeros_like(truncations, dtype=bool)
         else:
-            timeout_truncations = self.elapsed_steps >= self.cfg.max_episode_steps
+            timeout_truncations = self.elapsed_steps >= get_episode_step_limit(self.cfg)
         if not self.manual_episode_control_only:
             truncations = timeout_truncations
 
@@ -400,15 +413,29 @@ class RealWorldEnv(gym.Env):
             infos,
         )
 
-    def _notify_action_chunk_begin(self) -> None:
-        """Tell intervention wrappers a new action chunk is starting."""
+    def _notify_action_chunk_begin(self, chunk_size: int) -> None:
+        """Notify the environment and intervention wrappers of a new chunk."""
         for env in self.env.envs:
+            try:
+                begin_chunk = env.get_wrapper_attr("begin_action_chunk")
+            except AttributeError:
+                begin_chunk = None
+            if callable(begin_chunk):
+                begin_chunk(chunk_size)
             try:
                 on_begin = env.get_wrapper_attr("on_action_chunk_begin")
             except AttributeError:
                 continue
             if callable(on_begin):
                 on_begin()
+
+    def _report_chunk_progress(self) -> None:
+        """Publish executed chunk count independently of replay and learner progress."""
+        limit = self.cfg.get("max_episode_chunks")
+        if limit is not None:
+            get_logger().info(
+                "[EXEC] Episode chunks: %d/%d", self._episode_chunks, limit
+            )
 
     def chunk_step(self, chunk_actions: np.ndarray) -> ChunkStepResult:
         # Shape: [num_envs, chunk_steps, action_dim].
@@ -424,7 +451,7 @@ class RealWorldEnv(gym.Env):
         raw_chunk_intervene_actions = []
         raw_chunk_intervene_flag = []
         raw_chunk_rlt_switch_flags = []
-        self._notify_action_chunk_begin()
+        self._notify_action_chunk_begin(chunk_size)
         for i in range(chunk_size):
             actions = chunk_actions[:, i]
             extracted_obs, step_reward, terminations, truncations, infos = self.step(
@@ -467,10 +494,22 @@ class RealWorldEnv(gym.Env):
             )
             infos_list[-1] = infos_last
 
+        if self.cfg.get("max_episode_chunks") is not None:
+            self._episode_chunks += 1
+            self._report_chunk_progress()
+
         if past_dones.any() and self.auto_reset:
-            obs_list[-1], infos_list[-1] = self._handle_auto_reset(
-                past_dones.cpu().numpy(), obs_list[-1], infos_list[-1]
-            )
+            if self.cfg.get("flush_replay_on_episode_end", False):
+                final_info = copy.deepcopy(infos_list[-1])
+                infos_list[-1] = {
+                    **infos_list[-1],
+                    "final_observation": copy.deepcopy(obs_list[-1]),
+                    "final_info": final_info,
+                }
+            else:
+                obs_list[-1], infos_list[-1] = self._handle_auto_reset(
+                    past_dones.cpu().numpy(), obs_list[-1], infos_list[-1]
+                )
 
         if self.auto_reset or self.ignore_terminations:
             chunk_terminations = torch.zeros_like(raw_chunk_terminations)

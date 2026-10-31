@@ -1,0 +1,15 @@
+{
+  "mode": "disabled",
+  "physical_hardware": false,
+  "episodes": [
+    [
+      1
+    ],
+    [
+      2
+    ]
+  ],
+  "updates": 16,
+  "records": {},
+  "status": "passed"
+}

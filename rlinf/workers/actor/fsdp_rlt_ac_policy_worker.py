@@ -13,13 +13,18 @@
 # limitations under the License.
 
 import asyncio
+import json
 import queue
+import tempfile
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
+from omegaconf import OmegaConf
 
 from rlinf.algorithms.rlt.transition import use_simulator_transition_replay
-from rlinf.data.schema.embodied_types import Trajectory
+from rlinf.data.schema.embodied_types import EpisodeReplay, Trajectory
+from rlinf.data.storage.replay.buffer import clone_dict_of_tensors
 from rlinf.models.embodiment.base_policy import ForwardType
 from rlinf.scheduler import Worker
 from rlinf.utils.distributed import all_reduce_dict
@@ -28,6 +33,19 @@ from rlinf.utils.metric_utils import (
     collect_trajectory_replay_metrics,
     compute_split_num,
     trajectory_has_bool_tensor,
+)
+from rlinf.utils.progress import (
+    ElapsedTime,
+    StageTiming,
+    TrainingProgress,
+    get_timing_mode,
+    timing_active,
+    timing_detailed,
+)
+from rlinf.utils.startup_timing import (
+    StartupTiming,
+    record_worker_startup,
+    synchronize_startup_device,
 )
 from rlinf.utils.utils import clear_memory
 from rlinf.workers.actor.async_fsdp_sac_policy_worker import (
@@ -43,6 +61,19 @@ class RLTACLossMixin:
     RLT objective disables entropy/alpha and uses a fixed-std actor, min-Q
     critic target, Q1 actor objective, and BC regularization.
     """
+
+    def init_worker(self):
+        """Keep actor setup diagnostics separate from rollout model loading."""
+        with StartupTiming(
+            "load",
+            self.log_info,
+            record=lambda event, **fields: record_worker_startup(self, event, **fields),
+            synchronize=synchronize_startup_device,
+            enabled=timing_detailed(self.cfg),
+            component="rlt_actor",
+            rank=self._rank,
+        ):
+            return super().init_worker()
 
     @staticmethod
     def _flatten_chunk(tensor: torch.Tensor) -> torch.Tensor:
@@ -377,7 +408,237 @@ class RLTACLossMixin:
 
 
 class RLTACReplayMixin:
-    """Shared rollout-to-replay ingestion for sync and async RLT AC workers."""
+    """Own replay ingestion and its learner counters for both RLT AC workers."""
+
+    def init_worker(self):
+        with ElapsedTime(
+            "LOAD",
+            "Initializing RLT actor, critic, optimizer and replay",
+            log=self.log_info,
+            enabled=timing_active(self.cfg),
+        ):
+            return super().init_worker()
+
+    def _setup_warmup_cache(self) -> None:
+        """Load initial replay for a fresh run; resume owns its complete state."""
+        self._warmup_cache_pending = None
+        path = self.rlt_schedule_cfg.get("warmup_cache_path")
+        if not path or self.cfg.get("runner", {}).get("resume_dir"):
+            return
+        if (
+            not self.use_rlt_schedule
+            or not use_simulator_transition_replay(self.cfg)
+            or self._world_size != 1
+        ):
+            raise ValueError(
+                "warmup_cache_path requires RLT transition replay, scheduling, "
+                "and exactly one actor worker."
+            )
+        count = int(self.rlt_schedule_cfg.get("warmup_min_size", 1))
+        if count <= 0 or self.replay_buffer.sample_window_size < count:
+            raise ValueError(
+                "Warmup cache requires a positive count within the replay window."
+            )
+        self._warmup_cache_path = Path(path).expanduser()
+        self._warmup_cache_manifest = {"version": 2, "count": count}
+        for key in (
+            "actor.model",
+            "rollout.rlt_feature_model",
+            "env.train.override_cfg",
+        ):
+            value = OmegaConf.select(self.cfg, key)
+            self._warmup_cache_manifest[key] = (
+                OmegaConf.to_container(value, resolve=True)
+                if OmegaConf.is_config(value)
+                else value
+            )
+        if self._warmup_cache_path.exists():
+            with ElapsedTime(
+                "LOAD",
+                f"Loading warmup replay: {self._warmup_cache_path}",
+                log=self.log_info,
+                enabled=timing_active(self.cfg),
+            ):
+                payload = torch.load(
+                    self._warmup_cache_path, map_location="cpu", weights_only=True
+                )
+                if (
+                    not isinstance(payload, dict)
+                    or payload.get("manifest") != self._warmup_cache_manifest
+                ):
+                    raise ValueError(
+                        f"Warmup cache configuration mismatch at {self._warmup_cache_path}; "
+                        "select a new warmup_cache_path to recollect."
+                    )
+                rows = payload.get("transitions")
+                if not isinstance(rows, list) or len(rows) != count:
+                    raise ValueError(
+                        f"Expected {count} warmup transitions in {self._warmup_cache_path}."
+                    )
+                transitions = [Trajectory(**row) for row in rows]
+                for transition in transitions:
+                    if (
+                        not isinstance(transition.actions, torch.Tensor)
+                        or transition.actions.ndim != 3
+                        or transition.actions.shape[:2] != (1, 1)
+                        or not isinstance(transition.rewards, torch.Tensor)
+                        or transition.rewards.ndim != 3
+                        or transition.rewards.shape[:2] != (1, 1)
+                    ):
+                        raise ValueError(
+                            "Expected each warmup entry to contain one chunk transition."
+                        )
+                self.replay_buffer.add_trajectories(transitions)
+            self._update_rollout_ingest_counters(count, 0)
+            self.log_info(
+                f"Loaded {count} warmup transitions from {self._warmup_cache_path}; "
+                "critic warmup starts from update zero."
+            )
+        else:
+            self._warmup_cache_pending = []
+            self.log_info(
+                f"Collecting {count} warmup transitions for {self._warmup_cache_path}."
+            )
+
+    def _cache_warmup_transitions(self, trajectories: list[Trajectory]) -> None:
+        """Publish the first complete warmup set once, before learner updates."""
+        pending = getattr(self, "_warmup_cache_pending", None)
+        if pending is None:
+            return
+        count = self._warmup_cache_manifest["count"]
+        pending.extend(trajectories[: count - len(pending)])
+        if len(pending) < count:
+            return
+        path = self._warmup_cache_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "manifest": self._warmup_cache_manifest,
+            "transitions": [
+                {
+                    name: clone_dict_of_tensors(getattr(trajectory, name))
+                    for name in trajectory.__dataclass_fields__
+                }
+                for trajectory in pending
+            ],
+        }
+        # Publish only a fully written file; interrupted writes never replace the cache.
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                prefix=f".{path.name}-", dir=path.parent, delete=False
+            ) as stream:
+                temporary = Path(stream.name)
+                torch.save(payload, stream)
+            temporary.replace(path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        self._warmup_cache_pending = None
+        self.log_info(f"Saved {count} reusable warmup transitions to {path}.")
+
+    _CHECKPOINT_COUNTERS = (
+        "update_step",
+        "transitions_since_train",
+        "episodes_since_train",
+        "total_transitions_added",
+        "total_episodes_added",
+        "_warmup_ready_total_transitions",
+        "_warmup_ready_total_episodes",
+        "pending_update_budget",
+    )
+
+    def save_checkpoint(self, save_base_path: str, step: int) -> None:
+        """Save SAC components and the counters controlling RLT warmup."""
+        with ElapsedTime(
+            "SAVE",
+            f"Saving training checkpoint: {save_base_path}",
+            log=self.log_info,
+            enabled=timing_detailed(self.cfg),
+        ):
+            super().save_checkpoint(save_base_path, step)
+        state = {name: getattr(self, name) for name in self._CHECKPOINT_COUNTERS}
+        path = (
+            Path(save_base_path)
+            / "sac_components"
+            / f"rlt_training_state_rank_{self._rank}.json"
+        )
+        temporary = path.with_suffix(".json.tmp")
+        temporary.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(path)
+
+    def load_checkpoint(self, load_base_path: str) -> None:
+        """Restore RLT counters before any resumed rollout weight sync."""
+        with ElapsedTime(
+            "LOAD",
+            f"Resuming training checkpoint: {load_base_path}",
+            log=self.log_info,
+            enabled=timing_detailed(self.cfg),
+        ):
+            super().load_checkpoint(load_base_path)
+        path = (
+            Path(load_base_path)
+            / "sac_components"
+            / f"rlt_training_state_rank_{self._rank}.json"
+        )
+        if not path.is_file():
+            self._restore_legacy_update_step()
+            return
+        state = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(state, dict):
+            raise ValueError(f"Expected RLT training state object in {path}.")
+        nullable = {
+            "_warmup_ready_total_transitions",
+            "_warmup_ready_total_episodes",
+        }
+        for name in self._CHECKPOINT_COUNTERS:
+            if name not in state:
+                raise ValueError(f"Expected RLT counter {name!r} in {path}.")
+            value = state[name]
+            if value is None and name in nullable:
+                continue
+            if type(value) is not int or value < 0:
+                raise ValueError(
+                    f"Expected nonnegative integer RLT counter {name!r} "
+                    f"in {path}, got {value!r}."
+                )
+        for name in self._CHECKPOINT_COUNTERS:
+            setattr(self, name, state[name])
+        self.log_info(f"Restored RLT learner state at update_step={self.update_step}.")
+
+    def _restore_legacy_update_step(self) -> None:
+        """Recover the update count from an older checkpoint's critic optimizer."""
+        if self.use_rlt_schedule and not self.rlt_schedule_cfg.get(
+            "continuous_updates", False
+        ):
+            raise ValueError(
+                "Legacy RLT checkpoint has no schedule counters; exact resume "
+                "requires rlt_training_state for a data-budget schedule."
+            )
+        steps = set()
+        for state in self.qf_optimizer.state.values():
+            if "step" not in state:
+                continue
+            value = state["step"]
+            if isinstance(value, torch.Tensor):
+                value = value.item()
+            if not isinstance(value, (int, float)) or value < 0 or int(value) != value:
+                raise ValueError(
+                    f"Expected a nonnegative critic optimizer step, got {value!r}."
+                )
+            steps.add(int(value))
+        if len(steps) != 1:
+            raise ValueError(
+                "Cannot recover RLT update_step from legacy checkpoint: "
+                f"expected one consistent critic optimizer step, got {sorted(steps)}."
+            )
+        self.update_step = steps.pop()
+        for name in self._CHECKPOINT_COUNTERS[1:]:
+            setattr(self, name, None if name.startswith("_warmup_ready_") else 0)
+        self.log_warning(
+            "Legacy RLT checkpoint has no learner state; recovered "
+            f"update_step={self.update_step} from the critic optimizer. "
+            "Replay ingestion counters restart from zero."
+        )
 
     @staticmethod
     def _trajectory_transition_count(traj: Trajectory) -> int:
@@ -494,7 +755,8 @@ class RLTACReplayMixin:
         completed_episodes = 0
         traj_len = int(trajectory.actions.shape[0])
         bsz = int(trajectory.actions.shape[1])
-        num_rows = int(actions.shape[0])
+        # A trailing bootstrap policy output has no executed transition reward.
+        num_rows = min(int(actions.shape[0]), int(rewards.shape[0]))
         auto_reset = bool(self.cfg.env.train.get("auto_reset", False))
 
         for env_idx in range(bsz):
@@ -556,7 +818,9 @@ class RLTACReplayMixin:
                     isinstance(transition.dones, torch.Tensor)
                     and transition.dones.reshape(-1).to(torch.bool).any()
                 )
-                if is_done:
+                if is_done and not self.cfg.env.train.get(
+                    "flush_replay_on_episode_end", False
+                ):
                     next_obs = curr_obs
                 else:
                     next_obs = self._rlt_obs_from_flat_dict(flat, "next_obs", idx)
@@ -626,6 +890,7 @@ class RLTACReplayMixin:
                 **collect_trajectory_replay_metrics(recv_list, reducer=all_reduce_dict),
             }
             self.replay_buffer.add_trajectories(replay_list)
+            self._cache_warmup_transitions(replay_list)
 
             if self.demo_buffer is not None:
                 intervene_traj_list = [
@@ -658,6 +923,43 @@ class RLTACReplayMixin:
         )
         return added, completed
 
+    def _replay_display_size(self) -> int:
+        if use_simulator_transition_replay(self.cfg):
+            return min(
+                self.replay_buffer.total_samples, self.replay_buffer.sample_window_size
+            )
+        return self.replay_buffer.total_samples
+
+    def _prepare_training_progress(self) -> None:
+        warmup = int(self.rlt_schedule_cfg.get("warmup_post_collect_updates", 0))
+        if self.update_step < warmup and not hasattr(self, "_warmup_progress"):
+            self._warmup_progress = TrainingProgress(
+                "Warmup updates",
+                warmup,
+                self.log_info,
+                initial=int(self.update_step),
+                enabled=timing_active(self.cfg),
+            )
+            self._warmup_progress.update(
+                int(self.update_step), self._replay_display_size(), force=True
+            )
+        if not hasattr(self, "_update_timing"):
+            enabled = timing_active(self.cfg)
+            self._update_timing = StageTiming(
+                "Learner update",
+                enabled,
+                self.log_info,
+                timing_mode=get_timing_mode(self.cfg),
+            )
+
+    def _report_training_progress(self) -> None:
+        progress = getattr(self, "_warmup_progress", None)
+        if progress is not None:
+            progress.update(
+                min(int(self.update_step), progress.total),
+                self._replay_display_size(),
+            )
+
     def _update_rollout_ingest_counters(self, added: int, completed: int) -> None:
         if not getattr(self, "use_rlt_schedule", False):
             return
@@ -667,6 +969,17 @@ class RLTACReplayMixin:
         self.episodes_since_train += completed
         self.total_transitions_added += added
         self.total_episodes_added += completed
+        self.log_info(
+            f"[BUFFER] Critical chunks: {self._replay_display_size()} available; "
+            f"{self.replay_buffer.total_samples} collected total"
+        )
+        required = int(self.rlt_schedule_cfg.get("warmup_min_size", 1))
+        if self.total_transitions_added - added < required:
+            self.log_info(
+                f"[COLLECT] Warmup {min(self.replay_buffer.total_samples, required)}/{required}; "
+                f"replay total={self.replay_buffer.total_samples}, "
+                f"new critical transitions={added}, completed episodes={self.total_episodes_added}."
+            )
 
 
 class RLTACFSDPPolicy(RLTACLossMixin, RLTACReplayMixin, EmbodiedSACFSDPPolicy):
@@ -689,6 +1002,7 @@ class RLTACFSDPPolicy(RLTACLossMixin, RLTACReplayMixin, EmbodiedSACFSDPPolicy):
         super().setup_sac_components()
         if self.use_rlt_schedule:
             self.buffer_dataset.min_replay_buffer_size = 1
+        self._setup_warmup_cache()
 
     @Worker.timer("actor/recv_traj")
     async def recv_rollout_trajectories(self, input_channel):
@@ -736,6 +1050,19 @@ class RLTACFSDPPolicy(RLTACLossMixin, RLTACReplayMixin, EmbodiedSACFSDPPolicy):
         )
         counters = self._global_rlt_counters()
         buffer_ready = counters["min_replay_size"] >= min_buffer_size
+        if buffer_ready:
+            phase = (
+                "warmup"
+                if self.update_step
+                < int(schedule_cfg.get("warmup_post_collect_updates", 0))
+                else "online RL"
+            )
+            if getattr(self, "_reported_training_phase", None) != phase:
+                if phase == "online RL":
+                    self.log_info(
+                        f"[TRAIN] Starting {phase}; learner updates={self.update_step}."
+                    )
+                self._reported_training_phase = phase
         warmup_required_updates = int(
             schedule_cfg.get("warmup_post_collect_updates", 0)
         )
@@ -759,6 +1086,15 @@ class RLTACFSDPPolicy(RLTACLossMixin, RLTACReplayMixin, EmbodiedSACFSDPPolicy):
             skip_reason = 3
         elif not buffer_ready:
             skip_reason = 1
+        elif bool(schedule_cfg.get("continuous_updates", False)):
+            updates_to_run = update_epoch
+            if int(self.update_step) < warmup_required_updates:
+                updates_to_run = min(
+                    updates_to_run, warmup_required_updates - int(self.update_step)
+                )
+            desired_total_updates = int(self.update_step) + updates_to_run
+            pending_updates = updates_to_run
+            updates_scheduled = updates_to_run
         else:
             online_transitions = max(
                 int(counters["total_transitions_added"])
@@ -861,14 +1197,25 @@ class RLTACFSDPPolicy(RLTACLossMixin, RLTACReplayMixin, EmbodiedSACFSDPPolicy):
         metrics = {}
         critic_updates_run = 0
         actor_updates_run = 0
+        self._prepare_training_progress()
         for _ in range(updates_to_run):
             update_actor = int(self.update_step) % int(self.critic_actor_ratio) == 0
-            metrics_data = self.update_one_epoch(train_actor=update_actor)
+            with self._update_timing.measure(
+                update=int(self.update_step) + 1,
+                rank=self._rank,
+                actor_updated=update_actor,
+            ) as timing:
+                metrics_data = self.update_one_epoch(
+                    train_actor=update_actor, timing=timing
+                )
             append_to_dict(metrics, metrics_data)
             self.update_step += 1
+            self._report_training_progress()
             critic_updates_run += 1
             actor_updates_run += int(update_actor)
 
+        schedule_metrics["rlt/update_step"] = float(self.update_step)
+        schedule_metrics["rlt/replay_size"] = float(self._replay_display_size())
         schedule_metrics["rlt/critic_updates_run"] = float(critic_updates_run)
         schedule_metrics["rlt/actor_updates_run"] = float(actor_updates_run)
         self.pending_update_budget = max(
@@ -909,6 +1256,12 @@ class AsyncRLTACFSDPPolicy(
         super().setup_sac_components()
         if self.use_rlt_schedule:
             self.buffer_dataset.min_replay_buffer_size = 1
+        self._setup_warmup_cache()
+
+    async def recv_rollout_trajectories(self, input_channel, replay_ack_channel=None):
+        """Receive episode payloads and retain the replay commit receipt channel."""
+        self._replay_ack_channel = replay_ack_channel
+        await super().recv_rollout_trajectories(input_channel)
 
     def _global_rlt_counters(self) -> dict[str, float]:
         """Reuse the shared sync/async RLT counter reduction contract."""
@@ -934,8 +1287,35 @@ class AsyncRLTACFSDPPolicy(
         if not recv_list:
             return
 
-        added, completed = self._ingest_rollout_trajectories(recv_list)
+        episodes = [item for item in recv_list if isinstance(item, EpisodeReplay)]
+        if episodes and getattr(self, "_replay_ack_channel", None) is None:
+            raise RuntimeError("Episode replay requires a replay receipt channel.")
+        trajectories = [
+            item.trajectory if isinstance(item, EpisodeReplay) else item
+            for item in recv_list
+        ]
+        added, completed = self._ingest_rollout_trajectories(trajectories)
         self._update_rollout_ingest_counters(added, completed)
+        for episode in episodes:
+            self._replay_ack_channel.put(episode.end_key, async_op=True)
+
+    async def _wait_for_warmup_data(self, min_size: int) -> None:
+        """Keep receiving data without consuming runner steps during collection."""
+        ticks = 0
+        while True:
+            self._drain_received_trajectories(
+                max_trajectories=self.cfg.actor.get("recv_drain_max_trajectories", 1024)
+            )
+            if self.replay_buffer.total_samples >= min_size:
+                return
+            if ticks % 5 == 0:
+                self.log_info(
+                    f"[COLLECT] Waiting for critical-phase data: "
+                    f"{self.replay_buffer.total_samples}/{min_size}. "
+                    "Only executed critical chunks count; success and failure both count."
+                )
+            ticks += 1
+            await asyncio.sleep(1)
 
     async def run_training(self):
         if not self.use_rlt_schedule:
@@ -948,6 +1328,16 @@ class AsyncRLTACFSDPPolicy(
         if self.cfg.actor.get("enable_offload", False):
             self.load_param_and_grad(self.device)
             self.load_optimizer(self.device)
+
+        if bool(self.rlt_schedule_cfg.get("continuous_updates", False)):
+            await self._wait_for_warmup_data(
+                int(
+                    self.rlt_schedule_cfg.get(
+                        "warmup_min_size",
+                        self.cfg.algorithm.replay_buffer.get("min_buffer_size", 1),
+                    )
+                )
+            )
 
         self._drain_received_trajectories(
             max_trajectories=self.cfg.actor.get("recv_drain_max_trajectories", 1024)
@@ -976,15 +1366,29 @@ class AsyncRLTACFSDPPolicy(
         metrics = {}
         critic_updates_run = 0
         actor_updates_run = 0
+        self._prepare_training_progress()
         for _ in range(updates_to_run):
             update_actor = int(self.update_step) % int(self.critic_actor_ratio) == 0
             await asyncio.sleep(0)
-            metrics_data = self.update_one_epoch(train_actor=update_actor)
+            self._drain_received_trajectories(
+                max_trajectories=self.cfg.actor.get("recv_drain_max_trajectories", 1024)
+            )
+            with self._update_timing.measure(
+                update=int(self.update_step) + 1,
+                rank=self._rank,
+                actor_updated=update_actor,
+            ) as timing:
+                metrics_data = self.update_one_epoch(
+                    train_actor=update_actor, timing=timing
+                )
             append_to_dict(metrics, metrics_data)
             self.update_step += 1
+            self._report_training_progress()
             critic_updates_run += 1
             actor_updates_run += int(update_actor)
 
+        schedule_metrics["rlt/update_step"] = float(self.update_step)
+        schedule_metrics["rlt/replay_size"] = float(self._replay_display_size())
         schedule_metrics["rlt/critic_updates_run"] = float(critic_updates_run)
         schedule_metrics["rlt/actor_updates_run"] = float(actor_updates_run)
         self.pending_update_budget = max(

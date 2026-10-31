@@ -1,0 +1,88 @@
+{
+  "hardware": "RTX 4090 D; 62.43 GiB host RAM",
+  "scope": "Real RLinf Ray cluster, actor/critic initialization, rollout checkpoint, channels, initial weight synchronization, 3 synthetic warmup calls and 5 synthetic inference calls. Physical environment replaced; no robot/camera/gripper constructed.",
+  "sampling_interval_seconds": 0.25,
+  "cases": {
+    "startup_copy_after_reset": {
+      "order": "after-reset",
+      "loader": "copy",
+      "physical_hardware": false,
+      "initial_weight_sync": "passed",
+      "delayed_warmup_ms": [
+        10542.514847125858
+      ],
+      "inference_ms": [
+        [
+          85.60266415588558,
+          75.23665996268392,
+          79.43435898050666,
+          74.8894999269396,
+          74.19354096055031
+        ]
+      ],
+      "status": "passed",
+      "peak_host_unavailable_gib": 59.18026351928711,
+      "peak_rollout_rss_gib": 31.828407287597656,
+      "peak_rollout_uss_gib": 31.43140411376953,
+      "peak_memory_stage": "checkpoint_copy_and_dtype_conversion",
+      "warmup_seconds": 10.54,
+      "memory_sample_scope": "rollout.init_worker (includes warmup for before-reset case; after-reset warmup duration and inference recorded separately)"
+    },
+    "startup_mmap_before_reset": {
+      "order": "before-reset",
+      "loader": "default",
+      "physical_hardware": false,
+      "initial_weight_sync": "passed",
+      "inference_ms": [
+        [
+          81.20776107534766,
+          74.38099500723183,
+          73.8874978851527,
+          74.10530420020223,
+          73.97248898632824
+        ]
+      ],
+      "status": "passed",
+      "peak_host_unavailable_gib": 44.72933578491211,
+      "peak_rollout_rss_gib": 31.813098907470703,
+      "peak_rollout_uss_gib": 31.386070251464844,
+      "peak_memory_stage": "checkpoint_copy_and_dtype_conversion",
+      "peak_rollout_anonymous_gib": 16.594322204589844,
+      "warmup_seconds": 10.15,
+      "memory_sample_scope": "rollout.init_worker (includes warmup for before-reset case; after-reset warmup duration and inference recorded separately)"
+    },
+    "startup_mmap_after_reset": {
+      "order": "after-reset",
+      "loader": "default",
+      "physical_hardware": false,
+      "initial_weight_sync": "passed",
+      "delayed_warmup_ms": [
+        9213.266945909709
+      ],
+      "inference_ms": [
+        [
+          91.13673493266106,
+          77.97915395349264,
+          77.81259808689356,
+          77.01398502103984,
+          78.64059694111347
+        ]
+      ],
+      "status": "passed",
+      "peak_host_unavailable_gib": 44.969085693359375,
+      "peak_rollout_rss_gib": 31.77471923828125,
+      "peak_rollout_uss_gib": 31.423789978027344,
+      "peak_memory_stage": "checkpoint_copy_and_dtype_conversion",
+      "peak_rollout_anonymous_gib": 16.928600311279297,
+      "warmup_seconds": 9.21,
+      "memory_sample_scope": "rollout.init_worker (includes warmup for before-reset case; after-reset warmup duration and inference recorded separately)"
+    }
+  },
+  "original_failure_evidence": {
+    "raylet_log": "/tmp/ray/session_2026-10-29_23-03-53_703239_557549/logs/raylet.out:778",
+    "workers_killed_at": "2026-10-29 23:05:57.017",
+    "feature_model_load_completed_at": "2026-10-29 23:06:03",
+    "warmup_completed_at": "2026-10-29 23:06:13",
+    "conclusion": "The original OOM occurred during checkpoint loading, before startup warmup began."
+  }
+}
