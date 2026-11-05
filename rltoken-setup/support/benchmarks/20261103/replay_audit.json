@@ -1,0 +1,33 @@
+{
+  "new_resume": {
+    "chunks": 1203,
+    "human_actions": 2660,
+    "human_chunks": 420,
+    "actions": 12030,
+    "episode_ends": 57,
+    "reward_positive_chunks": 55,
+    "truncation_chunks": 2,
+    "human_terminal_chunks": 49,
+    "nonfinite_proprio": 0
+  },
+  "prior_7500": {
+    "chunks": 656,
+    "human_actions": 1839,
+    "human_chunks": 290,
+    "actions": 6560,
+    "episode_ends": 31,
+    "reward_positive_chunks": 31,
+    "truncation_chunks": 0,
+    "human_terminal_chunks": 24
+  },
+  "warmup_cache": {
+    "chunks": 141,
+    "human_actions": 330,
+    "human_chunks": 57,
+    "actions": 1410,
+    "episode_ends": 8,
+    "reward_positive_chunks": 8,
+    "truncation_chunks": 0,
+    "human_terminal_chunks": 7
+  }
+}

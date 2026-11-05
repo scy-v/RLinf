@@ -20,7 +20,8 @@ ur_evaluation:
   double_press_interval: 0.5
   wait_for_start: True
   output_path: ${runner.logger.log_path}/ur5e-evaluation.json
-  # Enable detailed per-action diagnostics; save_logs controls file output.
+  # Save detailed per-action timings without periodic console output.
+  # save_logs controls file output, including routine chunk/controller timings.
   action_timing_enabled: True
   save_logs: True
   log_dir: /home/suchenyu/RLinf-rltoken/results/rlinf-ur/logs
@@ -49,7 +50,7 @@ override_cfg:
   gripper_close_threshold: 0.7
   payload_settle_seconds: 0.25
   ft_zero_settle_seconds: 0.50
-  enable_camera_player: False
+  enable_camera_player: True
   task_description: "Insert the black rack into the blue slot"
   camera_names:
     "348522072391": exterior_image

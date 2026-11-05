@@ -439,3 +439,46 @@ def modules(**_: Any) -> dict[str, types.ModuleType]:
     made.update(gello())
     made.update(glove())
     return made
+
+
+def x11_keyboard_display():
+    """Return a fake Xlib display factory with independently controlled focus."""
+    import os
+
+    state = types.SimpleNamespace(active=42, failed=False, connections=[])
+
+    class Window:
+        def __init__(self, window_id):
+            self.id = window_id
+
+        def get_attributes(self):
+            return types.SimpleNamespace()
+
+        def get_full_property(self, name, property_type):
+            if state.failed:
+                raise OSError("X server disconnected")
+            values = {
+                "_NET_ACTIVE_WINDOW": [state.active],
+                "_NET_CLIENT_LIST": [42],
+                "_NET_WM_PID": [os.getpid()],
+            }
+            return types.SimpleNamespace(value=values[name])
+
+    class Display:
+        def __init__(self):
+            self.closed = False
+            state.connections.append(self)
+
+        def screen(self):
+            return types.SimpleNamespace(root=Window(0))
+
+        def intern_atom(self, name):
+            return name
+
+        def create_resource_object(self, kind, window_id):
+            return Window(window_id)
+
+        def close(self):
+            self.closed = True
+
+    return module("Xlib.display", Display=Display), state

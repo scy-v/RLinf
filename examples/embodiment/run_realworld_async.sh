@@ -15,8 +15,10 @@ fi
 
 if [ "$CONFIG_NAME" = "ur_rlt_stage2_ac_mlp" ]; then
     RUN_LOG_ROOT="${REPO_PATH}/logs/online_rltoken"
+    LOG_OPTIONS=(--compact --deduplicate-timing)
 else
     RUN_LOG_ROOT="${REPO_PATH}/logs"
+    LOG_OPTIONS=(--compact)
 fi
 LOG_DIR="${RLINF_LOG_DIR:-${RUN_LOG_ROOT}/$(date +'%Y%m%d-%H%M%S')-${CONFIG_NAME}}"
 mkdir -p "$LOG_DIR"
@@ -26,4 +28,4 @@ CMD=(python -u "${EMBODIED_PATH}/train_async.py"
 echo "Using Python at $(command -v python)"
 printf '%q ' "${CMD[@]}" > "$LOG_DIR/run_embodiment.log"
 printf '\n' >> "$LOG_DIR/run_embodiment.log"
-"${CMD[@]}" 2>&1 | python -u -m rlinf.utils.progress --compact --log-file "$LOG_DIR/run_embodiment.log"
+"${CMD[@]}" 2>&1 | python -u -m rlinf.utils.progress "${LOG_OPTIONS[@]}" --log-file "$LOG_DIR/run_embodiment.log"

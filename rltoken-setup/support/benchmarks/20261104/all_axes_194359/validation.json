@@ -1,0 +1,12 @@
+{
+  "restored_replay_prefix_identical_files": 909,
+  "episode_chunk_counts_match_metrics": 88,
+  "local_statistics_independent_checks": 120,
+  "source_hashes_unchanged": true,
+  "saved_scope": 2522,
+  "tail_last_observed_critic_update": 25361,
+  "new_files_bytes": 1017383,
+  "report_links_valid": true,
+  "ruff_check": "passed",
+  "final_directory_bytes": 1031859
+}

@@ -1,0 +1,39 @@
+{
+  "checkpoint": "logs/online_rltoken/20261101-235748-ur_rlt_stage2_ac_mlp/ur_rlt_stage2_ac_mlp/checkpoints/global_step_7500/actor",
+  "device": "cpu",
+  "scope": "DCP decoding, real MLP and optimizer restoration, target loading, replay restoration and eval forward; no Ray, GPU or robot startup",
+  "optimizer_steps": [
+    [
+      15002
+    ],
+    [
+      60006
+    ]
+  ],
+  "scheduler_last_epoch": [
+    15002,
+    60006
+  ],
+  "rng_saved": true,
+  "model_tensors": 40,
+  "replay_size": 806,
+  "replay_samples": 806,
+  "eval_action_shape": [
+    256,
+    10,
+    7
+  ],
+  "training_counters": {
+    "update_step": 60006,
+    "transitions_since_train": 0,
+    "episodes_since_train": 0,
+    "total_transitions_added": 806,
+    "total_episodes_added": 31,
+    "_warmup_ready_total_transitions": 150,
+    "_warmup_ready_total_episodes": 0,
+    "pending_update_budget": 0
+  },
+  "resume_global_step": 7500,
+  "critic_update_remainder": 6,
+  "result": "passed"
+}

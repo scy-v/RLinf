@@ -1,0 +1,178 @@
+{
+  "q_data_matrix_rows_dataset_cols_critic": [
+    [
+      0.11764822154119611,
+      0.1213379553835839
+    ],
+    [
+      0.08376348907756619,
+      0.08475022650649772
+    ]
+  ],
+  "q_data_total_change": -0.032897995034698396,
+  "q_data_symmetric_contributions": {
+    "dataset": -0.035236230670358054,
+    "critic": 0.002338235635659658
+  },
+  "q_pi": {
+    "deterministic": {
+      "values_axes_dataset_critic_actor": [
+        [
+          [
+            0.11764919281005859,
+            0.11772565269470214
+          ],
+          [
+            0.12158721733093261,
+            0.12167381095886232
+          ]
+        ],
+        [
+          [
+            0.08352755641937255,
+            0.08353773355484008
+          ],
+          [
+            0.08462769794464112,
+            0.0846392662525177
+          ]
+        ]
+      ],
+      "total_change": -0.03300992655754088,
+      "shapley_contributions": {
+        "dataset": -0.035576633453369144,
+        "critic": 0.0025212357044220057,
+        "actor": 4.547119140625259e-05
+      }
+    },
+    "training_4_seeds": {
+      "values_axes_dataset_critic_actor": [
+        [
+          [
+            0.11764913988113404,
+            0.11772459983825681
+          ],
+          [
+            0.12158735299110413,
+            0.1216724467277527
+          ]
+        ],
+        [
+          [
+            0.08352471804618834,
+            0.08353756797313693
+          ],
+          [
+            0.08462661069631576,
+            0.08463915377855301
+          ]
+        ]
+      ],
+      "total_change": -0.03300998610258103,
+      "shapley_contributions": {
+        "dataset": -0.0355772006213665,
+        "critic": 0.002521556228399273,
+        "actor": 4.565829038619823e-05
+      }
+    }
+  },
+  "groups": {
+    "22500": {
+      "failed": {
+        "n": 75,
+        "fraction": 0.0375,
+        "q_old_critic": 0.0009680248921116193,
+        "q_new_critic": 0.0008677454913655917
+      },
+      "partial": {
+        "n": 6,
+        "fraction": 0.003,
+        "q_old_critic": 0.3411838660637538,
+        "q_new_critic": 0.4478137269616127
+      },
+      "success_0_9": {
+        "n": 93,
+        "fraction": 0.0465,
+        "q_old_critic": 0.8389763332182362,
+        "q_new_critic": 0.8447003883700217
+      },
+      "success_10_29": {
+        "n": 186,
+        "fraction": 0.093,
+        "q_old_critic": 0.46443118635685215,
+        "q_new_critic": 0.4839616145498009
+      },
+      "success_30_59": {
+        "n": 279,
+        "fraction": 0.1395,
+        "q_old_critic": 0.17321708857158608,
+        "q_new_critic": 0.18303061744004595
+      },
+      "success_60_plus": {
+        "n": 1361,
+        "fraction": 0.6805,
+        "q_old_critic": 0.015018494236560143,
+        "q_new_critic": 0.01490404761432616
+      }
+    },
+    "47500": {
+      "failed": {
+        "n": 442,
+        "fraction": 0.221,
+        "q_old_critic": 0.010229173058968425,
+        "q_new_critic": 0.0004941509800596474
+      },
+      "partial": {
+        "n": 12,
+        "fraction": 0.006,
+        "q_old_critic": 0.20275887055322528,
+        "q_new_critic": 0.1935001821257174
+      },
+      "success_0_9": {
+        "n": 66,
+        "fraction": 0.033,
+        "q_old_critic": 0.7918746417218988,
+        "q_new_critic": 0.8451496796174482
+      },
+      "success_10_29": {
+        "n": 132,
+        "fraction": 0.066,
+        "q_old_critic": 0.4377246492288329,
+        "q_new_critic": 0.4677265616077365
+      },
+      "success_30_59": {
+        "n": 198,
+        "fraction": 0.099,
+        "q_old_critic": 0.16425751823216977,
+        "q_new_critic": 0.17474591152535546
+      },
+      "success_60_plus": {
+        "n": 1150,
+        "fraction": 0.575,
+        "q_old_critic": 0.01565757265618152,
+        "q_new_critic": 0.012904835326354142
+      }
+    }
+  },
+  "same_samples_critic_changes": {
+    "22500": {
+      "mean": 0.0036897338423877955,
+      "mean_abs": 0.010497240265831351,
+      "p5_p50_p95": [
+        -0.018238282203674315,
+        0.0003743693232536316,
+        0.03755287677049634
+      ]
+    },
+    "47500": {
+      "mean": 0.0009867374289315193,
+      "mean_abs": 0.01577104128547944,
+      "p5_p50_p95": [
+        -0.029053091257810592,
+        -0.0013122987002134323,
+        0.05058826506137837
+      ]
+    }
+  },
+  "method": "CPU float32; complete 2000-record buffers each; q_data averages both heads, fixed recorded actions; q_pi uses Q1, old/new actors crossed with old/new critics and buffers. Training probe has reference dropout .5 and stochastic actions with 4 paired seeds. Symmetric/Shapley decomposition is numerical attribution, not robot-performance causal attribution. Groups use realized terminal reward distance and exclude clipped first episode from complete labels."
+}

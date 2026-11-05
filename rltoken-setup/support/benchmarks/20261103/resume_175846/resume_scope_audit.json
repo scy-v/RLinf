@@ -1,0 +1,174 @@
+{
+  "run": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261103-175846-ur_rlt_stage2_ac_mlp",
+  "resume_checkpoint": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261102-232256-ur_rlt_stage2_ac_mlp/ur_rlt_stage2_ac_mlp/checkpoints/global_step_22500",
+  "initial_checkpoint_state": {
+    "update_step": 180006,
+    "transitions_since_train": 0,
+    "episodes_since_train": 0,
+    "total_transitions_added": 2009,
+    "total_episodes_added": 88,
+    "_warmup_ready_total_transitions": 150,
+    "_warmup_ready_total_episodes": 0,
+    "pending_update_budget": 0
+  },
+  "last_saved_checkpoint_state": {
+    "update_step": 380006,
+    "transitions_since_train": 0,
+    "episodes_since_train": 0,
+    "total_transitions_added": 4200,
+    "total_episodes_added": 175,
+    "_warmup_ready_total_transitions": 150,
+    "_warmup_ready_total_episodes": 0,
+    "pending_update_budget": 0
+  },
+  "metrics": {
+    "records": 25104,
+    "first_step": 22501,
+    "last_step": 47604,
+    "start_steps": [
+      22500
+    ],
+    "start_times": [
+      1793699996.331974
+    ],
+    "steps_contiguous": true,
+    "start": "2026-11-03T17:59:56.331974+08:00",
+    "last": "2026-11-03T18:54:40.999867+08:00",
+    "elapsed_seconds": 3284.6678926944733,
+    "critic_updates_sum": 200832.0,
+    "actor_updates_sum": 50208.0,
+    "first_update_step": 180014.0,
+    "last_update_step": 380838.0,
+    "transition_counter_first": 2009.0,
+    "transition_counter_last": 4232.0,
+    "buffer_counter_first": 2000.0,
+    "buffer_counter_last": 4223.0,
+    "new_transitions": 2223.0,
+    "critic_per_new_transition": 90.34278002699055,
+    "actor_per_new_transition": 22.58569500674764
+  },
+  "window_replaced": {
+    "step": 45225,
+    "elapsed_seconds": 2975.520656347275,
+    "timestamp": "2026-11-03T18:49:31.852630+08:00"
+  },
+  "loss_means": {
+    "22501-25000": {
+      "count": 2500,
+      "train/actor/q_pi": 0.1169771201223135,
+      "train/critic/q_data": 0.11669720378220082,
+      "train/actor/bc_loss": 5.341130031592911e-05,
+      "train/sac/critic_loss": 1.4062388585372786e-06,
+      "train/sac/actor_loss": -0.011430655703693629
+    },
+    "45001-47500": {
+      "count": 2500,
+      "train/actor/q_pi": 0.0844794444218278,
+      "train/critic/q_data": 0.08452031584680081,
+      "train/actor/bc_loss": 3.981958275835495e-05,
+      "train/sac/critic_loss": 9.263447372092059e-07,
+      "train/sac/actor_loss": -0.008248846688494087
+    }
+  },
+  "episodes": {
+    "total": 88,
+    "success": 76,
+    "timeouts": 12
+  },
+  "buffer_log_last": "[BUFFER] Critical chunks: 2000 available; 4223 collected total",
+  "replay_files": {
+    "22500": {
+      "count": 2000,
+      "min_id": 9,
+      "max_id": 2008,
+      "contiguous": true
+    },
+    "47500": {
+      "count": 2000,
+      "min_id": 2200,
+      "max_id": 4199,
+      "contiguous": true
+    }
+  },
+  "timing": {
+    "Learner update": {
+      "rows": 200828,
+      "first": "2026-11-03T17:59:56.750+08:00",
+      "last": "2026-11-03T18:54:40.954+08:00",
+      "samples": 200828.0,
+      "sum_work_ms": 2056480.4650829174,
+      "sum_inference_ms": 0,
+      "inference_samples": 0
+    },
+    "Rollout step": {
+      "rows": 4241,
+      "first": "2026-11-03T18:00:00.997+08:00",
+      "last": "2026-11-03T18:54:36.283+08:00",
+      "samples": 4241.0,
+      "sum_work_ms": 351025.5859554745,
+      "sum_inference_ms": 341039.34390842915,
+      "inference_samples": 4241
+    },
+    "Env step": {
+      "rows": 4240,
+      "first": "2026-11-03T18:00:02.879+08:00",
+      "last": "2026-11-03T18:54:36.336+08:00",
+      "samples": 4240.0,
+      "sum_work_ms": 2234697.175062727,
+      "sum_inference_ms": 0,
+      "inference_samples": 0
+    }
+  },
+  "sync_mean_ms": 23.97583651845284,
+  "at_saved_47500": {
+    "elapsed_seconds": 3271.3566195964813,
+    "critic_updates_since_resume": 200000.0,
+    "new_transitions": 2191.0
+  },
+  "episode_blocks": {
+    "1-20": {
+      "count": 20,
+      "success": 20,
+      "critical_seconds_mean": 13.55
+    },
+    "51-60": {
+      "count": 10,
+      "success": 7,
+      "critical_seconds_mean": 18.8
+    },
+    "61-70": {
+      "count": 10,
+      "success": 5,
+      "critical_seconds_mean": 19.4
+    },
+    "71-80": {
+      "count": 10,
+      "success": 10,
+      "critical_seconds_mean": 15.2
+    }
+  },
+  "inference_mean_ms": 80.41484176100664,
+  "timing_learner_missing_update_ids": [
+    228712,
+    274089,
+    349320,
+    366160
+  ],
+  "probe_source_paths_checked": {
+    "scripts": [
+      "/tmp/resume_deep_probe.py",
+      "/tmp/rlt_q_cross.py"
+    ],
+    "baseline_run": "20261102-232256-ur_rlt_stage2_ac_mlp",
+    "baseline_step": 22500,
+    "continuation_run": "20261103-175846-ur_rlt_stage2_ac_mlp",
+    "continuation_steps": [
+      30000,
+      35000,
+      40000,
+      42500,
+      47500
+    ],
+    "scope": "Source-path and replay-file-range audit; model forward/gradient probes were not rerun."
+  }
+}

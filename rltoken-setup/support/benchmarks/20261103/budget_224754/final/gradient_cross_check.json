@@ -1,0 +1,77 @@
+{
+  "method": {
+    "old_checkpoint": "20261103-175846-ur_rlt_stage2_ac_mlp/global_step_47500",
+    "new_checkpoint": "20261103-224754-ur_rlt_stage2_ac_mlp/global_step_3276",
+    "old_inputs": "96 eligible nonintervention nonterminal records from each of old 22500 and 47500 replay; same selection as resume_175846/deep_probe.json",
+    "new_inputs": "192 IDs in probe.json fixed_sample_ids",
+    "weights": {
+      "bc": 5,
+      "q": -0.1
+    },
+    "seeds": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "reference_dropout": 0.5,
+    "device": "cpu",
+    "dtype": "float32",
+    "optimizer_updates": false,
+    "gradient_scope": "actor parameters excluding q_head; each value averaged over four seeds"
+  },
+  "results": {
+    "old_inputs": {
+      "old_actor_old_critic": {
+        "q_gradient": 0.00036427986924536526,
+        "bc_gradient": 0.03499810490757227,
+        "q_action_gradient_batch_norm": 0.0001315470908593852,
+        "bc_to_q": 96.07712700888308
+      },
+      "old_actor_new_critic": {
+        "q_gradient": 0.028460722416639328,
+        "bc_gradient": 0.03499810490757227,
+        "q_action_gradient_batch_norm": 0.004475745721720159,
+        "bc_to_q": 1.2297174154757995
+      },
+      "new_actor_old_critic": {
+        "q_gradient": 0.0003807855609920807,
+        "bc_gradient": 0.06149410828948021,
+        "q_action_gradient_batch_norm": 0.00013147356730769388,
+        "bc_to_q": 161.45520101941509
+      },
+      "new_actor_new_critic": {
+        "q_gradient": 0.027845412027090788,
+        "bc_gradient": 0.06149410828948021,
+        "q_action_gradient_batch_norm": 0.004196534515358508,
+        "bc_to_q": 2.2084005280909054
+      }
+    },
+    "new_inputs": {
+      "old_actor_old_critic": {
+        "q_gradient": 0.0005946364253759384,
+        "bc_gradient": 0.08775480464100838,
+        "q_action_gradient_batch_norm": 0.00019926662935176864,
+        "bc_to_q": 146.9492144701061
+      },
+      "old_actor_new_critic": {
+        "q_gradient": 0.03365751262754202,
+        "bc_gradient": 0.08775480464100838,
+        "q_action_gradient_batch_norm": 0.005145907285623252,
+        "bc_to_q": 2.607147519007384
+      },
+      "new_actor_old_critic": {
+        "q_gradient": 0.0005546336906263605,
+        "bc_gradient": 0.04556963033974171,
+        "q_action_gradient_batch_norm": 0.00019930975759052671,
+        "bc_to_q": 82.16212110686152
+      },
+      "new_actor_new_critic": {
+        "q_gradient": 0.03451376035809517,
+        "bc_gradient": 0.04556963033974171,
+        "q_action_gradient_batch_norm": 0.004925699322484434,
+        "bc_to_q": 1.3203309298551011
+      }
+    }
+  }
+}

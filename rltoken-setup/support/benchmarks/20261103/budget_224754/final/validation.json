@@ -1,0 +1,60 @@
+{
+  "analysis_scope": "logs/online_rltoken/20261103-224754-ur_rlt_stage2_ac_mlp",
+  "generated_at": "2026-11-04T01:50:10.377123+08:00",
+  "sources": {
+    "run_embodiment.log": {
+      "size_bytes": 1054937,
+      "sha256": "60e4477c728037c62120acdede78c3b94d3e1492b5c3a815bd33602563877943"
+    },
+    "metrics.log": {
+      "size_bytes": 471672,
+      "sha256": "fdc10b04b1e81731df22d7c9dab3bffb4832e1b37d35b19b30311f975e6f2d38"
+    },
+    "timing.tsv": {
+      "size_bytes": 7900481,
+      "sha256": "2bd091aaaefe50082019ed93c04ba22ae62c1b1efd5451b645d84a07538e2e41"
+    },
+    "tensorboard/config.yaml": {
+      "size_bytes": 12197,
+      "sha256": "0f678e5d82f5bfaab366b1e555ddb933674ce24bbaea9a67108a863c600623ab"
+    }
+  },
+  "checks": {
+    "critic_update_sum": 16910,
+    "actor_update_sum": 8455,
+    "completed_episodes": 134,
+    "success_including_help": 110,
+    "online_training_batches": 130,
+    "metrics_including_warmup": 131,
+    "last_round": 3382,
+    "last_checkpoint": 3276,
+    "last_checkpoint_replay_records": 3396,
+    "last_logged_replay_records": 3502,
+    "uncheckpointed_new_records": 106,
+    "local_markdown_links_valid": true,
+    "q_factor_contributions_sum_to_total": true,
+    "no_missing_update_timing": true,
+    "no_nonfinite_scalar": true
+  },
+  "method": {
+    "device": "cpu",
+    "dtype": "float32",
+    "fixed_inputs": 192,
+    "paired_seeds": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "q_pi_head": "q1",
+    "q_data_head": "mean of twins",
+    "gradient_weights": {
+      "BC": 5.0,
+      "Q": -0.1
+    },
+    "cross_replacement": "Mean marginal contribution across all factor permutations",
+    "sample_ids_file": "probe.json",
+    "robot_connection": false,
+    "optimizer_updates": false
+  }
+}

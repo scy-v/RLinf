@@ -1,0 +1,1072 @@
+{
+  "replay": {
+    "22500": {
+      "indices": [
+        9,
+        2008
+      ],
+      "chunks": 2000,
+      "complete_episodes": 95,
+      "success_episodes": 93,
+      "mean_critical_chunks": 20.989473684210527,
+      "human_action_fraction": 0.2414499968290329,
+      "human_nonzero_xyz_fraction": 0.17640000581741333,
+      "reward_positive_chunk_fraction": 0.047,
+      "discounted_observed_return_mean": 0.11676808168425196
+    },
+    "30000": {
+      "indices": [
+        609,
+        2608
+      ],
+      "chunks": 2000,
+      "complete_episodes": 93,
+      "success_episodes": 90,
+      "mean_critical_chunks": 21.43010752688172,
+      "human_action_fraction": 0.2264000028371811,
+      "human_nonzero_xyz_fraction": 0.16120000183582306,
+      "reward_positive_chunk_fraction": 0.0455,
+      "discounted_observed_return_mean": 0.11377324574302501
+    },
+    "35000": {
+      "indices": [
+        1016,
+        3015
+      ],
+      "chunks": 2000,
+      "complete_episodes": 90,
+      "success_episodes": 86,
+      "mean_critical_chunks": 21.955555555555556,
+      "human_action_fraction": 0.1935500055551529,
+      "human_nonzero_xyz_fraction": 0.12675000727176666,
+      "reward_positive_chunk_fraction": 0.043,
+      "discounted_observed_return_mean": 0.1099544757147745
+    },
+    "40000": {
+      "indices": [
+        1516,
+        3515
+      ],
+      "chunks": 2000,
+      "complete_episodes": 83,
+      "success_episodes": 75,
+      "mean_critical_chunks": 23.83132530120482,
+      "human_action_fraction": 0.15289999544620514,
+      "human_nonzero_xyz_fraction": 0.08955000340938568,
+      "reward_positive_chunk_fraction": 0.038,
+      "discounted_observed_return_mean": 0.09575361724377827
+    },
+    "42500": {
+      "indices": [
+        1768,
+        3767
+      ],
+      "chunks": 2000,
+      "complete_episodes": 80,
+      "success_episodes": 67,
+      "mean_critical_chunks": 24.9625,
+      "human_action_fraction": 0.13744999468326569,
+      "human_nonzero_xyz_fraction": 0.07980000227689743,
+      "reward_positive_chunk_fraction": 0.034,
+      "discounted_observed_return_mean": 0.08420315168446352
+    },
+    "47500": {
+      "indices": [
+        2200,
+        4199
+      ],
+      "chunks": 2000,
+      "complete_episodes": 78,
+      "success_episodes": 66,
+      "mean_critical_chunks": 25.487179487179485,
+      "human_action_fraction": 0.14010000228881836,
+      "human_nonzero_xyz_fraction": 0.08015000075101852,
+      "reward_positive_chunk_fraction": 0.0335,
+      "discounted_observed_return_mean": 0.08367114670994595
+    }
+  },
+  "fixed_probe": {
+    "22500": {
+      "fixed_batch_q_pi": 0.07518351823091507,
+      "fixed_batch_q_data": 0.07504212856292725,
+      "fixed_batch_q_state_std": 0.1345769613981247,
+      "own_critic_new_minus_old_policy_q": 0.0,
+      "own_critic_policy_minus_reference_q": -3.9369409932987764e-05,
+      "action_rmse_vs22500_by_channel": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "action_rmse_to_reference_by_channel": [
+        0.0035724390763789415,
+        0.0037690340541303158,
+        0.004374767653644085,
+        0.00219517620280385,
+        0.0018281430238857865,
+        0.010178008116781712,
+        0.043989185243844986
+      ],
+      "weighted_gradient_mean_q_bc_cos": [
+        0.0008787865663180128,
+        0.06197413615882397,
+        0.2968771904706955
+      ],
+      "weighted_bc_to_q_gradient_norm_ratio_mean": 70.52222623501099
+    },
+    "30000": {
+      "fixed_batch_q_pi": 0.07484472543001175,
+      "fixed_batch_q_data": 0.07470430433750153,
+      "fixed_batch_q_state_std": 0.1334039866924286,
+      "own_critic_new_minus_old_policy_q": 2.0194178432575427e-05,
+      "own_critic_policy_minus_reference_q": -1.4923280104994774e-05,
+      "action_rmse_vs22500_by_channel": [
+        0.003491254523396492,
+        0.0032569493632763624,
+        0.003246885258704424,
+        0.0025380353908985853,
+        0.0022754280362278223,
+        0.008617238141596317,
+        0.03837917000055313
+      ],
+      "action_rmse_to_reference_by_channel": [
+        0.0030772159807384014,
+        0.002761774230748415,
+        0.0039050758350640535,
+        0.0014595070388168097,
+        0.00174662412609905,
+        0.009783146902918816,
+        0.05435711145401001
+      ],
+      "weighted_gradient_mean_q_bc_cos": [
+        0.0005351899453671649,
+        0.03636577632278204,
+        0.058118533343076706
+      ],
+      "weighted_bc_to_q_gradient_norm_ratio_mean": 67.94604115129076
+    },
+    "35000": {
+      "fixed_batch_q_pi": 0.07563336193561554,
+      "fixed_batch_q_data": 0.07448998838663101,
+      "fixed_batch_q_state_std": 0.1355218142271042,
+      "own_critic_new_minus_old_policy_q": 1.7155660316348076e-05,
+      "own_critic_policy_minus_reference_q": -3.052642568945885e-05,
+      "action_rmse_vs22500_by_channel": [
+        0.003031411673873663,
+        0.003810581983998418,
+        0.0045697977766394615,
+        0.0026957879308611155,
+        0.0024177473969757557,
+        0.00958916824311018,
+        0.038320958614349365
+      ],
+      "action_rmse_to_reference_by_channel": [
+        0.0028862827457487583,
+        0.0029178662225604057,
+        0.004833490587770939,
+        0.00265888893045485,
+        0.0017453610198572278,
+        0.0087879104539752,
+        0.05605649575591087
+      ],
+      "weighted_gradient_mean_q_bc_cos": [
+        0.0005503493157448247,
+        0.048329769633710384,
+        0.1797490231692791
+      ],
+      "weighted_bc_to_q_gradient_norm_ratio_mean": 87.81396951912424
+    },
+    "40000": {
+      "fixed_batch_q_pi": 0.07426821440458298,
+      "fixed_batch_q_data": 0.07436395436525345,
+      "fixed_batch_q_state_std": 0.1353294402360916,
+      "own_critic_new_minus_old_policy_q": 3.78219410777092e-05,
+      "own_critic_policy_minus_reference_q": -8.85074678080855e-06,
+      "action_rmse_vs22500_by_channel": [
+        0.004323057364672422,
+        0.003340264083817601,
+        0.005288090091198683,
+        0.003134625731036067,
+        0.003554246388375759,
+        0.010136041790246964,
+        0.04554598405957222
+      ],
+      "action_rmse_to_reference_by_channel": [
+        0.003874307731166482,
+        0.002803273731842637,
+        0.004587667994201183,
+        0.0017037561628967524,
+        0.002405470935627818,
+        0.008516335859894753,
+        0.03161020576953888
+      ],
+      "weighted_gradient_mean_q_bc_cos": [
+        0.00046805083547951654,
+        0.04531105142086744,
+        0.06040008086711168
+      ],
+      "weighted_bc_to_q_gradient_norm_ratio_mean": 96.80876788158062
+    },
+    "42500": {
+      "fixed_batch_q_pi": 0.07440873235464096,
+      "fixed_batch_q_data": 0.07421030104160309,
+      "fixed_batch_q_state_std": 0.13692481815814972,
+      "own_critic_new_minus_old_policy_q": 4.982047903467901e-05,
+      "own_critic_policy_minus_reference_q": 3.745624098883127e-06,
+      "action_rmse_vs22500_by_channel": [
+        0.004273144528269768,
+        0.002934055170044303,
+        0.004640320315957069,
+        0.0027165908832103014,
+        0.002936431672424078,
+        0.00948414672166109,
+        0.04858735203742981
+      ],
+      "action_rmse_to_reference_by_channel": [
+        0.0034340335987508297,
+        0.0031353067606687546,
+        0.004416223615407944,
+        0.0016916489694267511,
+        0.0021259139757603407,
+        0.00757580017670989,
+        0.041747383773326874
+      ],
+      "weighted_gradient_mean_q_bc_cos": [
+        0.0004315144178690389,
+        0.04513286240398884,
+        0.02222486981190741
+      ],
+      "weighted_bc_to_q_gradient_norm_ratio_mean": 104.59641140439308
+    },
+    "47500": {
+      "fixed_batch_q_pi": 0.07665003091096878,
+      "fixed_batch_q_data": 0.07623854279518127,
+      "fixed_batch_q_state_std": 0.14107327163219452,
+      "own_critic_new_minus_old_policy_q": 4.2832765757339075e-05,
+      "own_critic_policy_minus_reference_q": -2.9064249247312546e-06,
+      "action_rmse_vs22500_by_channel": [
+        0.004172694403678179,
+        0.004504165146499872,
+        0.00472750049084425,
+        0.0033176576253026724,
+        0.0026115807704627514,
+        0.010684942826628685,
+        0.046583715826272964
+      ],
+      "action_rmse_to_reference_by_channel": [
+        0.0034247986041009426,
+        0.003256384516134858,
+        0.004506229422986507,
+        0.0015769903548061848,
+        0.002004187786951661,
+        0.007384129334241152,
+        0.020369237288832664
+      ],
+      "weighted_gradient_mean_q_bc_cos": [
+        0.00036427986924536526,
+        0.03499810490757227,
+        -0.05716483946889639
+      ],
+      "weighted_bc_to_q_gradient_norm_ratio_mean": 96.07712700888308
+    }
+  },
+  "probe_samples": 192,
+  "episodes": [
+    {
+      "start_time": 1793700002.0,
+      "critical_time": 1793700016.0,
+      "end_time": 1793700028.0,
+      "actions": 431,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700035.0,
+      "critical_time": 1793700050.0,
+      "end_time": 1793700066.0,
+      "actions": 505,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700074.0,
+      "critical_time": 1793700087.0,
+      "end_time": 1793700101.0,
+      "actions": 441,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700107.0,
+      "critical_time": 1793700120.0,
+      "end_time": 1793700137.0,
+      "actions": 495,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700162.0,
+      "critical_time": 1793700175.0,
+      "end_time": 1793700188.0,
+      "actions": 425,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700196.0,
+      "critical_time": 1793700210.0,
+      "end_time": 1793700224.0,
+      "actions": 454,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700231.0,
+      "critical_time": 1793700245.0,
+      "end_time": 1793700259.0,
+      "actions": 444,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700264.0,
+      "critical_time": 1793700277.0,
+      "end_time": 1793700291.0,
+      "actions": 433,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700298.0,
+      "critical_time": 1793700313.0,
+      "end_time": 1793700324.0,
+      "actions": 417,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700348.0,
+      "critical_time": 1793700361.0,
+      "end_time": 1793700372.0,
+      "actions": 393,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700375.0,
+      "critical_time": 1793700390.0,
+      "end_time": 1793700406.0,
+      "actions": 493,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700412.0,
+      "critical_time": 1793700426.0,
+      "end_time": 1793700438.0,
+      "actions": 420,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700460.0,
+      "critical_time": 1793700474.0,
+      "end_time": 1793700487.0,
+      "actions": 433,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700491.0,
+      "critical_time": 1793700505.0,
+      "end_time": 1793700518.0,
+      "actions": 440,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700522.0,
+      "critical_time": 1793700535.0,
+      "end_time": 1793700551.0,
+      "actions": 478,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700557.0,
+      "critical_time": 1793700571.0,
+      "end_time": 1793700584.0,
+      "actions": 445,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700589.0,
+      "critical_time": 1793700602.0,
+      "end_time": 1793700614.0,
+      "actions": 404,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700619.0,
+      "critical_time": 1793700633.0,
+      "end_time": 1793700646.0,
+      "actions": 431,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700653.0,
+      "critical_time": 1793700666.0,
+      "end_time": 1793700679.0,
+      "actions": 414,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700686.0,
+      "critical_time": 1793700700.0,
+      "end_time": 1793700714.0,
+      "actions": 451,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700735.0,
+      "critical_time": 1793700747.0,
+      "end_time": 1793700760.0,
+      "actions": 410,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700772.0,
+      "critical_time": 1793700786.0,
+      "end_time": 1793700799.0,
+      "actions": 435,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700802.0,
+      "critical_time": 1793700816.0,
+      "end_time": 1793700829.0,
+      "actions": 430,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700833.0,
+      "critical_time": 1793700850.0,
+      "end_time": 1793700862.0,
+      "actions": 467,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700866.0,
+      "critical_time": 1793700879.0,
+      "end_time": 1793700892.0,
+      "actions": 426,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700896.0,
+      "critical_time": 1793700911.0,
+      "end_time": 1793700926.0,
+      "actions": 488,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793700937.0,
+      "critical_time": 1793700950.0,
+      "end_time": 1793700974.0,
+      "actions": 600,
+      "reward": 0.0,
+      "terminated": "False",
+      "truncated": "True"
+    },
+    {
+      "start_time": 1793700978.0,
+      "critical_time": 1793700991.0,
+      "end_time": 1793701007.0,
+      "actions": 469,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701041.0,
+      "critical_time": 1793701055.0,
+      "end_time": 1793701068.0,
+      "actions": 433,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701073.0,
+      "critical_time": 1793701086.0,
+      "end_time": 1793701099.0,
+      "actions": 421,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701104.0,
+      "critical_time": 1793701118.0,
+      "end_time": 1793701131.0,
+      "actions": 432,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701134.0,
+      "critical_time": 1793701148.0,
+      "end_time": 1793701162.0,
+      "actions": 444,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701166.0,
+      "critical_time": 1793701179.0,
+      "end_time": 1793701190.0,
+      "actions": 398,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701194.0,
+      "critical_time": 1793701208.0,
+      "end_time": 1793701221.0,
+      "actions": 446,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701225.0,
+      "critical_time": 1793701238.0,
+      "end_time": 1793701256.0,
+      "actions": 508,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701260.0,
+      "critical_time": 1793701274.0,
+      "end_time": 1793701288.0,
+      "actions": 459,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701291.0,
+      "critical_time": 1793701305.0,
+      "end_time": 1793701319.0,
+      "actions": 443,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701323.0,
+      "critical_time": 1793701337.0,
+      "end_time": 1793701351.0,
+      "actions": 464,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701406.0,
+      "critical_time": 1793701425.0,
+      "end_time": 1793701443.0,
+      "actions": 600,
+      "reward": 0.0,
+      "terminated": "False",
+      "truncated": "True"
+    },
+    {
+      "start_time": 1793701447.0,
+      "critical_time": 1793701460.0,
+      "end_time": 1793701473.0,
+      "actions": 435,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701477.0,
+      "critical_time": 1793701490.0,
+      "end_time": 1793701507.0,
+      "actions": 474,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701510.0,
+      "critical_time": 1793701523.0,
+      "end_time": 1793701547.0,
+      "actions": 600,
+      "reward": 0.0,
+      "terminated": "False",
+      "truncated": "True"
+    },
+    {
+      "start_time": 1793701553.0,
+      "critical_time": 1793701568.0,
+      "end_time": 1793701583.0,
+      "actions": 481,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701590.0,
+      "critical_time": 1793701603.0,
+      "end_time": 1793701616.0,
+      "actions": 416,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701619.0,
+      "critical_time": 1793701631.0,
+      "end_time": 1793701645.0,
+      "actions": 419,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701648.0,
+      "critical_time": 1793701662.0,
+      "end_time": 1793701675.0,
+      "actions": 435,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701679.0,
+      "critical_time": 1793701691.0,
+      "end_time": 1793701704.0,
+      "actions": 413,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701712.0,
+      "critical_time": 1793701726.0,
+      "end_time": 1793701741.0,
+      "actions": 471,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701744.0,
+      "critical_time": 1793701758.0,
+      "end_time": 1793701781.0,
+      "actions": 600,
+      "reward": 0.0,
+      "terminated": "False",
+      "truncated": "True"
+    },
+    {
+      "start_time": 1793701785.0,
+      "critical_time": 1793701799.0,
+      "end_time": 1793701812.0,
+      "actions": 447,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701819.0,
+      "critical_time": 1793701832.0,
+      "end_time": 1793701856.0,
+      "actions": 600,
+      "reward": 0.0,
+      "terminated": "False",
+      "truncated": "True"
+    },
+    {
+      "start_time": 1793701860.0,
+      "critical_time": 1793701873.0,
+      "end_time": 1793701897.0,
+      "actions": 600,
+      "reward": 0.0,
+      "terminated": "False",
+      "truncated": "True"
+    },
+    {
+      "start_time": 1793701901.0,
+      "critical_time": 1793701915.0,
+      "end_time": 1793701928.0,
+      "actions": 435,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793701931.0,
+      "critical_time": 1793701943.0,
+      "end_time": 1793701968.0,
+      "actions": 600,
+      "reward": 0.0,
+      "terminated": "False",
+      "truncated": "True"
+    },
+    {
+      "start_time": 1793701972.0,
+      "critical_time": 1793701986.0,
+      "end_time": 1793702002.0,
+      "actions": 480,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702005.0,
+      "critical_time": 1793702018.0,
+      "end_time": 1793702037.0,
+      "actions": 516,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702044.0,
+      "critical_time": 1793702056.0,
+      "end_time": 1793702072.0,
+      "actions": 456,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702089.0,
+      "critical_time": 1793702102.0,
+      "end_time": 1793702123.0,
+      "actions": 556,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702134.0,
+      "critical_time": 1793702147.0,
+      "end_time": 1793702163.0,
+      "actions": 467,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702166.0,
+      "critical_time": 1793702180.0,
+      "end_time": 1793702194.0,
+      "actions": 454,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702205.0,
+      "critical_time": 1793702219.0,
+      "end_time": 1793702232.0,
+      "actions": 441,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702235.0,
+      "critical_time": 1793702250.0,
+      "end_time": 1793702272.0,
+      "actions": 590,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702275.0,
+      "critical_time": 1793702289.0,
+      "end_time": 1793702312.0,
+      "actions": 600,
+      "reward": 0.0,
+      "terminated": "False",
+      "truncated": "True"
+    },
+    {
+      "start_time": 1793702316.0,
+      "critical_time": 1793702330.0,
+      "end_time": 1793702353.0,
+      "actions": 600,
+      "reward": 0.0,
+      "terminated": "False",
+      "truncated": "True"
+    },
+    {
+      "start_time": 1793702360.0,
+      "critical_time": 1793702373.0,
+      "end_time": 1793702397.0,
+      "actions": 600,
+      "reward": 0.0,
+      "terminated": "False",
+      "truncated": "True"
+    },
+    {
+      "start_time": 1793702401.0,
+      "critical_time": 1793702415.0,
+      "end_time": 1793702438.0,
+      "actions": 600,
+      "reward": 0.0,
+      "terminated": "False",
+      "truncated": "True"
+    },
+    {
+      "start_time": 1793702450.0,
+      "critical_time": 1793702464.0,
+      "end_time": 1793702479.0,
+      "actions": 464,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702482.0,
+      "critical_time": 1793702497.0,
+      "end_time": 1793702519.0,
+      "actions": 600,
+      "reward": 0.0,
+      "terminated": "False",
+      "truncated": "True"
+    },
+    {
+      "start_time": 1793702524.0,
+      "critical_time": 1793702537.0,
+      "end_time": 1793702551.0,
+      "actions": 435,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702572.0,
+      "critical_time": 1793702587.0,
+      "end_time": 1793702602.0,
+      "actions": 480,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702615.0,
+      "critical_time": 1793702629.0,
+      "end_time": 1793702644.0,
+      "actions": 472,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702655.0,
+      "critical_time": 1793702669.0,
+      "end_time": 1793702683.0,
+      "actions": 449,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702695.0,
+      "critical_time": 1793702709.0,
+      "end_time": 1793702723.0,
+      "actions": 441,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702728.0,
+      "critical_time": 1793702741.0,
+      "end_time": 1793702758.0,
+      "actions": 483,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702762.0,
+      "critical_time": 1793702775.0,
+      "end_time": 1793702789.0,
+      "actions": 446,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702797.0,
+      "critical_time": 1793702810.0,
+      "end_time": 1793702822.0,
+      "actions": 415,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702828.0,
+      "critical_time": 1793702842.0,
+      "end_time": 1793702859.0,
+      "actions": 505,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702863.0,
+      "critical_time": 1793702876.0,
+      "end_time": 1793702894.0,
+      "actions": 491,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702898.0,
+      "critical_time": 1793702913.0,
+      "end_time": 1793702928.0,
+      "actions": 480,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702942.0,
+      "critical_time": 1793702955.0,
+      "end_time": 1793702971.0,
+      "actions": 475,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793702975.0,
+      "critical_time": 1793702988.0,
+      "end_time": 1793703011.0,
+      "actions": 580,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793703028.0,
+      "critical_time": 1793703042.0,
+      "end_time": 1793703059.0,
+      "actions": 512,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793703069.0,
+      "critical_time": 1793703086.0,
+      "end_time": 1793703102.0,
+      "actions": 525,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793703106.0,
+      "critical_time": 1793703120.0,
+      "end_time": 1793703133.0,
+      "actions": 445,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793703137.0,
+      "critical_time": 1793703151.0,
+      "end_time": 1793703166.0,
+      "actions": 468,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793703171.0,
+      "critical_time": 1793703185.0,
+      "end_time": 1793703200.0,
+      "actions": 461,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793703210.0,
+      "critical_time": 1793703224.0,
+      "end_time": 1793703239.0,
+      "actions": 472,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    },
+    {
+      "start_time": 1793703243.0,
+      "critical_time": 1793703256.0,
+      "end_time": 1793703276.0,
+      "actions": 531,
+      "reward": 1.0,
+      "terminated": "True",
+      "truncated": "False"
+    }
+  ],
+  "method": "CPU float32, deterministic checkpoint comparison; fixed 96 nonintervention nonterminal chunks from each endpoint; weighted gradients with 4 seeds, reference dropout 0.5 and online action noise; no optimizer updates. Observed discounted return is behavior return with terminal/time-limit tail zero, not Bellman target."
+}

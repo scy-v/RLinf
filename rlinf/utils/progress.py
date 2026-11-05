@@ -554,11 +554,24 @@ def stream_run_log(
     color: bool = False,
     compact: bool = False,
     interactive: bool = False,
+    deduplicate_timing: bool = False,
 ) -> None:
-    """Keep full plain logs and optionally show a compact live stage summary."""
+    """Persist logs and optionally route timing lines exclusively to timing.log.
+
+    Deduplicated timing keeps the original transport line and full numeric
+    precision; other messages, including malformed records, stay in the run log.
+    """
     import re
     import shutil
     import textwrap
+
+    timing_path = Path(log_path).with_name("timing.tsv")
+    if deduplicate_timing and timing_path.exists() and timing_path.stat().st_size:
+        with timing_path.open(encoding="utf-8", newline="") as existing:
+            # Appended rows must use the existing run's schema and log format.
+            deduplicate_timing = next(csv.reader(existing, delimiter="\t")) == list(
+                TIMING_COLUMNS + ("run_log_offset",)
+            )
 
     ansi = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
     stage = re.compile(
@@ -602,9 +615,11 @@ def stream_run_log(
         timing_table_file = None
         for line in source:
             plain = ansi.sub("", line)
-            log.write(plain)
-            log.flush()
-            if "[TIMING_RECORD] " in plain:
+            is_timing = "[TIMING_RECORD] " in plain
+            if not (deduplicate_timing and is_timing):
+                log.write(plain)
+                log.flush()
+            if is_timing:
                 try:
                     record = json.loads(plain.split("[TIMING_RECORD] ", 1)[1])
                     if not isinstance(record, dict) or set(record) - set(
@@ -618,6 +633,9 @@ def stream_run_log(
                     )
                 except (ValueError, TypeError, KeyError, OverflowError):
                     # The original malformed record remains in the full run log.
+                    if deduplicate_timing:
+                        log.write(plain)
+                        log.flush()
                     clear_live()
                     terminal.write(
                         "[WARNING] Invalid timing record; see run_embodiment.log.\n"
@@ -635,7 +653,10 @@ def stream_run_log(
                         )
                     )
                     timing_writer = csv.DictWriter(
-                        timing_file, fieldnames=TIMING_COLUMNS, delimiter="\t"
+                        timing_file,
+                        fieldnames=TIMING_COLUMNS
+                        + (("run_log_offset",) if deduplicate_timing else ()),
+                        delimiter="\t",
                     )
                     if timing_file.tell() == 0:
                         timing_writer.writeheader()
@@ -661,15 +682,26 @@ def stream_run_log(
                             "PD episode/chunk/action identify the window end; n/a = not measured.\n"
                             "Raw numeric records: timing.tsv.\n\n"
                         )
+                        if deduplicate_timing:
+                            timing_table_file.write(
+                                "Original timing transport lines follow. TSV run_log_offset "
+                                "is the UTF-8 byte position in the run log preceding each line.\n\n"
+                            )
+                timing_table_file.write(
+                    plain if deduplicate_timing else format_timing_table(record)
+                )
+                timing_table_file.flush()
+                if deduplicate_timing:
+                    record["run_log_offset"] = log.tell()
                 timing_writer.writerow(
                     {
-                        key: f"{value:.6f}" if isinstance(value, float) else value
+                        key: f"{value:.6f}"
+                        if isinstance(value, float) and not deduplicate_timing
+                        else value
                         for key, value in record.items()
                     }
                 )
                 timing_file.flush()
-                timing_table_file.write(format_timing_table(record))
-                timing_table_file.flush()
                 continue
             match = stage.search(plain)
             message = (
@@ -862,6 +894,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--log-file", required=True)
     parser.add_argument("--compact", action="store_true")
+    parser.add_argument("--deduplicate-timing", action="store_true")
     args = parser.parse_args()
     stream_run_log(
         sys.stdin,
@@ -870,4 +903,5 @@ if __name__ == "__main__":
         color=sys.stdout.isatty() and "NO_COLOR" not in os.environ,
         compact=args.compact,
         interactive=sys.stdout.isatty(),
+        deduplicate_timing=args.deduplicate_timing,
     )

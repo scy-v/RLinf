@@ -1,0 +1,12 @@
+# Large local analysis data; summaries and reproducible scripts stay visible.
+*.pt
+*.pth
+*.safetensors
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.parquet
+*.arrow
+*.feather
+*.zarr/

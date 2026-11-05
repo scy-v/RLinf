@@ -1,0 +1,515 @@
+[
+  {
+    "chunks": 22,
+    "actions": 220,
+    "human_before_done": 57,
+    "human_at_or_after_done": 1,
+    "human_nonzero_translation_before_done": 56,
+    "last_trajectory": 827,
+    "success": 1
+  },
+  {
+    "chunks": 20,
+    "actions": 200,
+    "human_before_done": 62,
+    "human_at_or_after_done": 3,
+    "human_nonzero_translation_before_done": 47,
+    "last_trajectory": 847,
+    "success": 1
+  },
+  {
+    "chunks": 21,
+    "actions": 210,
+    "human_before_done": 68,
+    "human_at_or_after_done": 8,
+    "human_nonzero_translation_before_done": 51,
+    "last_trajectory": 868,
+    "success": 1
+  },
+  {
+    "chunks": 19,
+    "actions": 190,
+    "human_before_done": 49,
+    "human_at_or_after_done": 6,
+    "human_nonzero_translation_before_done": 39,
+    "last_trajectory": 887,
+    "success": 1
+  },
+  {
+    "chunks": 21,
+    "actions": 210,
+    "human_before_done": 63,
+    "human_at_or_after_done": 10,
+    "human_nonzero_translation_before_done": 53,
+    "last_trajectory": 908,
+    "success": 1
+  },
+  {
+    "chunks": 17,
+    "actions": 170,
+    "human_before_done": 69,
+    "human_at_or_after_done": 7,
+    "human_nonzero_translation_before_done": 59,
+    "last_trajectory": 925,
+    "success": 1
+  },
+  {
+    "chunks": 18,
+    "actions": 180,
+    "human_before_done": 84,
+    "human_at_or_after_done": 0,
+    "human_nonzero_translation_before_done": 81,
+    "last_trajectory": 943,
+    "success": 1
+  },
+  {
+    "chunks": 20,
+    "actions": 200,
+    "human_before_done": 61,
+    "human_at_or_after_done": 6,
+    "human_nonzero_translation_before_done": 56,
+    "last_trajectory": 963,
+    "success": 1
+  },
+  {
+    "chunks": 19,
+    "actions": 190,
+    "human_before_done": 61,
+    "human_at_or_after_done": 8,
+    "human_nonzero_translation_before_done": 57,
+    "last_trajectory": 982,
+    "success": 1
+  },
+  {
+    "chunks": 19,
+    "actions": 190,
+    "human_before_done": 71,
+    "human_at_or_after_done": 8,
+    "human_nonzero_translation_before_done": 60,
+    "last_trajectory": 1001,
+    "success": 1
+  },
+  {
+    "chunks": 38,
+    "actions": 380,
+    "human_before_done": 101,
+    "human_at_or_after_done": 0,
+    "human_nonzero_translation_before_done": 98,
+    "last_trajectory": 1039,
+    "success": 0
+  },
+  {
+    "chunks": 17,
+    "actions": 170,
+    "human_before_done": 0,
+    "human_at_or_after_done": 10,
+    "human_nonzero_translation_before_done": 0,
+    "last_trajectory": 1056,
+    "success": 1
+  },
+  {
+    "chunks": 21,
+    "actions": 210,
+    "human_before_done": 0,
+    "human_at_or_after_done": 6,
+    "human_nonzero_translation_before_done": 0,
+    "last_trajectory": 1077,
+    "success": 1
+  },
+  {
+    "chunks": 21,
+    "actions": 210,
+    "human_before_done": 38,
+    "human_at_or_after_done": 6,
+    "human_nonzero_translation_before_done": 31,
+    "last_trajectory": 1098,
+    "success": 1
+  },
+  {
+    "chunks": 19,
+    "actions": 190,
+    "human_before_done": 25,
+    "human_at_or_after_done": 10,
+    "human_nonzero_translation_before_done": 17,
+    "last_trajectory": 1117,
+    "success": 1
+  },
+  {
+    "chunks": 17,
+    "actions": 170,
+    "human_before_done": 62,
+    "human_at_or_after_done": 3,
+    "human_nonzero_translation_before_done": 53,
+    "last_trajectory": 1134,
+    "success": 1
+  },
+  {
+    "chunks": 21,
+    "actions": 210,
+    "human_before_done": 74,
+    "human_at_or_after_done": 6,
+    "human_nonzero_translation_before_done": 74,
+    "last_trajectory": 1155,
+    "success": 1
+  },
+  {
+    "chunks": 19,
+    "actions": 190,
+    "human_before_done": 39,
+    "human_at_or_after_done": 6,
+    "human_nonzero_translation_before_done": 30,
+    "last_trajectory": 1174,
+    "success": 1
+  },
+  {
+    "chunks": 15,
+    "actions": 150,
+    "human_before_done": 22,
+    "human_at_or_after_done": 1,
+    "human_nonzero_translation_before_done": 22,
+    "last_trajectory": 1189,
+    "success": 1
+  },
+  {
+    "chunks": 19,
+    "actions": 190,
+    "human_before_done": 62,
+    "human_at_or_after_done": 3,
+    "human_nonzero_translation_before_done": 57,
+    "last_trajectory": 1208,
+    "success": 1
+  },
+  {
+    "chunks": 20,
+    "actions": 200,
+    "human_before_done": 85,
+    "human_at_or_after_done": 1,
+    "human_nonzero_translation_before_done": 70,
+    "last_trajectory": 1228,
+    "success": 1
+  },
+  {
+    "chunks": 17,
+    "actions": 170,
+    "human_before_done": 66,
+    "human_at_or_after_done": 1,
+    "human_nonzero_translation_before_done": 52,
+    "last_trajectory": 1245,
+    "success": 1
+  },
+  {
+    "chunks": 19,
+    "actions": 190,
+    "human_before_done": 57,
+    "human_at_or_after_done": 7,
+    "human_nonzero_translation_before_done": 56,
+    "last_trajectory": 1264,
+    "success": 1
+  },
+  {
+    "chunks": 19,
+    "actions": 190,
+    "human_before_done": 63,
+    "human_at_or_after_done": 0,
+    "human_nonzero_translation_before_done": 48,
+    "last_trajectory": 1283,
+    "success": 1
+  },
+  {
+    "chunks": 18,
+    "actions": 180,
+    "human_before_done": 62,
+    "human_at_or_after_done": 0,
+    "human_nonzero_translation_before_done": 51,
+    "last_trajectory": 1301,
+    "success": 1
+  },
+  {
+    "chunks": 19,
+    "actions": 190,
+    "human_before_done": 42,
+    "human_at_or_after_done": 8,
+    "human_nonzero_translation_before_done": 37,
+    "last_trajectory": 1320,
+    "success": 1
+  },
+  {
+    "chunks": 21,
+    "actions": 210,
+    "human_before_done": 54,
+    "human_at_or_after_done": 6,
+    "human_nonzero_translation_before_done": 45,
+    "last_trajectory": 1341,
+    "success": 1
+  },
+  {
+    "chunks": 18,
+    "actions": 180,
+    "human_before_done": 59,
+    "human_at_or_after_done": 2,
+    "human_nonzero_translation_before_done": 57,
+    "last_trajectory": 1359,
+    "success": 1
+  },
+  {
+    "chunks": 22,
+    "actions": 220,
+    "human_before_done": 88,
+    "human_at_or_after_done": 4,
+    "human_nonzero_translation_before_done": 87,
+    "last_trajectory": 1381,
+    "success": 1
+  },
+  {
+    "chunks": 20,
+    "actions": 200,
+    "human_before_done": 52,
+    "human_at_or_after_done": 7,
+    "human_nonzero_translation_before_done": 48,
+    "last_trajectory": 1401,
+    "success": 1
+  },
+  {
+    "chunks": 20,
+    "actions": 200,
+    "human_before_done": 52,
+    "human_at_or_after_done": 0,
+    "human_nonzero_translation_before_done": 31,
+    "last_trajectory": 1421,
+    "success": 1
+  },
+  {
+    "chunks": 24,
+    "actions": 240,
+    "human_before_done": 64,
+    "human_at_or_after_done": 8,
+    "human_nonzero_translation_before_done": 59,
+    "last_trajectory": 1445,
+    "success": 1
+  },
+  {
+    "chunks": 22,
+    "actions": 220,
+    "human_before_done": 35,
+    "human_at_or_after_done": 4,
+    "human_nonzero_translation_before_done": 18,
+    "last_trajectory": 1467,
+    "success": 1
+  },
+  {
+    "chunks": 23,
+    "actions": 230,
+    "human_before_done": 29,
+    "human_at_or_after_done": 10,
+    "human_nonzero_translation_before_done": 26,
+    "last_trajectory": 1490,
+    "success": 1
+  },
+  {
+    "chunks": 23,
+    "actions": 230,
+    "human_before_done": 54,
+    "human_at_or_after_done": 4,
+    "human_nonzero_translation_before_done": 52,
+    "last_trajectory": 1513,
+    "success": 1
+  },
+  {
+    "chunks": 24,
+    "actions": 240,
+    "human_before_done": 50,
+    "human_at_or_after_done": 4,
+    "human_nonzero_translation_before_done": 39,
+    "last_trajectory": 1537,
+    "success": 1
+  },
+  {
+    "chunks": 22,
+    "actions": 220,
+    "human_before_done": 49,
+    "human_at_or_after_done": 4,
+    "human_nonzero_translation_before_done": 31,
+    "last_trajectory": 1559,
+    "success": 1
+  },
+  {
+    "chunks": 20,
+    "actions": 200,
+    "human_before_done": 0,
+    "human_at_or_after_done": 5,
+    "human_nonzero_translation_before_done": 0,
+    "last_trajectory": 1579,
+    "success": 1
+  },
+  {
+    "chunks": 24,
+    "actions": 240,
+    "human_before_done": 71,
+    "human_at_or_after_done": 1,
+    "human_nonzero_translation_before_done": 38,
+    "last_trajectory": 1603,
+    "success": 1
+  },
+  {
+    "chunks": 21,
+    "actions": 210,
+    "human_before_done": 47,
+    "human_at_or_after_done": 3,
+    "human_nonzero_translation_before_done": 47,
+    "last_trajectory": 1624,
+    "success": 1
+  },
+  {
+    "chunks": 19,
+    "actions": 190,
+    "human_before_done": 0,
+    "human_at_or_after_done": 9,
+    "human_nonzero_translation_before_done": 0,
+    "last_trajectory": 1643,
+    "success": 1
+  },
+  {
+    "chunks": 25,
+    "actions": 250,
+    "human_before_done": 25,
+    "human_at_or_after_done": 10,
+    "human_nonzero_translation_before_done": 24,
+    "last_trajectory": 1668,
+    "success": 1
+  },
+  {
+    "chunks": 20,
+    "actions": 200,
+    "human_before_done": 23,
+    "human_at_or_after_done": 9,
+    "human_nonzero_translation_before_done": 4,
+    "last_trajectory": 1688,
+    "success": 1
+  },
+  {
+    "chunks": 15,
+    "actions": 150,
+    "human_before_done": 0,
+    "human_at_or_after_done": 4,
+    "human_nonzero_translation_before_done": 0,
+    "last_trajectory": 1703,
+    "success": 1
+  },
+  {
+    "chunks": 22,
+    "actions": 220,
+    "human_before_done": 28,
+    "human_at_or_after_done": 2,
+    "human_nonzero_translation_before_done": 27,
+    "last_trajectory": 1725,
+    "success": 1
+  },
+  {
+    "chunks": 22,
+    "actions": 220,
+    "human_before_done": 60,
+    "human_at_or_after_done": 4,
+    "human_nonzero_translation_before_done": 32,
+    "last_trajectory": 1747,
+    "success": 1
+  },
+  {
+    "chunks": 23,
+    "actions": 230,
+    "human_before_done": 29,
+    "human_at_or_after_done": 10,
+    "human_nonzero_translation_before_done": 13,
+    "last_trajectory": 1770,
+    "success": 1
+  },
+  {
+    "chunks": 21,
+    "actions": 210,
+    "human_before_done": 35,
+    "human_at_or_after_done": 0,
+    "human_nonzero_translation_before_done": 20,
+    "last_trajectory": 1791,
+    "success": 1
+  },
+  {
+    "chunks": 23,
+    "actions": 230,
+    "human_before_done": 31,
+    "human_at_or_after_done": 6,
+    "human_nonzero_translation_before_done": 21,
+    "last_trajectory": 1814,
+    "success": 1
+  },
+  {
+    "chunks": 21,
+    "actions": 210,
+    "human_before_done": 12,
+    "human_at_or_after_done": 8,
+    "human_nonzero_translation_before_done": 7,
+    "last_trajectory": 1835,
+    "success": 1
+  },
+  {
+    "chunks": 25,
+    "actions": 250,
+    "human_before_done": 1,
+    "human_at_or_after_done": 5,
+    "human_nonzero_translation_before_done": 1,
+    "last_trajectory": 1860,
+    "success": 1
+  },
+  {
+    "chunks": 26,
+    "actions": 260,
+    "human_before_done": 0,
+    "human_at_or_after_done": 2,
+    "human_nonzero_translation_before_done": 0,
+    "last_trajectory": 1886,
+    "success": 1
+  },
+  {
+    "chunks": 17,
+    "actions": 170,
+    "human_before_done": 0,
+    "human_at_or_after_done": 4,
+    "human_nonzero_translation_before_done": 0,
+    "last_trajectory": 1903,
+    "success": 1
+  },
+  {
+    "chunks": 17,
+    "actions": 170,
+    "human_before_done": 0,
+    "human_at_or_after_done": 4,
+    "human_nonzero_translation_before_done": 0,
+    "last_trajectory": 1920,
+    "success": 1
+  },
+  {
+    "chunks": 23,
+    "actions": 230,
+    "human_before_done": 0,
+    "human_at_or_after_done": 0,
+    "human_nonzero_translation_before_done": 0,
+    "last_trajectory": 1943,
+    "success": 1
+  },
+  {
+    "chunks": 28,
+    "actions": 280,
+    "human_before_done": 0,
+    "human_at_or_after_done": 5,
+    "human_nonzero_translation_before_done": 0,
+    "last_trajectory": 1971,
+    "success": 1
+  },
+  {
+    "chunks": 37,
+    "actions": 370,
+    "human_before_done": 0,
+    "human_at_or_after_done": 0,
+    "human_nonzero_translation_before_done": 0,
+    "last_trajectory": 2008,
+    "success": 0
+  }
+]

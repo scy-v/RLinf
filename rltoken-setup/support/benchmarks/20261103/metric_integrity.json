@@ -1,0 +1,20 @@
+{
+  "20261101-165859": {
+    "nonfinite_values": {
+      "train/actor/q_pi": 0,
+      "train/actor/bc_loss": 0,
+      "train/sac/actor_loss": 0,
+      "train/sac/critic_loss": 0
+    },
+    "actor_loss_formula_max_abs_error": 5.587935447692871e-09
+  },
+  "20261102-232256": {
+    "nonfinite_values": {
+      "train/actor/q_pi": 0,
+      "train/actor/bc_loss": 0,
+      "train/sac/actor_loss": 0,
+      "train/sac/critic_loss": 0
+    },
+    "actor_loss_formula_max_abs_error": 1.382431946694851e-09
+  }
+}

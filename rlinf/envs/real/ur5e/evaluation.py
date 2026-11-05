@@ -45,6 +45,7 @@ class UREvaluationWrapper(KeyboardSession):
         action_timing_enabled: bool = False,
         save_logs: bool = True,
         log_dir: str | None = None,
+        stage2_enabled: bool = False,
     ) -> None:
         if num_episodes < 1 or not all(
             math.isfinite(x) and x > 0
@@ -81,10 +82,18 @@ class UREvaluationWrapper(KeyboardSession):
         )
         self._episode_timer: ElapsedTime | None = None
         self._action_trace = None
-        self._last_action_report = 0.0
         self._last_control_report = 0.0
         self._summary_written = False
+        from rlinf.algorithms.rlt.inference import CriticalPhaseSwitch
+
+        self.stage2_enabled = stage2_enabled
+        self._critical_switch = CriticalPhaseSwitch()
         super().__init__(env)
+
+    @property
+    def critical_phase(self) -> bool:
+        """Whether the next inference chunk should use the trained MLP."""
+        return self.stage2_enabled and self._critical_switch.active
 
     @property
     def evaluation_complete(self) -> bool:
@@ -117,6 +126,7 @@ class UREvaluationWrapper(KeyboardSession):
         temporary.replace(self.output_path)
 
     def reset(self, **kwargs: Any) -> tuple[Any, dict]:
+        self._critical_switch.reset()
         self.base_env().stop_motion()
         self._record_control_timing(force=True)
         if self._episode_timer is not None:
@@ -169,9 +179,15 @@ class UREvaluationWrapper(KeyboardSession):
             self.drain()
         self.base_env().start_motion()
         self.log("UR episode started; force control enabled.")
+        if self.stage2_enabled:
+            self.log(
+                "Stage2: executing VLA actions. Double '.' within 0.5s to use MLP from the next chunk."
+            )
         self._episode_started = time.monotonic()
         self._episode_timer = ElapsedTime(
-            "TIME", f"Episode {len(self.results) + 1}", log=self.log
+            "TIME",
+            f"Episode {len(self.results) + 1}",
+            log=self._record_episode_progress,
         )
         self._episode_timer.__enter__()
         self._write_results()
@@ -192,6 +208,11 @@ class UREvaluationWrapper(KeyboardSession):
             "action_steps": self._steps,
         }
         self.results.append(record)
+        self.log(
+            f"[EPISODE] {record['episode_index']}: {status}, "
+            f"{record['duration_sec']:.1f}s, {self._steps} actions; "
+            f"success {sum(r['completed'] for r in self.results)}/{len(self.results)}."
+        )
         if self._run_log_paths is not None:
             append_record(self._run_log_paths[0], {"episode_result": record})
         self._write_results()
@@ -228,9 +249,17 @@ class UREvaluationWrapper(KeyboardSession):
         if self._last_obs is None:
             raise RuntimeError("Expected reset() before UR evaluation stepping.")
         for key, timestamp in self.listener.pop_pressed_events():
+            if key == "Key.focus_lost":
+                self._first_press.clear()
+                self._critical_switch.clear_pending_press()
+                continue
             if timestamp < self._accept_after:
                 continue
             key = "Key.enter" if key == "Key.kpenter" else key
+            if self.stage2_enabled and key == "Key.dot":
+                if self._critical_switch.press(timestamp):
+                    self.log("Stage2: MLP selected for the next inference chunk.")
+                continue
             if key not in {"Key.enter", "Key.space"}:
                 self._first_press.clear()
                 continue
@@ -282,26 +311,6 @@ class UREvaluationWrapper(KeyboardSession):
                         "step": self._steps,
                     },
                 )
-            now = time.monotonic()
-            if now - self._last_action_report >= 1.0:
-                self.log(
-                    "[ACTION] target_hz=%.2f control_hz=%.2f "
-                    "control_sec=%.4f control_overrun_sec=%.4f "
-                    "command_sec=%.4f pace_wait_sec=%.4f "
-                    "observation_sec=%.4f action_interval_sec=%s target_interval_sec=%s"
-                    % (
-                        trace["target_hz"],
-                        trace["control_hz"],
-                        trace["control_sec"],
-                        trace["control_overrun_sec"],
-                        trace["command_sec"],
-                        trace["pace_wait_sec"],
-                        trace["observation_sec"],
-                        trace["action_interval_sec"],
-                        trace.get("target_interval_sec"),
-                    )
-                )
-                self._last_action_report = now
         return copy.deepcopy(self._last_obs), 0.0, False, False, info
 
     def _record_control_timing(self, *, force: bool = False) -> None:
@@ -322,20 +331,20 @@ class UREvaluationWrapper(KeyboardSession):
                     **timing,
                 },
             )
-        measured = timing["measured_hz"]
-        rate = "pending" if measured is None else f"{measured:.2f}"
-        maximum = timing["send_interval_sec_max"]
-        gap = "pending" if maximum is None else f"{maximum * 1000:.2f}"
-        self.log(
-            "[PD] target_hz=%.2f measured_hz=%s samples=%d "
-            "max_send_interval_ms=%s work_overruns=%d held_target_samples=%d",
-            timing["target_hz"],
-            rate,
-            timing["samples"],
-            gap,
-            timing["work_overruns"],
-            timing["held_target_samples"],
-        )
+
+    def _record_episode_progress(self, message: str) -> None:
+        """Keep periodic episode progress in the timing file."""
+        if self._run_log_paths is not None:
+            append_record(
+                self._run_log_paths[1],
+                {
+                    "component": "env",
+                    "event": "episode_progress",
+                    "timestamp": time.time(),
+                    "episode_index": len(self.results) + 1,
+                    "message": message,
+                },
+            )
 
     def close(self) -> None:
         if self._evaluation_closed:

@@ -1,0 +1,36 @@
+{
+  "checkpoint": "logs/online_rltoken/20261102-232256-ur_rlt_stage2_ac_mlp/ur_rlt_stage2_ac_mlp/checkpoints/global_step_22500/actor",
+  "state_tensors": 40,
+  "export_max_abs_diff": 0.0,
+  "nonfinite_tensors": [],
+  "scheduler_states": [
+    {
+      "factor": 1,
+      "total_iters": 5,
+      "base_lrs": [
+        0.0003
+      ],
+      "last_epoch": 45002,
+      "_step_count": 45003,
+      "_is_initial": false,
+      "_get_lr_called_within_step": false,
+      "_last_lr": [
+        0.0003
+      ]
+    },
+    {
+      "factor": 1,
+      "total_iters": 5,
+      "base_lrs": [
+        0.0003
+      ],
+      "last_epoch": 180006,
+      "_step_count": 180007,
+      "_is_initial": false,
+      "_get_lr_called_within_step": false,
+      "_last_lr": [
+        0.0003
+      ]
+    }
+  ]
+}

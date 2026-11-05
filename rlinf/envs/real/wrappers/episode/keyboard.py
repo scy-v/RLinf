@@ -16,9 +16,11 @@ import errno
 import os
 import select
 import threading
+import time
 from collections import deque
 from typing import Any
 
+from rlinf.utils.keyboard_focus import FOCUS_LOST, TerminalKeyboardFocus
 from rlinf.utils.logging import get_logger
 
 _logger = get_logger()
@@ -48,7 +50,14 @@ class KeyboardListener:
         self._press_events: deque[tuple[str, float]] = deque()
         self._pressed_keys: set[str] = set()
         self._closed = threading.Event()
-        self.device = self._open_keyboard_device()
+        self._focus = TerminalKeyboardFocus()
+        try:
+            self.device = self._open_keyboard_device()
+        except Exception:
+            self._focus.close()
+            raise
+        self._focused = True
+        self._accept_after = 0.0
 
         self.listener = threading.Thread(
             target=self._listen_loop,
@@ -156,10 +165,24 @@ class KeyboardListener:
         device_path = self.device.path
         while not self._closed.is_set():
             try:
-                readable, _, _ = select.select([self.device], [], [], 0.1)
+                focused = self._focus.accepts_input()
+                with self.state_lock:
+                    if focused != self._focused:
+                        self._accept_after = time.time()
+                        self._pressed_keys.clear()
+                        self.latest_data["key"] = None
+                        self._press_events.clear()
+                        self._press_events.append((FOCUS_LOST, self._accept_after))
+                    self._focused = focused
+                readable, _, _ = select.select([self.device], [], [], 0.02)
                 if not readable:
                     continue
                 for event in self.device.read():
+                    if (
+                        not self._focus.accepts_input()
+                        or event.timestamp() < self._accept_after
+                    ):
+                        continue
                     if event.type != self._ecodes.EV_KEY:
                         continue
 
@@ -175,7 +198,8 @@ class KeyboardListener:
                             self._press_events.append((key, event.timestamp()))
                     elif event.value == 2:
                         with self.state_lock:
-                            self.latest_data["key"] = key
+                            if not self._focus.window_id or key in self._pressed_keys:
+                                self.latest_data["key"] = key
                     elif event.value == 0:
                         with self.state_lock:
                             self._pressed_keys.discard(key)
@@ -262,3 +286,4 @@ class KeyboardListener:
         self._closed.set()
         self.listener.join()
         self.device.close()
+        self._focus.close()

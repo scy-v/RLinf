@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import math
 import os
 import time
@@ -602,11 +603,13 @@ def print_metrics_table(
     metrics: dict,
     start_step: int = 0,
     log_path: str | None = None,
+    compact: bool = False,
 ):
     """Print training metrics in a simple, fast formatted table.
 
     The rendered table is written to stdout and, when ``log_path`` is given,
-    also appended to ``<log_path>/metrics.log``.
+    also appended to ``<log_path>/metrics.log``. Compact mode writes complete
+    JSON records there without duplicating them on stdout.
     """
     # Accumulate the table into lines so the exact same rendering goes to both
     # stdout and the log file.
@@ -622,6 +625,40 @@ def print_metrics_table(
     eta_seconds = (
         elapsed_time / steps_done * (total_steps - step - 1) if steps_done > 0 else 0
     )
+
+    if compact and log_path:
+        metrics_path = os.path.join(log_path, "metrics.log")
+        if os.path.exists(metrics_path):
+            with open(metrics_path) as existing:
+                # Keep an existing run readable in its original format.
+                prefix = existing.read(128).lstrip()
+                compact = not prefix or prefix.startswith("{")
+
+    if compact and log_path:
+
+        def serialize(value):
+            if isinstance(value, torch.Tensor):
+                return value.detach().cpu().tolist()
+            if isinstance(value, (np.ndarray, np.generic)):
+                return value.tolist()
+            return str(value)
+
+        record = {
+            "step": step + 1,
+            "total_steps": total_steps,
+            "start_step": start_step,
+            "start_time": start_time,
+            "timestamp": start_time + elapsed_time,
+            "elapsed_seconds": elapsed_time,
+            "eta_seconds": eta_seconds,
+            "average_step_seconds": elapsed_time / steps_done,
+            "metrics": metrics,
+        }
+        serialized = json.dumps(record, default=serialize, ensure_ascii=False)
+        os.makedirs(log_path, exist_ok=True)
+        with open(os.path.join(log_path, "metrics.log"), "a") as metrics_file:
+            metrics_file.write(serialized + "\n")
+        return
 
     def format_time(seconds):
         hours, remainder = divmod(int(seconds), 3600)

@@ -21,6 +21,7 @@ from omegaconf.omegaconf import OmegaConf
 
 from rlinf.config import validate_cfg
 from rlinf.scheduler import Cluster
+from rlinf.utils.keyboard_focus import configure_terminal_keyboard
 from rlinf.utils.placement import HybridComponentPlacement
 from rlinf.utils.robot_lifecycle import termination_signals
 from rlinf.workers.env.async_env_worker import AsyncEnvWorker
@@ -37,6 +38,7 @@ mp.set_start_method("spawn", force=True)
 )
 def main(cfg) -> None:
     cfg = validate_cfg(cfg)
+    configure_terminal_keyboard(cfg.get("keyboard_terminal_only", False))
     print(json.dumps(OmegaConf.to_container(cfg, resolve=True), indent=2))
 
     cluster = Cluster(

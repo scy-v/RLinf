@@ -23,7 +23,7 @@ from rlinf.runners.embodied_runner import EmbodiedRunner
 from rlinf.scheduler import Channel
 from rlinf.scheduler import WorkerGroupFuncResult as Handle
 from rlinf.utils.metric_utils import compute_evaluate_metrics
-from rlinf.utils.runner_utils import check_progress
+from rlinf.utils.runner_utils import check_progress, crossed_interval
 
 if TYPE_CHECKING:
     from rlinf.workers.actor.async_fsdp_dagger_policy_worker import (
@@ -145,7 +145,37 @@ class AsyncEmbodiedRunner(AsyncWeightSyncMixin, EmbodiedRunner):
         eval_metrics = compute_evaluate_metrics(eval_metrics_list)
         return eval_metrics
 
+    def _advance_training_step(self, metrics: dict[str, float]) -> bool:
+        """Count RLT rounds from cumulative critic updates, including partial rounds."""
+        if not metrics:
+            return False
+        if self.cfg.algorithm.get("rlt_schedule", {}).get("enable", False):
+            if metrics["rlt/critic_updates_run"] <= 0:
+                return False
+            self.global_step = int(metrics["rlt/update_step"]) // int(
+                self.cfg.algorithm.update_epoch
+            )
+        else:
+            self.global_step += 1
+        return True
+
     def run(self):
+        use_rlt_schedule = self.cfg.algorithm.get("rlt_schedule", {}).get(
+            "enable", False
+        )
+        if use_rlt_schedule:
+            update_epoch = int(self.cfg.algorithm.update_epoch)
+            if update_epoch <= 0:
+                raise ValueError(f"Expected positive update_epoch, got {update_epoch}.")
+            updates = self.actor.get_rollout_sync_version().wait()
+            if len(set(updates)) != 1:
+                raise ValueError(f"Expected matching RLT update counts, got {updates}.")
+            # Learner state preserves partial rounds and supersedes legacy folder counts.
+            self.global_step = int(updates[0]) // update_epoch
+            self.logger.info(
+                f"RLT progress: {updates[0]} critic updates / {update_epoch} "
+                f"updates per round = {self.global_step} completed rounds."
+            )
         start_step = self.global_step
         start_time = time.time()
         self.env.set_global_step(self.global_step).wait()
@@ -199,25 +229,27 @@ class AsyncEmbodiedRunner(AsyncWeightSyncMixin, EmbodiedRunner):
             with self.timer("step"):
                 actor_training_handle: Handle = self.actor.run_training()
                 actor_result = actor_training_handle.wait()
-                if not actor_result[0]:
-                    skip_step = True
+                metrics = self._aggregate_numeric_metrics(actor_result)
+                previous_step = self.global_step
+                skip_step = not self._advance_training_step(metrics)
 
                 if not skip_step:
-                    self.global_step += 1
-                    if self.global_step % self.weight_sync_interval == 0:
-                        self.update_rollout_weights(no_wait=self.sync_weight_no_wait)
-
-                    training_metrics = {
-                        f"train/{k}": v
-                        for k, v in self._aggregate_numeric_metrics(
-                            actor_result
-                        ).items()
-                    }
-
-                    update_step = training_metrics.get("train/rlt/update_step", 0)
                     warmup = self.cfg.algorithm.get("rlt_schedule", {}).get(
                         "warmup_post_collect_updates", 0
                     )
+                    update_step = metrics.get("rlt/update_step", 0)
+                    warmup_completed = use_rlt_schedule and (
+                        update_step - metrics["rlt/critic_updates_run"]
+                        < warmup
+                        <= update_step
+                    )
+                    if warmup_completed or crossed_interval(
+                        previous_step, self.global_step, self.weight_sync_interval
+                    ):
+                        self.update_rollout_weights(no_wait=self.sync_weight_no_wait)
+
+                    training_metrics = {f"train/{k}": v for k, v in metrics.items()}
+
                     if (
                         self.cfg.algorithm.get("rlt_schedule", {}).get("enable", False)
                         and update_step >= warmup
@@ -242,6 +274,7 @@ class AsyncEmbodiedRunner(AsyncWeightSyncMixin, EmbodiedRunner):
                         self.cfg.runner.save_interval,
                         1.0,
                         run_time_exceeded=False,
+                        previous_step=previous_step,
                     )
                     if save_model:
                         self._save_checkpoint()
@@ -254,6 +287,10 @@ class AsyncEmbodiedRunner(AsyncWeightSyncMixin, EmbodiedRunner):
                             }
 
             if skip_step:
+                if metrics:
+                    self.metric_logger.log(
+                        {f"train/{k}": v for k, v in metrics.items()}, self.global_step
+                    )
                 self.timer.consume_durations()
                 if profiled_step is not None:
                     self._close_profiling_window(profiled_step)

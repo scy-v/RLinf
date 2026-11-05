@@ -228,6 +228,7 @@ class RealWorldEnv(gym.Env):
         self.returns = np.zeros(self.num_envs)
         self.intervened_once = np.zeros(self.num_envs, dtype=bool)
         self.intervened_steps = np.zeros(self.num_envs, dtype=int)
+        self.terminal_hold_steps = np.zeros(self.num_envs, dtype=int)
 
     def _reset_metrics(self, env_idx: Optional[np.ndarray] = None) -> None:
         if env_idx is not None:
@@ -240,6 +241,7 @@ class RealWorldEnv(gym.Env):
             self._elapsed_steps[mask] = 0
             self.intervened_once[mask] = False
             self.intervened_steps[mask] = 0
+            self.terminal_hold_steps[mask] = 0
         else:
             self.prev_step_reward[:] = 0
             self.success_once[:] = False
@@ -248,6 +250,7 @@ class RealWorldEnv(gym.Env):
             self._elapsed_steps[:] = 0
             self.intervened_once[:] = False
             self.intervened_steps[:] = 0
+            self.terminal_hold_steps[:] = 0
 
     def _record_metrics(
         self,
@@ -258,17 +261,27 @@ class RealWorldEnv(gym.Env):
         infos: EnvInfos,
     ) -> EnvInfos:
         episode_info = {}
+        terminal_hold = np.asarray(
+            infos.get("terminal_hold", np.zeros(self.num_envs, dtype=bool)),
+            dtype=bool,
+        ).reshape(self.num_envs)
+        operator_intervention = intervene_current_step & ~terminal_hold
         self.returns += step_reward
         self.success_once = self.success_once | success_current_step
-        self.intervened_once = self.intervened_once | intervene_current_step
-        self.intervened_steps += intervene_current_step.astype(int)
+        self.intervened_once = self.intervened_once | operator_intervention
+        self.intervened_steps += operator_intervention.astype(int)
+        self.terminal_hold_steps += terminal_hold.astype(int)
 
         episode_info["success_once"] = self.success_once.copy()
         episode_info["return"] = self.returns.copy()
         episode_info["episode_len"] = self.elapsed_steps.copy()
         episode_info["reward"] = episode_info["return"] / episode_info["episode_len"]
-        episode_info["intervened_once"] = self.intervened_once
-        episode_info["intervened_steps"] = self.intervened_steps
+        episode_info["intervened_once"] = self.intervened_once.copy()
+        episode_info["intervened_steps"] = self.intervened_steps.copy()
+        episode_info["terminal_hold_steps"] = self.terminal_hold_steps.copy()
+        episode_info["recorded_override_steps"] = (
+            self.intervened_steps + self.terminal_hold_steps
+        )
         episode_info["success_no_intervened"] = self.success_once.copy() & (
             ~self.intervened_once
         )

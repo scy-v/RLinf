@@ -1,3 +1,18 @@
+# false: preserve existing keyboard behavior; true: launching terminal only.
+# true requires a local X11 terminal and python-xlib; focus is window-level, not tab-level.
+keyboard_terminal_only: false
+
+# stage1: direct VLA actions; stage2: paired frozen VLA + trained MLP.
+inference_stage: stage1
+stage2:
+  # Must describe the Stage1/MLP pair used to train the selected online checkpoint.
+  training_config: /home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261102-232256-ur_rlt_stage2_ac_mlp/tensorboard/config.yaml
+  checkpoint_path: /home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261102-232256-ur_rlt_stage2_ac_mlp/ur_rlt_stage2_ac_mlp/checkpoints/global_step_22500/actor/model_state_dict/full_weights.pt
+  num_steps: 4  # Stage2 reference denoising; Stage1 also defaults to 4 steps.
+  compile_mode: max-autotune  # Online RLT denoising scope; null disables this compilation.
+  mlp_compile_mode: max-autotune-no-cudagraphs  # Same MLP compile hook as online rollout.
+  gripper_close_threshold: 0.5  # Stage1 keeps its existing 0.7 threshold.
+
 defaults:
   - env/realworld_ur5e_sft_env@env.eval
   - model/pi0_5@rollout.model
@@ -79,6 +94,8 @@ env:
   group_name: EnvGroup
   enable_offload: false
   eval:
+    ur_evaluation:
+      stage2_enabled: false  # Derived from inference_stage before launching workers.
     override_cfg:
       enable_camera_player: true
 rollout:
@@ -93,13 +110,13 @@ rollout:
   sampler_compile_mode: max-autotune
   model:
     model_type: openpi
-    model_path: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor
+    model_path: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_5000/actor
     precision: bf16
     is_lora: false
     num_action_chunks: ${.openpi.action_chunk}
     action_dim: 7
     add_value_head: false
-    num_steps: 10
+    num_steps: 4
     openpi_data:
       repo_id: scylearning/insert_black_rack_into_blue_slot_20260916_v01
       norm_stats_path: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/norm_stats.json

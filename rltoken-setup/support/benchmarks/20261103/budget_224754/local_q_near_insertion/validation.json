@@ -1,0 +1,10 @@
+{
+  "statistic_groups_independently_recomputed": 120,
+  "unique_adjacent_pairs": 870,
+  "near_fraction": 0.9,
+  "finite_q_arrays": true,
+  "local_markdown_links_exist": true,
+  "script_sha256": "20770f210481442374967529ae72df0069e3ce3afd1d317cfaa015e45f101f1b",
+  "npz_bytes": 307463,
+  "checks": "CPU offline; no robot execution; original data and weights unchanged"
+}

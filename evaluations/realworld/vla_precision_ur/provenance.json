@@ -3,6 +3,7 @@
   "source_commit": "ac23e5382974ae60c2188f535cc8b0fb4eca101e",
   "license": "Apache-2.0",
   "changes": [
+    "Accept keyboard_terminal_only with boolean validation; both settings preserve this backend's terminal-stdin episode controls.",
     "Completed episode results are appended and flushed immediately; a separate runs/<timestamp>-ur5e-eval/ur5e-evaluation.json is initialized and atomically refreshed with cumulative statistics after each episode.",
     "Local package imports and Python formatting.",
     "UR model setup and policy factory load RLinf full_weights.pt and explicit norm_stats.json.",
@@ -10,8 +11,8 @@
     "Standalone default config path.",
     "UR first-inference warmup displays elapsed time in place once per second; hardware setup and warmup call order are preserved.",
     "Optional per-action timing logs in execute_actions, _calculate_ft_target and _send_force_action; timed_ur_methods retains their upstream AST hashes. Control formulas and command ordering are preserved.",
-    "Routine load, warmup and loop timings are always displayed and saved to timing_*.jsonl; record.action_timing_enabled controls detailed action diagnostics only.",
-    "record.save_logs independently controls saved timing, input-state/action, episode and summary-plot logs; routine console output remains enabled.",
+    "Routine loop, controller and episode-progress timings are saved to timing_*.jsonl without periodic console output; record.action_timing_enabled adds detailed per-action records. Load/warmup progress, episode results and warnings remain visible.",
+    "record.save_logs independently controls saved timing, input-state/action, episode and summary-plot logs. Console summaries remain enabled regardless of save_logs.",
     "Action timings include inference and within-chunk IDs; action YAML records include infer_index and latest.jsonl points to the current timing file.",
     "Standalone Policy directly returns the decoded action chunk from RLinf predict_action_batch, without a second observation conversion or output decoding; configuration validates the returned chunk length against the prediction horizon; the robot executes and records the entire returned chunk, with summary length derived from the model configuration.",
     "Exit cleanup always attempts forceModeStop, servoStop, stopScript, both RTDE disconnects, gripper serial close and camera disconnects. Gripper polling stops on close; partial startup failures release opened devices. Normal completion retains exit homing, while interrupted or failed inference stops without homing. lifecycle_ur_methods preserves upstream hashes for modified connection/thread methods; run also has exit cleanup changes.",
@@ -19,7 +20,9 @@
     "Rotational PD gains are direct torque gains, independent of rtde_freq. The supplied 100 Hz profile converts kp_rot/kd_rot from 2000/400 to 20/4; omitted-gain defaults convert 4000/800 at the original default 125 Hz to 32/6.4. The torque formula no longer divides by rtde_freq; control_ur_methods retains its upstream AST hash. Existing custom profiles must divide their old rotational gains by their original configured rtde_freq.",
     "Action cadence is scheduled immediately before forceMode or continuous target publication, including conversion, acknowledgement and logging work between submissions. Each chunk starts without a pacing delay, missed periods do not trigger catch-up bursts, and the final target is held for one period before returning. target_interval_sec records actual foreground submission cadence; per-call control_sec is no longer a complete action period.",
     "Shared startup diagnostics retain total load/warmup timings and record stage wall time, process CPU/I/O/page faults and available compiler metrics; accelerator synchronization is scoped to startup boundaries. Robot execution methods and normal per-action timing are unchanged.",
-    "Episode timing plots are saved beside the resolved inference YAML log, following output_root; the plotting CLI also resolves its default latest log from the standalone inference configuration."
+    "Episode timing plots are saved beside the resolved inference YAML log, following output_root; the plotting CLI also resolves its default latest log from the standalone inference configuration.",
+    "Stage2 mode loads the paired frozen RLToken feature model and online MLP through a shared inference adapter. Double dot selects MLP at the next chunk, reset restores VLA, and action records identify the controller. Stage1 robot control remains unchanged. stage2_ur_methods preserves upstream hashes for the adapted keyboard methods; reset_episode and run were already adapted for tracking/timing.",
+    "Terminal double-press controls use unbuffered file-descriptor reads after select and exit on EOF, preserving the double-dot, Space and Enter mappings and terminal restoration."
   ],
   "source_files": {
     "ur.py": {
@@ -64,8 +67,6 @@
     "connect_robot": "a96af6c8edb64ff469f16f3c5b9b9e7398a746008e51c6d69785e78dc16ed702",
     "_clear_action_idle_hold": "cc8e3590063012a30378699ff9611c1db9b25466cb67818bdf91e3334c3e0815",
     "_stop_keyboard_episode_control_listener": "74b9a43ea94104245fa89f935685aae661608415ac72436497c50aa0c8bd4efa",
-    "_print_episode_time_every_second": "5563195a395c82da6dfafdb2b8acf7c0723e9655910709d8b7632eec47f71f02",
-    "_keyboard_episode_control_listener": "cdcbb25eb296d892421cdc31e2065fd94ab3c506ef7315018b08f9491754eeda",
     "_target_pose_from_action": "81b36dbe9cbd21b4e6d42cb1d0ab32855e73b997d4480249a7f4d58ea8c22d0c",
     "set_episode_reference_pose": "46eb48db620750e077a7c0d55baf8ac132ee208b730fb38fb38858ff7176da5f",
     "_wait_for_next_episode_start": "589e8bdebee52a6c45e8861a0fd2691ad4e3566a52c14d645c8fe931b27923c0",
@@ -84,7 +85,6 @@
     "_pose_euler": "f127a1b99dd864b56c76ecb05b51d243f91c0a9d2e2969a669a929d14df20409",
     "_wrench_base_to_task": "6e81dd2a685efeb78393c37013fe237656def9cfa5b71cce602d21aba36537f7",
     "_action_motion_mask": "52e7f0514a7a48be116a921903a14136d0c5b0b1be272741dca6f3c60c64d523",
-    "_start_keyboard_episode_control_listener": "bc972647851556e456e0ef66315d1a2d7d7f395f2ea3ff3121cccd71e1e4ac7e",
     "_is_none_pose": "2990237fdbdb9697eecd2a34cf88803c2f8fafa717557c59b41705bf499b8c09",
     "_transform_to_pose": "608bcd745489ee24f2aa594d03763caa1428320daf4aeb2775619a87c89ddea6",
     "_finish_episode_if_needed": "7bbcf173dfa46729db625117de1a827bb9f98c90c1f4f2cc26bd0d5c0cdd5ff6",
@@ -100,7 +100,8 @@
     "_send_force_action": "c252d6868b29569a8934473c809c26979d00255da528a76f8854e91c4afdd1e7",
     "run": "ad2a5c0e0333389e7b1c33036bb98f49768e2602928362a47763c6f6861e2af4",
     "_start_episode_time_printer": "6b8e8dee7b7c749603f57dd575fd9e80853b0e0615f6bcadd9fd445dc0d4e532",
-    "_submit_step": "51467a0457fa2da4d675666586f5fb227c17b1846ccbf67316b93c89af918ed0"
+    "_submit_step": "51467a0457fa2da4d675666586f5fb227c17b1846ccbf67316b93c89af918ed0",
+    "_print_episode_time_every_second": "5563195a395c82da6dfafdb2b8acf7c0723e9655910709d8b7632eec47f71f02"
   },
   "lifecycle_ur_methods": {
     "_read_gripper_state": "bbf4a9afdd5976d119bf8a498ca221448051b2d9757119a9626b06fb514ac9cc",
@@ -119,5 +120,9 @@
   },
   "control_ur_methods": {
     "_calculate_force": "bc7579f0fadb92c16726daafe8c6007b6c8e4b9c4966ec15539cfa87db536fd2"
+  },
+  "stage2_ur_methods": {
+    "_keyboard_episode_control_listener": "cdcbb25eb296d892421cdc31e2065fd94ab3c506ef7315018b08f9491754eeda",
+    "_start_keyboard_episode_control_listener": "bc972647851556e456e0ef66315d1a2d7d7f395f2ea3ff3121cccd71e1e4ac7e"
   }
 }

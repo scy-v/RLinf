@@ -1,0 +1,28 @@
+{
+  "config": "ur_rlt_stage2_ac_mlp",
+  "resume_dir": null,
+  "update_epoch": 5,
+  "critic_actor_ratio": 2,
+  "continuous_updates": false,
+  "train_every_transitions": 1,
+  "replay_window": 5000,
+  "warmup_cache_manifest_matches": true,
+  "warmup_records_loaded": 150,
+  "sample_actions_shape": [
+    150,
+    70
+  ],
+  "warmup_critic_updates": 150,
+  "save_interval": 2500,
+  "scope": "CPU Hydra composition and real warmup replay load/sample; no Ray, GPU or robot startup",
+  "validation": {
+    "config_and_runner_tests_passed": 2,
+    "warmup_and_schedule_tests_passed": 7,
+    "inference_logging_tests_passed": 4,
+    "gloo_initial_sandbox_errors": 2,
+    "gloo_retry": "passed with loopback communication permitted",
+    "ruff": "passed",
+    "git_diff_check": "passed",
+    "documentation": "local Markdown progress/commands checked against code and relative links; Sphinx sources unchanged"
+  }
+}

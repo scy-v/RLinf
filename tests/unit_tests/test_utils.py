@@ -36,6 +36,33 @@ from rlinf.runners.reasoning_runner import ReasoningRunner
 from rlinf.utils.metric_utils import compute_evaluate_metrics, compute_rollout_metrics
 
 
+@pytest.mark.parametrize(
+    "previous, current, save, ended",
+    [
+        (2490, 2520, True, False),
+        (2500, 2500, False, False),
+        (2490, 2499, False, False),
+        (7990, 8050, True, True),
+    ],
+)
+def test_check_progress_crossed_training_rounds(previous, current, save, ended):
+    from rlinf.utils.runner_utils import check_progress
+
+    validate, save_model, is_end = check_progress(
+        current, 8000, -1, 2500, 1.0, previous_step=previous
+    )
+    assert not validate
+    assert save_model == save
+    assert is_end == ended
+
+
+def test_check_progress_preserves_call_based_contract():
+    from rlinf.utils.runner_utils import check_progress
+
+    assert check_progress(2500, 8000, -1, 2500, 1.0) == (False, True, False)
+    assert check_progress(2520, 8000, -1, 2500, 1.0) == (False, False, False)
+
+
 @pytest.mark.parametrize("fail", [False, True])
 def test_startup_timing_nested_stages_and_failure_restore_scope(fail):
     from rlinf.utils.startup_timing import StartupTiming, startup_section
@@ -1407,6 +1434,206 @@ def test_worker_timing_modes_partition_local_work_without_sync(
     )
     assert log.with_name("timing.tsv").exists()
     assert "Invalid timing" not in output.getvalue()
+
+
+@pytest.mark.parametrize("mode", ["basic", "detailed"])
+def test_deduplicated_timing_preserves_records_and_other_output(tmp_path, mode):
+    import csv
+    import json
+
+    from rlinf.utils.progress import stream_run_log
+
+    record = {
+        "timestamp": 1793526641.8338847,
+        "source": "Learner update",
+        "timing_mode": mode,
+        "clock": "host_elapsed",
+        "rank": 0,
+        "update": 182014,
+        "sample": 182014,
+        "actor_updated": False,
+        "work_ms": 7.774195168167353,
+        "target_ms": 0.09318580850958824,
+        "action_interval_hz": None,
+    }
+    if mode == "detailed":
+        record.update(episode=81, chunk=60, prefix_ms=52.432123456789)
+    timing_line = (
+        "(ActorGroup(rank=0) pid=3914163) [INFO 17:50:41 ActorGroup-Rank-0]"
+        "[progress.py:419] [TIMING_RECORD] " + json.dumps(record) + "\n"
+    )
+    ordinary = "[RESET] Completed\nUserWarning: stream mismatch\n"
+    malformed = '[TIMING_RECORD] {"timestamp": broken}\n'
+    unknown = '[TIMING_RECORD] {"timestamp": 1, "future_field": 7}\n'
+    traceback = "Traceback (most recent call last):\n  call()\nRuntimeError: failed\n"
+    stream = ordinary + timing_line + malformed + unknown + traceback
+    old, new = tmp_path / "old", tmp_path / "new"
+    old.mkdir()
+    new.mkdir()
+    for directory, deduplicate in [(old, False), (new, True)]:
+        for _ in range(2):
+            stream_run_log(
+                io.StringIO(stream),
+                io.StringIO(),
+                str(directory / "run.log"),
+                compact=True,
+                deduplicate_timing=deduplicate,
+            )
+    assert (old / "run.log").read_text() == stream * 2
+    assert (new / "run.log").read_text() == (
+        ordinary + malformed + unknown + traceback
+    ) * 2
+    original = [
+        line
+        for line in (old / "run.log").read_text().splitlines(keepends=True)
+        if line == timing_line
+    ]
+    preserved = [
+        line
+        for line in (new / "timing.log").read_text().splitlines(keepends=True)
+        if "[TIMING_RECORD] " in line
+    ]
+    assert preserved == original == [timing_line, timing_line]
+    with (new / "timing.tsv").open() as file:
+        rows = list(csv.DictReader(file, delimiter="\t"))
+    assert len(rows) == 2
+    run_bytes = (new / "run.log").read_bytes()
+    restored = bytearray()
+    offset = 0
+    for row, line in zip(rows, preserved):
+        next_offset = int(row["run_log_offset"])
+        restored.extend(run_bytes[offset:next_offset])
+        restored.extend(line.encode())
+        offset = next_offset
+    restored.extend(run_bytes[offset:])
+    assert restored.decode() == (old / "run.log").read_text()
+    for row in rows:
+        assert float(row["work_ms"]) == record["work_ms"]
+        assert float(row["target_ms"]) == record["target_ms"]
+        assert row["update"] == "182014"
+        assert row["actor_updated"] == "False"
+    assert (new / "timing.log").stat().st_size < (old / "timing.log").stat().st_size
+
+
+def test_compact_metrics_preserve_every_value_and_progress(
+    tmp_path, monkeypatch, capsys
+):
+    import json
+
+    import numpy as np
+
+    from rlinf.utils import metric_utils
+
+    monkeypatch.setattr(metric_utils.time, "time", lambda: 1700000123.125)
+    metrics = {
+        "train/actor/very_long_metric_name_that_tables_truncate": 1.2345678901234567,
+        "train/sac/critic_loss": np.float32(1.1420744e-6),
+        "train/rlt/update_step": np.int64(182006),
+        "time/step": torch.tensor(0.10556268692016602, dtype=torch.float64),
+        "env/success_once": True,
+        "env/note": "接管\n释放",
+        "custom": {"missing": None, "values": np.array([1.0, 2.0])},
+    }
+    for step in (22500, 22501):
+        metric_utils.print_metrics_table(
+            step, 80000, 1700000000.0, metrics, 100, str(tmp_path), compact=True
+        )
+    assert capsys.readouterr().out == ""
+    records = [
+        json.loads(line) for line in (tmp_path / "metrics.log").read_text().splitlines()
+    ]
+    assert len(records) == 2
+    for step, record in zip((22501, 22502), records):
+        assert record["step"] == step
+        assert record["total_steps"] == 80000
+        assert record["start_step"] == 100
+        assert record["start_time"] == 1700000000.0
+        assert record["timestamp"] == 1700000123.125
+        assert record["elapsed_seconds"] == 123.125
+        assert record["average_step_seconds"] == 123.125 / (step - 100)
+        assert record["eta_seconds"] == 123.125 / (step - 100) * (80000 - step)
+        assert record["metrics"] == {
+            **metrics,
+            "train/sac/critic_loss": float(metrics["train/sac/critic_loss"]),
+            "custom": {"missing": None, "values": [1.0, 2.0]},
+        }
+
+
+def test_compact_metrics_can_reproduce_legacy_table(tmp_path, monkeypatch, capsys):
+    import json
+
+    from rlinf.utils import metric_utils
+
+    monkeypatch.setattr(metric_utils.time, "time", lambda: 1234.56789)
+    metrics = {
+        "time/step": 0.12567890123456,
+        "train/sac/actor_loss": -0.008408108726143837,
+        "train/sac/critic_loss": 1.1420744385759463e-6,
+        "train/actor/weighted_bc": 0.00011898841330548748,
+        "train/actor/weighted_q": 0.008527097292244434,
+        "train/rlt/update_step": 182006,
+        "env/success_once": True,
+    }
+    legacy = tmp_path / "legacy"
+    compact = tmp_path / "compact"
+    metric_utils.print_metrics_table(22500, 80000, 1000, metrics, 100, str(legacy))
+    expected = capsys.readouterr().out
+    assert (legacy / "metrics.log").read_text() == expected
+    metric_utils.print_metrics_table(
+        22500, 80000, 1000, metrics, 100, str(compact), compact=True
+    )
+    record = json.loads((compact / "metrics.log").read_text())
+    metric_utils.print_metrics_table(
+        record["step"] - 1,
+        record["total_steps"],
+        record["start_time"],
+        record["metrics"],
+        record["start_step"],
+    )
+    assert capsys.readouterr().out == expected
+    assert (compact / "metrics.log").stat().st_size < (
+        legacy / "metrics.log"
+    ).stat().st_size
+
+    metric_utils.print_metrics_table(
+        22500, 80000, 1000, metrics, 100, str(legacy), compact=True
+    )
+    assert capsys.readouterr().out == expected
+    assert (legacy / "metrics.log").read_text() == expected * 2
+
+
+def test_deduplicated_timing_keeps_existing_legacy_run_readable(tmp_path):
+    import csv
+    import json
+
+    from rlinf.utils.progress import stream_run_log
+
+    line = (
+        "[TIMING_RECORD] "
+        + json.dumps(
+            {
+                "timestamp": 1793526641.8338847,
+                "source": "Rollout step",
+                "work_ms": 80.12,
+            }
+        )
+        + "\n"
+    )
+    path = tmp_path / "run.log"
+    for deduplicate in (False, True):
+        stream_run_log(
+            io.StringIO(line),
+            io.StringIO(),
+            str(path),
+            compact=True,
+            deduplicate_timing=deduplicate,
+        )
+    assert path.read_text() == line * 2
+    with path.with_name("timing.tsv").open() as file:
+        rows = list(csv.DictReader(file, delimiter="\t"))
+    assert len(rows) == 2
+    assert all(None not in row for row in rows)
+    assert path.with_name("timing.log").read_text().count("Timing | Rollout step") == 2
 
 
 def test_disabled_additional_timers_do_not_start_threads_or_read_clocks(monkeypatch):

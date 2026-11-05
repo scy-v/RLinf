@@ -1,0 +1,138 @@
+{
+  "20261104-194359-ur_rlt_stage2_ac_mlp": {
+    "scalar_values_scanned": 38726,
+    "tags": {
+      "train/actor/bc_human_loss": {
+        "n": 29,
+        "min": 9.467216295888647e-05,
+        "max": 0.0023748266976326704,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/actor/bc_loss": {
+        "n": 29,
+        "min": 8.957812679000199e-05,
+        "max": 0.006549892481416464,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/actor/bc_ref_loss": {
+        "n": 29,
+        "min": 8.510284533258528e-05,
+        "max": 0.008172725327312946,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/actor/grad_norm": {
+        "n": 29,
+        "min": 0.5426515936851501,
+        "max": 0.961978018283844,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/alpha/grad_norm": {
+        "n": 29,
+        "min": 0.0,
+        "max": 0.0,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/critic/grad_norm": {
+        "n": 29,
+        "min": 0.03953784704208374,
+        "max": 0.4741230607032776,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/sac/actor_loss": {
+        "n": 29,
+        "min": -0.008188534528017044,
+        "max": 0.03035951964557171,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/sac/alpha_loss": {
+        "n": 29,
+        "min": 0.0,
+        "max": 0.0,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/sac/critic_loss": {
+        "n": 29,
+        "min": 8.710396286915056e-06,
+        "max": 0.007679026108235121,
+        "nonfinite": 0,
+        "above_clip10": 0
+      }
+    }
+  },
+  "20261104-203520-ur_rlt_stage2_ac_mlp": {
+    "scalar_values_scanned": 94344,
+    "tags": {
+      "train/actor/bc_human_loss": {
+        "n": 60,
+        "min": 6.920181476743892e-05,
+        "max": 0.0003981212212238461,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/actor/bc_loss": {
+        "n": 60,
+        "min": 6.340387335512787e-05,
+        "max": 0.00038660786231048405,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/actor/bc_ref_loss": {
+        "n": 60,
+        "min": 5.9957685152767226e-05,
+        "max": 0.0003803411964327097,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/actor/grad_norm": {
+        "n": 60,
+        "min": 0.7347419261932373,
+        "max": 0.8386003375053406,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/alpha/grad_norm": {
+        "n": 60,
+        "min": 0.0,
+        "max": 0.0,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/critic/grad_norm": {
+        "n": 60,
+        "min": 0.0391189381480217,
+        "max": 0.11318744719028473,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/sac/actor_loss": {
+        "n": 60,
+        "min": -0.008254011161625385,
+        "max": -0.005683892406523228,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/sac/alpha_loss": {
+        "n": 60,
+        "min": 0.0,
+        "max": 0.0,
+        "nonfinite": 0,
+        "above_clip10": 0
+      },
+      "train/sac/critic_loss": {
+        "n": 60,
+        "min": 4.961463218933204e-06,
+        "max": 0.0001396496081724763,
+        "nonfinite": 0,
+        "above_clip10": 0
+      }
+    }
+  }
+}

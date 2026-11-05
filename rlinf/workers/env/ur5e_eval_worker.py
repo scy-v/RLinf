@@ -105,11 +105,8 @@ def record_timing(worker: Any, component: str, event: str, **values: Any) -> Non
                 **values,
             },
         )
-    now = time.monotonic()
-    previous = getattr(worker, "_ur_last_report", 0.0)
-    if event != "step" or now - previous >= 1.0:
+    if event != "step":
         worker.log_info(f"[TIMING] {component} {event}: {values}")
-        worker._ur_last_report = now
 
 
 class URRolloutTiming:
@@ -134,8 +131,14 @@ class URRolloutTiming:
             ),
         ):
             super().init_worker()
+            from rlinf.algorithms.rlt.inference import Stage2Inference, is_stage2
+
+            if is_stage2(self.cfg):
+                self._stage2_policy = Stage2Inference.load(
+                    self.hf_model, self.cfg.stage2
+                )
             mode = self.cfg.rollout.get("sampler_compile_mode")
-            if mode is not None:
+            if mode is not None and not is_stage2(self.cfg):
                 with startup_section("model.compile_setup"):
                     self.hf_model.sample_actions = torch.compile(
                         self.hf_model.sample_actions, mode=mode
@@ -144,6 +147,8 @@ class URRolloutTiming:
 
     @torch.inference_mode()
     def _predict_rollout_actions(self, env_obs: dict, **kwargs: Any) -> tuple:
+        if getattr(self, "_stage2_policy", None) is not None:
+            return self._stage2_policy.predict(env_obs, noise=kwargs.get("noise"))
         return super()._predict_rollout_actions(env_obs, **kwargs)
 
 
@@ -266,6 +271,17 @@ class URSyncEnvWorker(EnvWorker):
         episode_action_count: int = 0,
     ) -> None:
         data = self._build_rollout_input_data(output.to_dict())
+        from rlinf.algorithms.rlt.inference import is_stage2
+
+        if is_stage2(self.cfg):
+            active = (
+                self.eval_env_list[0]
+                .unwrapped.env.envs[0]
+                .get_wrapper_attr("critical_phase")
+            )
+            data["obs"]["rlt_switch_flags"] = torch.tensor(
+                [bool(active) and not warmup]
+            )
         data["ur_eval_stop"] = torch.tensor([stop])
         data["ur_eval_warmup"] = torch.tensor([warmup])
         data["ur_infer_index"] = torch.tensor([infer_index])
@@ -375,6 +391,13 @@ class URSyncRolloutWorker(URRolloutTiming, MultiStepRolloutWorker):
                         episode_index=int(output["ur_episode_index"][0]),
                         episode_action_count=int(output["ur_episode_action_count"][0]),
                         action_horizon=int(actions.shape[1]),
+                        controller="mlp"
+                        if bool(
+                            output["obs"]
+                            .get("rlt_switch_flags", torch.tensor([False]))
+                            .any()
+                        )
+                        else "vla",
                     )
                     record_timing(
                         self,

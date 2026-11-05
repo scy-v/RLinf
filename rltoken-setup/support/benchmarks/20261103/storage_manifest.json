@@ -1,0 +1,69 @@
+{
+  "format": "lossless_analysis_storage_v1",
+  "repacked": [
+    {
+      "path": "rltoken-setup/support/benchmarks/20261103/resume_175846/scalars.npz",
+      "before_bytes": 12121429,
+      "after_bytes": 7188111,
+      "before_sha256": "d42979a8c75361ce51e8516b54602fadb1c73fded25ce4a99f03868b5a67ee68",
+      "after_sha256": "bcb4b0f01df5417598b1e2314caadbdb47ce4a65605526913c5a672e1657edb1",
+      "replaced": true,
+      "verification": "same keys, shapes, dtypes and C-order array bytes",
+      "encoding": "ZIP_LZMA; multidimensional NPY arrays in Fortran order"
+    },
+    {
+      "path": "rltoken-setup/support/benchmarks/20261103/20261101-165859_scalars.npz",
+      "before_bytes": 11060008,
+      "after_bytes": 6879555,
+      "before_sha256": "eaeeb98448ec6e5161281d2277868caf42c411641798e1475a17142250634084",
+      "after_sha256": "d87ebd5100c7581a77915d4f94d2a0efa9cfe4c4413f1f77a23b3339f105b498",
+      "replaced": true,
+      "verification": "same keys, shapes, dtypes and C-order array bytes",
+      "encoding": "ZIP_LZMA; multidimensional NPY arrays in Fortran order"
+    },
+    {
+      "path": "rltoken-setup/support/benchmarks/20261103/20261102-232256_scalars.npz",
+      "before_bytes": 7586745,
+      "after_bytes": 4780579,
+      "before_sha256": "e32f63a8453785c5de23ada8b5a78641ef8358f1f57a0a3b83834a19d6b591e7",
+      "after_sha256": "67f0db96e032a8d98e566fc4dafbccb01ead773b0e51e688f11e113543b9d87f",
+      "replaced": true,
+      "verification": "same keys, shapes, dtypes and C-order array bytes",
+      "encoding": "ZIP_LZMA; multidimensional NPY arrays in Fortran order"
+    },
+    {
+      "path": "rltoken-setup/support/benchmarks/20261103/budget_224754/final/action_output_pairs.npz",
+      "before_bytes": 7176003,
+      "after_bytes": 6648622,
+      "before_sha256": "945fc018977f4fc51b4694e2367dd305b3cf04304cc6db161ffa503d5fe35c2a",
+      "after_sha256": "792609524bfd3eff14911af556680858548ecf8d824c022c78421fdcc4940e90",
+      "replaced": true,
+      "verification": "same keys, shapes, dtypes and C-order array bytes",
+      "encoding": "ZIP_LZMA; multidimensional NPY arrays in Fortran order"
+    }
+  ],
+  "deduplicated_view": {
+    "path": "rltoken-setup/support/benchmarks/20261103/budget_224754/action_output_pairs.view.json",
+    "original_npz": "rltoken-setup/support/benchmarks/20261103/budget_224754/action_output_pairs.npz",
+    "format": "npz_first_axis_slice_v1",
+    "source": "final/action_output_pairs.npz",
+    "slice": {
+      "start": 0,
+      "stop": 5496
+    },
+    "keys": [
+      "vla",
+      "actor",
+      "version",
+      "time",
+      "critical",
+      "episode"
+    ],
+    "source_sha256": "792609524bfd3eff14911af556680858548ecf8d824c022c78421fdcc4940e90",
+    "original_archive_sha256": "1739e55cff6310de5a3ec22cca4ca00c0ef7e34fe4501ba68efab8fdb1b23b27",
+    "original_bytes": 5836066,
+    "verification": "all prefix arrays have identical shapes, dtypes and C-order bytes",
+    "read": "np.load(source, allow_pickle=False); use archive[key][0:stop] for each key"
+  },
+  "method": "ZIP_LZMA and Fortran NPY storage; no key, shape, dtype or value changes; one exact duplicate prefix represented by a slice manifest"
+}

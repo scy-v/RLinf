@@ -3,6 +3,7 @@ __pycache__
 *.log
 *.idx
 *.npy
+*.npz
 *.txt
 !requirements/**
 !docs/*

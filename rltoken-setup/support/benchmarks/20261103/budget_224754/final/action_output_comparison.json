@@ -1,0 +1,639 @@
+{
+  "run": "logs/online_rltoken/20261103-224754-ur_rlt_stage2_ac_mlp",
+  "cutoff": "2026-11-04T00:17:50.599108+08:00",
+  "last_step": 3382,
+  "method": "data.log pairs before route/human override; first 10 of VLA 20 compared with Actor 10. policy_version // 5 stages, train sampling fixed_std=.002 before tanh. Critical phase inferred with 1-second margins from second-resolution main log, not exact executed-action attribution.",
+  "total_complete_inferences": 6758,
+  "excluded_untrained": 1,
+  "phase_counts": {
+    "critical_interior": 2946,
+    "noncritical_interior": 2516,
+    "boundary_or_wait": 1296
+  },
+  "stages": {
+    "30-266": {
+      "critical_interior": {
+        "chunks": 203,
+        "xyz_bias_mm": [
+          -3.056604822737606,
+          0.3014797462063947,
+          0.2755665479232511
+        ],
+        "xyz_rmse_mm": [
+          7.275270512284582,
+          4.284148720953709,
+          5.277837393144858
+        ],
+        "xyz_diff_l2_mm_mean_p50_p95": [
+          8.097535404650044,
+          6.303686608382559,
+          21.24586320229776
+        ],
+        "vla_xyz_norm_mm_mean": 9.936711617880457,
+        "actor_xyz_norm_mm_mean": 9.055959362996358,
+        "vla_xyz_bias_mm": [
+          5.019224292934181,
+          0.7508806980048057,
+          2.8030445830180435
+        ],
+        "actor_xyz_bias_mm": [
+          1.9626194701965853,
+          1.0523604442111987,
+          3.0786111309412902
+        ],
+        "rotation_bias_deg": [
+          0.029142221750595474,
+          0.016785298079081783,
+          -0.16268584136798217
+        ],
+        "rotation_rmse_deg": [
+          0.2303791312492399,
+          0.23125528578704085,
+          0.7822166199648238
+        ],
+        "direction_cos_mean_active": 0.6506172237119848,
+        "direction_cos_negative_fraction_active": 0.08153846153846153,
+        "active_direction_samples": 1950,
+        "gripper_threshold_disagreement": 0.015763546798029555,
+        "gripper_mae": 0.029505112433384415,
+        "vla_gripper_mean": 0.11468512982696058,
+        "actor_gripper_mean": 0.11370730318087134,
+        "vla_intra_chunk_xyz_adjacent_l2_mm": 1.3498510296322366,
+        "actor_intra_chunk_xyz_adjacent_l2_mm": 6.40767649011338,
+        "episode_count": 10,
+        "success_episode_chunks": 203
+      },
+      "noncritical_interior": {
+        "chunks": 197,
+        "xyz_bias_mm": [
+          7.2750584422742115,
+          14.372898995087352,
+          -7.460455383050439
+        ],
+        "xyz_rmse_mm": [
+          14.56285714355224,
+          21.29181315552426,
+          22.174255109741747
+        ],
+        "xyz_diff_l2_mm_mean_p50_p95": [
+          31.60775425371917,
+          32.99141460694805,
+          51.252596571795294
+        ],
+        "vla_xyz_norm_mm_mean": 29.79855209949793,
+        "actor_xyz_norm_mm_mean": 15.079963905144009,
+        "vla_xyz_bias_mm": [
+          2.1132263010668364,
+          -10.646633580593077,
+          9.489271272792429
+        ],
+        "actor_xyz_bias_mm": [
+          9.388284743341066,
+          3.726265414494282,
+          2.0288158897419795
+        ],
+        "rotation_bias_deg": [
+          0.10144468113824974,
+          -0.011555285337888677,
+          0.3758588236321855
+        ],
+        "rotation_rmse_deg": [
+          0.45749761855216925,
+          0.47307848914720585,
+          1.5454043419912311
+        ],
+        "direction_cos_mean_active": 0.1290097256997216,
+        "direction_cos_negative_fraction_active": 0.42833052276559863,
+        "active_direction_samples": 1779,
+        "gripper_threshold_disagreement": 0.10558375634517767,
+        "gripper_mae": 0.19664015363016651,
+        "vla_gripper_mean": 0.6436466992975207,
+        "actor_gripper_mean": 0.6537636219452763,
+        "vla_intra_chunk_xyz_adjacent_l2_mm": 2.9056329789939395,
+        "actor_intra_chunk_xyz_adjacent_l2_mm": 11.035684737243232,
+        "episode_count": 10,
+        "success_episode_chunks": 197
+      }
+    },
+    "267-1275": {
+      "critical_interior": {
+        "chunks": 880,
+        "xyz_bias_mm": [
+          -0.19218081249368701,
+          0.5526372506133554,
+          -0.31268930702215203
+        ],
+        "xyz_rmse_mm": [
+          5.298496242344752,
+          4.98387499418627,
+          5.060621434624046
+        ],
+        "xyz_diff_l2_mm_mean_p50_p95": [
+          7.479869585379124,
+          6.401340617334771,
+          17.409572286227103
+        ],
+        "vla_xyz_norm_mm_mean": 7.769014123198031,
+        "actor_xyz_norm_mm_mean": 9.309412269633103,
+        "vla_xyz_bias_mm": [
+          2.9568696531040226,
+          0.17412612307880432,
+          4.043739676405058
+        ],
+        "actor_xyz_bias_mm": [
+          2.764688840610328,
+          0.7267633736921606,
+          3.7310503693829045
+        ],
+        "rotation_bias_deg": [
+          0.10843994152058968,
+          0.028753156634179506,
+          -0.12348663060286334
+        ],
+        "rotation_rmse_deg": [
+          0.3807517563114327,
+          0.3826847255216512,
+          0.7130494864380279
+        ],
+        "direction_cos_mean_active": 0.5818031488085,
+        "direction_cos_negative_fraction_active": 0.10649714219059839,
+        "active_direction_samples": 8573,
+        "gripper_threshold_disagreement": 0.011590909090909091,
+        "gripper_mae": 0.0205580586854731,
+        "vla_gripper_mean": 0.0661705211285515,
+        "actor_gripper_mean": 0.06313732862075322,
+        "vla_intra_chunk_xyz_adjacent_l2_mm": 1.2609140892148094,
+        "actor_intra_chunk_xyz_adjacent_l2_mm": 6.6723589041830795,
+        "episode_count": 39,
+        "success_episode_chunks": 656
+      },
+      "noncritical_interior": {
+        "chunks": 769,
+        "xyz_bias_mm": [
+          4.946017722850488,
+          14.994021651830066,
+          -7.872641689951886
+        ],
+        "xyz_rmse_mm": [
+          13.720404708676712,
+          24.023250670770928,
+          21.812126566788645
+        ],
+        "xyz_diff_l2_mm_mean_p50_p95": [
+          32.845541699026306,
+          33.28051613833742,
+          52.600656871796005
+        ],
+        "vla_xyz_norm_mm_mean": 29.56979448683279,
+        "actor_xyz_norm_mm_mean": 17.585921398496325,
+        "vla_xyz_bias_mm": [
+          3.094351321072211,
+          -9.984789708541816,
+          8.689409649786684
+        ],
+        "actor_xyz_bias_mm": [
+          8.0403690439227,
+          5.009231943288228,
+          0.8167679598348045
+        ],
+        "rotation_bias_deg": [
+          0.19468511875870365,
+          0.10543447052028876,
+          -0.3811460746501678
+        ],
+        "rotation_rmse_deg": [
+          0.5481787570327518,
+          0.5541012986269991,
+          1.57773826459647
+        ],
+        "direction_cos_mean_active": 0.12830548524440752,
+        "direction_cos_negative_fraction_active": 0.419577340769005,
+        "active_direction_samples": 6814,
+        "gripper_threshold_disagreement": 0.12236671001300391,
+        "gripper_mae": 0.18450597999089827,
+        "vla_gripper_mean": 0.6269477804437547,
+        "actor_gripper_mean": 0.5905044426579963,
+        "vla_intra_chunk_xyz_adjacent_l2_mm": 2.9831499398188543,
+        "actor_intra_chunk_xyz_adjacent_l2_mm": 11.28048304644599,
+        "episode_count": 39,
+        "success_episode_chunks": 624
+      }
+    },
+    "1276-1519": {
+      "critical_interior": {
+        "chunks": 210,
+        "xyz_bias_mm": [
+          -0.6124205149168759,
+          0.3697705693942985,
+          -0.03433864889917625
+        ],
+        "xyz_rmse_mm": [
+          5.453506998644856,
+          4.774789149056645,
+          4.1617227006211195
+        ],
+        "xyz_diff_l2_mm_mean_p50_p95": [
+          6.979219172841625,
+          5.924357360225114,
+          15.533653077293772
+        ],
+        "vla_xyz_norm_mm_mean": 7.8556136155699745,
+        "actor_xyz_norm_mm_mean": 9.97287346659697,
+        "vla_xyz_bias_mm": [
+          3.641471841588269,
+          0.6160773221910545,
+          3.8280335269126207
+        ],
+        "actor_xyz_bias_mm": [
+          3.029051326671401,
+          0.985847891585353,
+          3.7936948780134454
+        ],
+        "rotation_bias_deg": [
+          0.062032799376087425,
+          0.031894037764374446,
+          -0.09410624677253447
+        ],
+        "rotation_rmse_deg": [
+          0.3377148468306361,
+          0.3534604985703185,
+          0.6389772278531215
+        ],
+        "direction_cos_mean_active": 0.6295320192921647,
+        "direction_cos_negative_fraction_active": 0.08402540302882266,
+        "active_direction_samples": 2047,
+        "gripper_threshold_disagreement": 0.009523809523809525,
+        "gripper_mae": 0.016156415032158165,
+        "vla_gripper_mean": 0.06005825083369549,
+        "actor_gripper_mean": 0.06414919623132698,
+        "vla_intra_chunk_xyz_adjacent_l2_mm": 1.1528397785257287,
+        "actor_intra_chunk_xyz_adjacent_l2_mm": 6.5424058325121655,
+        "episode_count": 11,
+        "success_episode_chunks": 174
+      },
+      "noncritical_interior": {
+        "chunks": 214,
+        "xyz_bias_mm": [
+          6.614266926055179,
+          17.19481590692025,
+          -7.028695380773587
+        ],
+        "xyz_rmse_mm": [
+          14.757260404376527,
+          25.644870904735168,
+          22.646100889501078
+        ],
+        "xyz_diff_l2_mm_mean_p50_p95": [
+          34.70970672442808,
+          34.90917503973036,
+          56.255742345969814
+        ],
+        "vla_xyz_norm_mm_mean": 30.047940293760703,
+        "actor_xyz_norm_mm_mean": 18.925972714679922,
+        "vla_xyz_bias_mm": [
+          2.2361805791795235,
+          -11.62890997323315,
+          9.074417138160376
+        ],
+        "actor_xyz_bias_mm": [
+          8.850447505234705,
+          5.565905933687095,
+          2.0457217573867967
+        ],
+        "rotation_bias_deg": [
+          0.18875239513843936,
+          0.09767270313985808,
+          -0.37576248152336944
+        ],
+        "rotation_rmse_deg": [
+          0.5462945867041467,
+          0.536125894669438,
+          1.4735131810655777
+        ],
+        "direction_cos_mean_active": 0.08968384724415444,
+        "direction_cos_negative_fraction_active": 0.4563758389261745,
+        "active_direction_samples": 1937,
+        "gripper_threshold_disagreement": 0.1378504672897196,
+        "gripper_mae": 0.18442904609367877,
+        "vla_gripper_mean": 0.6557383052940636,
+        "actor_gripper_mean": 0.5584942562911952,
+        "vla_intra_chunk_xyz_adjacent_l2_mm": 3.1478998631826776,
+        "actor_intra_chunk_xyz_adjacent_l2_mm": 10.792735203105103,
+        "episode_count": 11,
+        "success_episode_chunks": 196
+      }
+    },
+    "1520-2002": {
+      "critical_interior": {
+        "chunks": 428,
+        "xyz_bias_mm": [
+          -0.7005422157654209,
+          -0.3343333110252618,
+          -0.39966380803802093
+        ],
+        "xyz_rmse_mm": [
+          5.939224393181269,
+          5.556560754097697,
+          4.749985679652553
+        ],
+        "xyz_diff_l2_mm_mean_p50_p95": [
+          7.5415172229942975,
+          6.10260055314026,
+          19.46288385790384
+        ],
+        "vla_xyz_norm_mm_mean": 8.077694621636223,
+        "actor_xyz_norm_mm_mean": 9.611431263523357,
+        "vla_xyz_bias_mm": [
+          3.364000500873653,
+          1.1527019426582925,
+          4.094265292395206
+        ],
+        "actor_xyz_bias_mm": [
+          2.663458285108225,
+          0.8183686316330366,
+          3.694601484357181
+        ],
+        "rotation_bias_deg": [
+          0.05500154865439262,
+          0.035731276723618095,
+          0.0055170073921804175
+        ],
+        "rotation_rmse_deg": [
+          0.28577041086044114,
+          0.2999263095691671,
+          0.697370963893092
+        ],
+        "direction_cos_mean_active": 0.5815734205265918,
+        "direction_cos_negative_fraction_active": 0.11561525545694411,
+        "active_direction_samples": 4169,
+        "gripper_threshold_disagreement": 0.008644859813084112,
+        "gripper_mae": 0.014380022670947542,
+        "vla_gripper_mean": 0.05488577840863735,
+        "actor_gripper_mean": 0.05307913929802046,
+        "vla_intra_chunk_xyz_adjacent_l2_mm": 1.338336245237792,
+        "actor_intra_chunk_xyz_adjacent_l2_mm": 6.485316592135239,
+        "episode_count": 19,
+        "success_episode_chunks": 321
+      },
+      "noncritical_interior": {
+        "chunks": 369,
+        "xyz_bias_mm": [
+          6.059298719926183,
+          17.82766985994206,
+          -9.931852145927664
+        ],
+        "xyz_rmse_mm": [
+          15.29419669020933,
+          26.535012163331967,
+          25.15645380495048
+        ],
+        "xyz_diff_l2_mm_mean_p50_p95": [
+          36.62677163931529,
+          36.19282655628325,
+          61.71776027752684
+        ],
+        "vla_xyz_norm_mm_mean": 30.06796254351587,
+        "actor_xyz_norm_mm_mean": 19.445742120581947,
+        "vla_xyz_bias_mm": [
+          2.5939457266177106,
+          -10.487026839926125,
+          9.008149784531994
+        ],
+        "actor_xyz_bias_mm": [
+          8.653244446543937,
+          7.340643020016008,
+          -0.9237023613956925
+        ],
+        "rotation_bias_deg": [
+          0.17697217275255922,
+          0.10430943110074392,
+          -0.08916190223428946
+        ],
+        "rotation_rmse_deg": [
+          0.5167621208236074,
+          0.5312297087267229,
+          1.4389654192239065
+        ],
+        "direction_cos_mean_active": -0.029070054818651225,
+        "direction_cos_negative_fraction_active": 0.5506329113924051,
+        "active_direction_samples": 3318,
+        "gripper_threshold_disagreement": 0.15203252032520326,
+        "gripper_mae": 0.19457506371987474,
+        "vla_gripper_mean": 0.6403452384417438,
+        "actor_gripper_mean": 0.5474795471421993,
+        "vla_intra_chunk_xyz_adjacent_l2_mm": 3.0872553391205133,
+        "actor_intra_chunk_xyz_adjacent_l2_mm": 11.72987817579363,
+        "episode_count": 19,
+        "success_episode_chunks": 315
+      }
+    },
+    "2003-2801": {
+      "critical_interior": {
+        "chunks": 741,
+        "xyz_bias_mm": [
+          0.3020608590067208,
+          0.5080690685083817,
+          -1.083916311054006
+        ],
+        "xyz_rmse_mm": [
+          5.5720455323436004,
+          4.825576772328708,
+          4.657014343744166
+        ],
+        "xyz_diff_l2_mm_mean_p50_p95": [
+          7.344881673016478,
+          6.304513265098194,
+          16.70941550821448
+        ],
+        "vla_xyz_norm_mm_mean": 7.78964293709763,
+        "actor_xyz_norm_mm_mean": 8.972390831985503,
+        "vla_xyz_bias_mm": [
+          2.650863311939409,
+          0.546157543214405,
+          4.13430210419633
+        ],
+        "actor_xyz_bias_mm": [
+          2.9529241709461305,
+          1.0542266117227859,
+          3.050385793142307
+        ],
+        "rotation_bias_deg": [
+          0.031952774511553296,
+          0.013111886922315286,
+          0.01161586341378756
+        ],
+        "rotation_rmse_deg": [
+          0.2334986651470853,
+          0.23721170112466108,
+          0.687206279748096
+        ],
+        "direction_cos_mean_active": 0.5130554540863784,
+        "direction_cos_negative_fraction_active": 0.14640198511166252,
+        "active_direction_samples": 7254,
+        "gripper_threshold_disagreement": 0.011201079622132253,
+        "gripper_mae": 0.016350215344420407,
+        "vla_gripper_mean": 0.04196374448888945,
+        "actor_gripper_mean": 0.043764259677016505,
+        "vla_intra_chunk_xyz_adjacent_l2_mm": 1.2855552523027145,
+        "actor_intra_chunk_xyz_adjacent_l2_mm": 6.616342221463111,
+        "episode_count": 31,
+        "success_episode_chunks": 498
+      },
+      "noncritical_interior": {
+        "chunks": 592,
+        "xyz_bias_mm": [
+          8.435958195588775,
+          17.594800832893053,
+          -9.549473386116176
+        ],
+        "xyz_rmse_mm": [
+          15.796621292081255,
+          24.708187999830617,
+          24.461727627696124
+        ],
+        "xyz_diff_l2_mm_mean_p50_p95": [
+          35.33200568682402,
+          35.43427653610021,
+          58.98976771223171
+        ],
+        "vla_xyz_norm_mm_mean": 29.5815397875734,
+        "actor_xyz_norm_mm_mean": 18.87979368775181,
+        "vla_xyz_bias_mm": [
+          2.7028204220907592,
+          -11.46089758589483,
+          9.113020330962064
+        ],
+        "actor_xyz_bias_mm": [
+          11.138778617679513,
+          6.133903246998267,
+          -0.43645305515414023
+        ],
+        "rotation_bias_deg": [
+          0.12615387772756564,
+          0.05754549583626677,
+          0.1702613130940483
+        ],
+        "rotation_rmse_deg": [
+          0.4228244414119481,
+          0.41653275506521886,
+          1.3110976536307941
+        ],
+        "direction_cos_mean_active": 0.008149029225671617,
+        "direction_cos_negative_fraction_active": 0.50754432289702,
+        "active_direction_samples": 5302,
+        "gripper_threshold_disagreement": 0.20050675675675675,
+        "gripper_mae": 0.22243006320282718,
+        "vla_gripper_mean": 0.6570617770935531,
+        "actor_gripper_mean": 0.5127968744840393,
+        "vla_intra_chunk_xyz_adjacent_l2_mm": 3.0262698830097743,
+        "actor_intra_chunk_xyz_adjacent_l2_mm": 10.907470908817714,
+        "episode_count": 31,
+        "success_episode_chunks": 463
+      }
+    },
+    "2802-3382": {
+      "critical_interior": {
+        "chunks": 484,
+        "xyz_bias_mm": [
+          -0.11092653162282606,
+          0.4379311954146704,
+          -0.34763111241907924
+        ],
+        "xyz_rmse_mm": [
+          5.077229335634531,
+          4.876899394191713,
+          6.2831726941564705
+        ],
+        "xyz_diff_l2_mm_mean_p50_p95": [
+          7.654411583969904,
+          6.273679893099631,
+          20.16728945083056
+        ],
+        "vla_xyz_norm_mm_mean": 8.076512876577533,
+        "actor_xyz_norm_mm_mean": 9.117503379943317,
+        "vla_xyz_bias_mm": [
+          2.735957063236905,
+          0.09185731503750416,
+          3.642712328717481
+        ],
+        "actor_xyz_bias_mm": [
+          2.625030531614083,
+          0.5297885104521769,
+          3.2950812162984002
+        ],
+        "rotation_bias_deg": [
+          0.044361453281305786,
+          0.03665857994858143,
+          -0.010886520528634194
+        ],
+        "rotation_rmse_deg": [
+          0.2583858519454457,
+          0.2533682277329537,
+          0.6002538164151163
+        ],
+        "direction_cos_mean_active": 0.5269007721587925,
+        "direction_cos_negative_fraction_active": 0.14207071776413296,
+        "active_direction_samples": 4723,
+        "gripper_threshold_disagreement": 0.008471074380165288,
+        "gripper_mae": 0.01564001520722435,
+        "vla_gripper_mean": 0.057015590938276205,
+        "actor_gripper_mean": 0.052831218453203876,
+        "vla_intra_chunk_xyz_adjacent_l2_mm": 1.362870340484847,
+        "actor_intra_chunk_xyz_adjacent_l2_mm": 6.699411996203578,
+        "episode_count": 20,
+        "success_episode_chunks": 417
+      },
+      "noncritical_interior": {
+        "chunks": 375,
+        "xyz_bias_mm": [
+          8.045711393845801,
+          17.247857491349787,
+          -6.818783111353209
+        ],
+        "xyz_rmse_mm": [
+          15.042161626747772,
+          24.865833620838913,
+          21.037076600514055
+        ],
+        "xyz_diff_l2_mm_mean_p50_p95": [
+          33.140771658358496,
+          33.63121927401009,
+          54.68307356506308
+        ],
+        "vla_xyz_norm_mm_mean": 30.076631304558973,
+        "actor_xyz_norm_mm_mean": 18.170035429930994,
+        "vla_xyz_bias_mm": [
+          3.1071424508440546,
+          -10.773539704882637,
+          9.216656903882551
+        ],
+        "actor_xyz_bias_mm": [
+          11.152853844689895,
+          6.474317786467164,
+          2.3978737925293387
+        ],
+        "rotation_bias_deg": [
+          0.13233289888516483,
+          0.0715145760156446,
+          0.09250028527606015
+        ],
+        "rotation_rmse_deg": [
+          0.4519950279318597,
+          0.4510476334207098,
+          1.1920429679592164
+        ],
+        "direction_cos_mean_active": 0.1342943806038722,
+        "direction_cos_negative_fraction_active": 0.41147058823529414,
+        "active_direction_samples": 3400,
+        "gripper_threshold_disagreement": 0.24026666666666666,
+        "gripper_mae": 0.2555051958466791,
+        "vla_gripper_mean": 0.6328390187373535,
+        "actor_gripper_mean": 0.425692807176381,
+        "vla_intra_chunk_xyz_adjacent_l2_mm": 2.8262616100105764,
+        "actor_intra_chunk_xyz_adjacent_l2_mm": 10.2495304191538,
+        "episode_count": 20,
+        "success_episode_chunks": 334
+      }
+    }
+  }
+}

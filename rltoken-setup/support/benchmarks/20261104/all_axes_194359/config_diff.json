@@ -1,0 +1,66 @@
+{
+  "previous_to_new": [
+    {
+      "key": ".runner.logger.log_path",
+      "old": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261103-224754-ur_rlt_stage2_ac_mlp",
+      "new": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-194359-ur_rlt_stage2_ac_mlp"
+    },
+    {
+      "key": ".env.eval.video_cfg.video_base_dir",
+      "old": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261103-224754-ur_rlt_stage2_ac_mlp/video/eval",
+      "new": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-194359-ur_rlt_stage2_ac_mlp/video/eval"
+    },
+    {
+      "key": ".env.train.video_cfg.video_base_dir",
+      "old": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261103-224754-ur_rlt_stage2_ac_mlp/video/train",
+      "new": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-194359-ur_rlt_stage2_ac_mlp/video/train"
+    },
+    {
+      "key": ".cluster.node_groups[0].hardware.configs[0].impedance.selection_vector[3]",
+      "old": 0,
+      "new": 1
+    },
+    {
+      "key": ".cluster.node_groups[0].hardware.configs[0].impedance.selection_vector[4]",
+      "old": 0,
+      "new": 1
+    },
+    {
+      "key": ".algorithm.rlt_schedule.warmup_cache_path",
+      "old": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/warmup/insert_black_rack_into_blue_slot.pt",
+      "new": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/warmup/warmup_insert_black_rack_into_blue_slot_all_axes.pt"
+    },
+    {
+      "key": ".algorithm.update_epoch",
+      "old": 5,
+      "new": 10
+    },
+    {
+      "key": ".algorithm.critic_actor_ratio",
+      "old": 2,
+      "new": 4
+    }
+  ],
+  "fresh_to_resume": [
+    {
+      "key": ".runner.logger.log_path",
+      "old": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-194359-ur_rlt_stage2_ac_mlp",
+      "new": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-203520-ur_rlt_stage2_ac_mlp"
+    },
+    {
+      "key": ".runner.resume_dir",
+      "old": null,
+      "new": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-194359-ur_rlt_stage2_ac_mlp/ur_rlt_stage2_ac_mlp/checkpoints/global_step_773"
+    },
+    {
+      "key": ".env.eval.video_cfg.video_base_dir",
+      "old": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-194359-ur_rlt_stage2_ac_mlp/video/eval",
+      "new": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-203520-ur_rlt_stage2_ac_mlp/video/eval"
+    },
+    {
+      "key": ".env.train.video_cfg.video_base_dir",
+      "old": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-194359-ur_rlt_stage2_ac_mlp/video/train",
+      "new": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-203520-ur_rlt_stage2_ac_mlp/video/train"
+    }
+  ]
+}

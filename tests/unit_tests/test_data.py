@@ -370,7 +370,7 @@ def test_rlt_warmup_cache_reuses_first_150_with_human_actions(rlt_warmup_cache_a
     assert (batch["actions"][human_mask] == 0.75).all()
     assert worker.update_step == 0
     updates, metrics = worker._rlt_updates_to_run()
-    assert updates == 8
+    assert updates == 150
     assert metrics["rlt/warmup_required_updates"] == 150
 
 
@@ -481,7 +481,7 @@ def test_rlt_realworld_warmup_then_continues_without_new_data(
     worker._ingest_rollout_trajectories([_rlt_replay_trajectory(149)])
     assert worker._rlt_updates_to_run()[0] == 0
     worker._ingest_rollout_trajectories([_rlt_replay_trajectory(1)])
-    assert worker._rlt_updates_to_run()[0] == 8
+    assert worker._rlt_updates_to_run()[0] == 150
     worker.update_step = 149
     assert worker._rlt_updates_to_run()[0] == 1
     assert (routed(worker.get_rollout_sync_version(), True).actions == 0.25).all()
@@ -493,6 +493,69 @@ def test_rlt_realworld_warmup_then_continues_without_new_data(
     assert worker._rlt_updates_to_run()[0] == 8
     worker._ingest_rollout_trajectories([_rlt_replay_trajectory(1, marker=9.0)])
     assert worker.replay_buffer.total_samples == 151
+
+
+@pytest.mark.parametrize("continuous", [False, True])
+@pytest.mark.parametrize("cap", [0, 8])
+def test_rlt_shared_warmup_preserves_online_budget(
+    realworld_rlt_actor, continuous, cap
+):
+    worker = realworld_rlt_actor
+    worker.rlt_schedule_cfg.continuous_updates = continuous
+    worker.rlt_schedule_cfg.max_updates_per_train_step = cap
+    added, completed = worker._ingest_rollout_trajectories(
+        [_rlt_replay_trajectory(150)]
+    )
+    worker._update_rollout_ingest_counters(added, completed)
+    assert worker._rlt_updates_to_run()[0] == (cap or 150)
+
+    # New data received during warmup must remain available to online scheduling.
+    added, completed = worker._ingest_rollout_trajectories([_rlt_replay_trajectory(10)])
+    worker._update_rollout_ingest_counters(added, completed)
+    worker.update_step = 148
+    assert worker._rlt_updates_to_run()[0] == 2
+    worker.update_step = 150
+    expected = 8 if continuous else (cap or 80)
+    assert worker._rlt_updates_to_run()[0] == expected
+    worker.update_step = 230
+    assert worker._rlt_updates_to_run()[0] == (8 if continuous else 0)
+
+
+def test_rlt_runner_counts_updates_across_calls_and_resume():
+    runner = object.__new__(AsyncEmbodiedRunner)
+    runner.cfg = OmegaConf.create(
+        {"algorithm": {"update_epoch": 8, "rlt_schedule": {"enable": True}}}
+    )
+    runner.global_step = 0
+    assert runner._advance_training_step(
+        {"rlt/update_step": 150, "rlt/critic_updates_run": 150}
+    )
+    assert runner.global_step == 18
+    assert not runner._advance_training_step(
+        {"rlt/update_step": 150, "rlt/critic_updates_run": 0}
+    )
+    assert runner.global_step == 18
+    # The six remaining updates survive call boundaries and checkpoint restoration.
+    runner.global_step = 18
+    assert runner._advance_training_step(
+        {"rlt/update_step": 152, "rlt/critic_updates_run": 2}
+    )
+    assert runner.global_step == 19
+    runner.cfg.algorithm.update_epoch = 5
+    assert runner._advance_training_step(
+        {"rlt/update_step": 300, "rlt/critic_updates_run": 150}
+    )
+    assert runner.global_step == 60
+
+
+def test_rlt_runner_without_schedule_keeps_call_count():
+    runner = object.__new__(AsyncEmbodiedRunner)
+    runner.cfg = OmegaConf.create({"algorithm": {}})
+    runner.global_step = 12
+    assert not runner._advance_training_step({})
+    assert runner.global_step == 12
+    assert runner._advance_training_step({"critic_loss": 0.01})
+    assert runner.global_step == 13
 
 
 def test_rlt_maniskill_keeps_data_budget_schedule(realworld_rlt_actor):

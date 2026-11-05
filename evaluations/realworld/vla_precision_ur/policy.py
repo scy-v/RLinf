@@ -99,6 +99,19 @@ def model_config_from_yaml(config: dict[str, Any]) -> Any:
     """Build a model configuration without starting a Ray cluster or hardware."""
     from omegaconf import OmegaConf
 
+    from rlinf.algorithms.rlt.inference import is_stage2, stage2_configs
+
+    if is_stage2(config):
+        if config["policy"].get("location", "local") != "local" or config["robot"].get(
+            "fix_gripper", False
+        ):
+            raise ValueError("Stage2 requires a local policy and fix_gripper=false.")
+        if config["model"]["network"]["openpi"].get("rtc_enabled", False):
+            raise ValueError("Stage2 inference currently runs without RTC.")
+        feature, head = stage2_configs(config["stage2"])
+        feature.num_action_chunks = head.num_action_chunks
+        return feature
+
     model = config["model"]
     network = copy.deepcopy(model["network"])
     # The shared loader accepts booleans; complete-sampler modes belong to UR.
@@ -136,8 +149,9 @@ def model_config_from_yaml(config: dict[str, Any]) -> Any:
 class RLinfPolicy:
     """Return RLinf's decoded action chunk to the standalone UR backend."""
 
-    def __init__(self, model: torch.nn.Module):
+    def __init__(self, model: torch.nn.Module, stage2: Any = None):
         self.model = model
+        self.stage2 = stage2
 
     @torch.inference_mode()
     def infer(self, obs: dict, *, noise: np.ndarray | None = None) -> dict:
@@ -160,13 +174,22 @@ class RLinfPolicy:
                 noise = noise[None]
             noise_tensor = torch.as_tensor(noise, device=self.model.device)
         started = time.perf_counter()
-        actions, _ = self.model.predict_action_batch(
-            env_obs, mode="eval", noise=noise_tensor
-        )
+        if self.stage2 is not None:
+            env_obs["rlt_switch_flags"] = torch.tensor(
+                [bool(obs.get("rlt_actor_enabled", False))]
+            )
+            actions, _ = self.stage2.predict(env_obs, noise=noise_tensor)
+        else:
+            actions, _ = self.model.predict_action_batch(
+                env_obs, mode="eval", noise=noise_tensor
+            )
         with startup_section("inference.to_cpu"):
             actions = actions[0].detach().to(device="cpu", dtype=torch.float32).numpy()
         return {
             "actions": actions,
+            "controller": "mlp"
+            if self.stage2 is not None and obs.get("rlt_actor_enabled", False)
+            else "vla",
             "policy_timing": {"infer_ms": (time.perf_counter() - started) * 1000},
         }
 
@@ -204,16 +227,25 @@ def _create_policy(config: dict[str, Any]) -> Any:
     model = get_model(cfg)
     with startup_section("model.to_device"):
         model = model.to(str(config["model"].get("device", "cuda:0"))).eval()
+    from rlinf.algorithms.rlt.inference import Stage2Inference, is_stage2
+
     with startup_section("model.compile_setup"):
-        _configure_sampler_compile(model, _torch_compile_setting(config))
-    return RLinfPolicy(model)
+        if is_stage2(config):
+            stage2 = Stage2Inference.load(model, config["stage2"])
+        else:
+            stage2 = None
+            _configure_sampler_compile(model, _torch_compile_setting(config))
+    return RLinfPolicy(model, stage2)
 
 
 def check_model(config: dict[str, Any]) -> None:
     """Compare standalone and RLinf worker I/O with fixed noise, without hardware."""
-    from rlinf.utils.logging import get_logger
+    _check_policy(config, create_policy(config))
 
-    policy = create_policy(config)
+
+@torch.inference_mode()
+def _check_policy(config: dict[str, Any], policy: RLinfPolicy) -> None:
+    """Construct both inputs in the same inference context used at runtime."""
     model = policy.model
     rng = np.random.default_rng(42)
     obs = {
@@ -235,18 +267,46 @@ def check_model(config: dict[str, Any]) -> None:
         "task_descriptions": [obs["prompt"]],
     }
     with torch.inference_mode():
-        original_actions, _ = model.predict_action_batch(
-            env_obs, mode="eval", noise=torch.from_numpy(noise[None]).to(model.device)
-        )
+        if policy.stage2 is not None:
+            original_actions, _ = policy.stage2.predict(
+                env_obs, noise=torch.from_numpy(noise[None]).to(model.device)
+            )
+        else:
+            original_actions, _ = model.predict_action_batch(
+                env_obs,
+                mode="eval",
+                noise=torch.from_numpy(noise[None]).to(model.device),
+            )
     actual = original_actions[0].detach().cpu().numpy()
-    if (
-        standalone_actions.shape != actual.shape
-        or not np.isfinite(standalone_actions).all()
-    ):
-        raise ValueError(
-            f"Expected finite action chunk shape {actual.shape}, got {standalone_actions.shape}"
-        )
     np.testing.assert_allclose(actual, standalone_actions, rtol=1e-5, atol=1e-6)
+    if not np.isfinite(standalone_actions).all():
+        raise ValueError("Expected finite inference actions.")
+    if policy.stage2 is not None:
+        obs["rlt_actor_enabled"] = True
+        actor_actions = policy.infer(obs, noise=noise)["actions"]
+        env_obs["rlt_switch_flags"] = torch.tensor([True])
+        expected, _ = policy.stage2.predict(
+            env_obs, noise=torch.from_numpy(noise[None]).to(model.device)
+        )
+        np.testing.assert_allclose(
+            actor_actions, expected[0].cpu().numpy(), rtol=1e-5, atol=1e-6
+        )
+        repeated = policy.infer(obs, noise=noise)["actions"]
+        np.testing.assert_allclose(actor_actions, repeated, rtol=1e-5, atol=1e-6)
+        if (
+            actor_actions.shape != (policy.stage2.head.chunk_len, 7)
+            or not np.isfinite(actor_actions).all()
+        ):
+            raise ValueError("Expected a finite Stage2 MLP action chunk.")
+        runtime = policy.infer(obs)
+        if runtime["controller"] != "mlp" or not np.isfinite(runtime["actions"]).all():
+            raise ValueError(
+                "Expected finite MLP actions with runtime-generated noise."
+            )
+        get_logger().info(
+            "Stage2 MLP check passed: fixed-noise max abs diff=%.8g; runtime noise passed",
+            float(np.max(np.abs(actor_actions - expected[0].cpu().numpy()))),
+        )
     get_logger().info(
         "RLinf Policy GPU check passed: action chunk shape=%s, prediction horizon=%s, max abs diff=%.8g; no hardware connected",
         standalone_actions.shape,

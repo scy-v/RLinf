@@ -1,3 +1,18 @@
+# false: preserve existing keyboard behavior; true: launching terminal only.
+# This backend already reads terminal stdin, so both settings are terminal-only.
+keyboard_terminal_only: false
+
+# stage1: direct VLA actions; stage2: paired frozen VLA + trained MLP.
+inference_stage: stage1
+stage2:
+  # Must describe the Stage1/MLP pair used to train the selected online checkpoint.
+  training_config: /home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261102-232256-ur_rlt_stage2_ac_mlp/tensorboard/config.yaml
+  checkpoint_path: /home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261102-232256-ur_rlt_stage2_ac_mlp/ur_rlt_stage2_ac_mlp/checkpoints/global_step_22500/actor/model_state_dict/full_weights.pt
+  num_steps: 4  # Stage2 reference denoising; Stage1 also defaults to 4 steps.
+  compile_mode: max-autotune  # Online RLT denoising scope; null disables this compilation.
+  mlp_compile_mode: max-autotune-no-cudagraphs  # Same MLP compile hook as online rollout.
+  gripper_close_threshold: 0.5  # Stage1 keeps its existing 0.7 threshold.
+
 # VLA-Precision UR deployment with optional background force tracking.
 experiment:
   name: insert_black_rack_into_blue_slot
@@ -16,7 +31,8 @@ video:
 record:
   num_episodes: 20
   episode_timeout_sec: 60
-  # Enable detailed per-action diagnostics; save_logs controls file output.
+  # Save detailed per-action timings without periodic console output.
+  # save_logs controls file output, including routine chunk/controller timings.
   action_timing_enabled: true
   save_logs: true
 robot:
@@ -104,11 +120,11 @@ cameras:
   width: 640
   height: 480
 model:
-  checkpoint_dir: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor
+  checkpoint_dir: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_5000/actor
   norm_stats_path: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/norm_stats.json
   device: cuda:0
   torch_num_threads: 4
-  sample_steps: 10
+  sample_steps: 4
   network:
     model_type: openpi
     precision: bf16

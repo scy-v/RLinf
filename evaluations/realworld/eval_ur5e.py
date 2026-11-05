@@ -18,10 +18,13 @@ from contextlib import ExitStack
 
 import hydra
 import torch.multiprocessing as mp
+from omegaconf import OmegaConf
 
+from rlinf.algorithms.rlt.inference import is_stage2, stage2_configs
 from rlinf.config import validate_cfg
 from rlinf.runners.embodied_eval_runner import EmbodiedEvalRunner
 from rlinf.scheduler import Cluster
+from rlinf.utils.keyboard_focus import configure_terminal_keyboard
 from rlinf.utils.placement import HybridComponentPlacement
 from rlinf.utils.robot_lifecycle import termination_signals
 from rlinf.workers.env.ur5e_eval_worker import (
@@ -32,13 +35,42 @@ from rlinf.workers.env.ur5e_eval_worker import (
 )
 
 
+def prepare_inference_config(cfg):
+    """Select a Stage2 profile without changing the Stage1 configuration."""
+    if is_stage2(cfg):
+        if cfg.runner.rtc.enabled or cfg.runner.get("ckpt_path"):
+            raise ValueError(
+                "Stage2 uses synchronous inference and stage2.checkpoint_path; disable RTC and runner.ckpt_path."
+            )
+        feature, head = stage2_configs(cfg.stage2)
+        cfg = OmegaConf.merge(
+            cfg,
+            {
+                "env": {
+                    "eval": {
+                        "ur_evaluation": {"stage2_enabled": True},
+                        "override_cfg": {
+                            "gripper_close_threshold": cfg.stage2.gripper_close_threshold
+                        },
+                    }
+                },
+            },
+        )
+        # The worker exposes the MLP execution length while the feature model retains its horizon.
+        feature.num_action_chunks = head.num_action_chunks
+        cfg.rollout.model = feature
+    return cfg
+
+
 @hydra.main(
     version_base="1.1", config_path=".", config_name="realworld_ur5e_eval_pi05_sft"
 )
 def main(cfg) -> None:
     """Launch a single UR environment and its sync or RTC model worker."""
     mp.set_start_method("spawn", force=True)
+    cfg = prepare_inference_config(cfg)
     cfg = validate_cfg(cfg)
+    configure_terminal_keyboard(cfg.get("keyboard_terminal_only", False))
     if cfg.rollout.pipeline_stage_num != 1 or cfg.env.eval.total_num_envs != 1:
         raise ValueError(
             "UR evaluation requires one environment and one pipeline stage."

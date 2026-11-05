@@ -1086,12 +1086,15 @@ class RLTACFSDPPolicy(RLTACLossMixin, RLTACReplayMixin, EmbodiedSACFSDPPolicy):
             skip_reason = 3
         elif not buffer_ready:
             skip_reason = 1
+        elif int(self.update_step) < warmup_required_updates:
+            desired_total_updates = warmup_required_updates
+            pending_updates = warmup_required_updates - int(self.update_step)
+            updates_scheduled = pending_updates
+            updates_to_run = pending_updates
+            if max_updates > 0:
+                updates_to_run = min(updates_to_run, max_updates)
         elif bool(schedule_cfg.get("continuous_updates", False)):
             updates_to_run = update_epoch
-            if int(self.update_step) < warmup_required_updates:
-                updates_to_run = min(
-                    updates_to_run, warmup_required_updates - int(self.update_step)
-                )
             desired_total_updates = int(self.update_step) + updates_to_run
             pending_updates = updates_to_run
             updates_scheduled = updates_to_run

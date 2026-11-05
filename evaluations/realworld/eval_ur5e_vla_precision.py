@@ -40,8 +40,15 @@ def main() -> None:
         action="store_true",
         help="Check actual checkpoint inference on GPU without connecting hardware",
     )
+    parser.add_argument(
+        "--stage",
+        choices=("stage1", "stage2"),
+        help="Override inference_stage from YAML",
+    )
     args = parser.parse_args()
     config = yaml.safe_load(args.config.read_text())
+    if args.stage is not None:
+        config["inference_stage"] = args.stage
     os.environ["CUDA_VISIBLE_DEVICES"] = str(
         config["policy"].get("cuda_visible_devices", "0")
     )
@@ -58,7 +65,7 @@ def main() -> None:
         raise FileNotFoundError(
             f"No full_weights.pt found under {model_cfg.model_path}"
         )
-    stats = load_norm_stats(config["model"]["norm_stats_path"])
+    stats = load_norm_stats(model_cfg.openpi_data.norm_stats_path)
     from evaluations.realworld.vla_precision_ur.utils import (
         validate_single_arm_norm_stats,
     )
@@ -67,7 +74,7 @@ def main() -> None:
         stats,
         fixed_gripper=False,
         learned_state_dim=19,
-        path=config["model"]["norm_stats_path"],
+        path=model_cfg.openpi_data.norm_stats_path,
         padded_action_dim=int(model_cfg.openpi.model_action_dim),
     )
     if args.check_model:
@@ -80,7 +87,7 @@ def main() -> None:
             "VLA-Precision UR config, checkpoint paths, norm stats and hardware imports passed; no hardware connected"
         )
         return
-    engine = Inference(args.config)
+    engine = Inference(args.config, inference_stage=args.stage)
     engine.run()
 
 

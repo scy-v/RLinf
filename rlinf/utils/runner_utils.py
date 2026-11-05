@@ -28,6 +28,11 @@ def safe_is_divisible(a, b):
     return a % b == 0
 
 
+def crossed_interval(previous_step: int, step: int, interval: int) -> bool:
+    """Return whether completed work crossed at least one interval boundary."""
+    return interval > 0 and step // interval > previous_step // interval
+
+
 def check_progress(
     step: int,
     max_steps: int,
@@ -35,10 +40,15 @@ def check_progress(
     save_interval: int,
     limit_val_batches: Union[int, float, None],
     run_time_exceeded: bool = False,
+    previous_step: int | None = None,
 ):
     is_validation_enabled = limit_val_batches != 0 and val_check_interval > 0
     is_save_enabled = save_interval > 0
-    is_train_end = step == max_steps
+    is_train_end = (
+        step == max_steps
+        if previous_step is None
+        else previous_step < max_steps <= step
+    )
 
     if is_validation_enabled:
         assert save_interval < 0 or save_interval % val_check_interval == 0, (
@@ -47,15 +57,21 @@ def check_progress(
 
     # run validation on the last step
     # or when we hit the val check interval
-    run_val = (
-        safe_is_divisible(step, val_check_interval) or is_train_end or run_time_exceeded
+    validation_due = (
+        safe_is_divisible(step, val_check_interval)
+        if previous_step is None
+        else crossed_interval(previous_step, step, val_check_interval)
     )
+    run_val = validation_due or is_train_end or run_time_exceeded
     run_val &= is_validation_enabled
 
     # save model at save intervals or last step
-    save_model = (
-        safe_is_divisible(step, save_interval) or is_train_end or run_time_exceeded
+    save_due = (
+        safe_is_divisible(step, save_interval)
+        if previous_step is None
+        else crossed_interval(previous_step, step, save_interval)
     )
+    save_model = save_due or is_train_end or run_time_exceeded
     # sometimes the user will provide a validation metric
     # to save against, so we need to run val when we save
     save_model &= is_save_enabled

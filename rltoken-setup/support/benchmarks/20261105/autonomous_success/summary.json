@@ -1,0 +1,65 @@
+{
+  "training_start": "2026-11-04 23:08:12+08:00",
+  "time_axis": "Minutes since first network update (including warmup), not wall-clock time",
+  "source": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-230711-ur_rlt_stage2_ac_mlp",
+  "cutoff": "2026-11-04 23:59:33+08:00",
+  "episodes": 93,
+  "unmatched_completed_episodes": 1,
+  "peak_rate": 0.8,
+  "peak_windows": [
+    {
+      "first_episode": 55,
+      "last_episode": 74,
+      "end_time": "2026-11-04 23:49:21+08:00",
+      "approximate_runner_step": 18046,
+      "latest_saved_checkpoint": 17500
+    },
+    {
+      "first_episode": 59,
+      "last_episode": 78,
+      "end_time": "2026-11-04 23:51:23+08:00",
+      "approximate_runner_step": 18936,
+      "latest_saved_checkpoint": 17500
+    }
+  ],
+  "checkpoints": [
+    {
+      "step": 2500,
+      "time": "2026-11-04 23:13:44+08:00"
+    },
+    {
+      "step": 5000,
+      "time": "2026-11-04 23:19:26+08:00"
+    },
+    {
+      "step": 7500,
+      "time": "2026-11-04 23:25:09+08:00"
+    },
+    {
+      "step": 10000,
+      "time": "2026-11-04 23:30:53+08:00"
+    },
+    {
+      "step": 12500,
+      "time": "2026-11-04 23:36:31+08:00"
+    },
+    {
+      "step": 15000,
+      "time": "2026-11-04 23:42:15+08:00"
+    },
+    {
+      "step": 17500,
+      "time": "2026-11-04 23:48:01+08:00"
+    },
+    {
+      "step": 20000,
+      "time": "2026-11-04 23:53:50+08:00"
+    },
+    {
+      "step": 22500,
+      "time": "2026-11-04 23:59:35+08:00"
+    }
+  ],
+  "latest20": 0.45,
+  "method": "Episode summaries matched in order with reward and rounded chunk length assertions. Corrected intervention = intervened_steps - max(0, (-actions)%10 - terminal_hold_steps). Window time is last episode end, not a frozen-policy evaluation."
+}

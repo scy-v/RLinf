@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-02",
+  "progress_entry": "2026-11-01",
+  "hardware": "NVIDIA RTX 4090 D, 24 GiB",
+  "hardware_connected": false,
+  "cpu_tests": {
+    "passed": 43,
+    "selection": "(vla_precision_ur or ur5e_evaluation or ur5e_warmup or ur_stage2) and not can_close",
+    "excluded": "test_ur5e_evaluation_can_close_while_waiting_for_operator blocked and was interrupted"
+  },
+  "gpu": {
+    "command": "PYTHONPATH=. PYTHONNOUSERSITE=1 XLA_PYTHON_CLIENT_PREALLOCATE=false .venv/bin/python evaluations/realworld/eval_ur5e_vla_precision.py --stage stage2 --check-model",
+    "result": "passed",
+    "checkpoint_step": 7500,
+    "paired_frozen_stage1_step": 5000,
+    "denoise_steps": 4,
+    "action_shape": [
+      10,
+      7
+    ],
+    "prediction_horizon": 20,
+    "fixed_noise_reference_max_abs_diff": 0.0,
+    "fixed_noise_mlp_max_abs_diff": 0.0,
+    "runtime_generated_noise": "finite actions passed",
+    "inference_context": "both comparison inputs constructed inside torch.inference_mode; model loaded outside it"
+  },
+  "limitations": [
+    "No physical robot execution or success-rate measurement",
+    "No complete native Ray startup test",
+    "Stage2 RTC unsupported"
+  ],
+  "log": "stage2_inference_gpu_check.log"
+}

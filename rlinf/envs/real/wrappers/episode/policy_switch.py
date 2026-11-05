@@ -198,6 +198,7 @@ class KeyboardRLTPolicySwitchWrapper(KeyboardSession):
         return {
             "rlt_switch_flags": self._rlt_switch_flags,
             "rlt_policy_switch_event": "manual_success",
+            "terminal_hold": True,
             "intervene_action": self._success_hold_action.copy(),
         }
 
@@ -222,6 +223,10 @@ class KeyboardRLTPolicySwitchWrapper(KeyboardSession):
             else self.listener.pop_pressed_events()
         )
         for key, timestamp in events:
+            if key == "Key.focus_lost":
+                self._first_switch_press = None
+                self._first_success_press = None
+                continue
             if timestamp < self._accept_after:
                 continue
             if key == self.switch_key:

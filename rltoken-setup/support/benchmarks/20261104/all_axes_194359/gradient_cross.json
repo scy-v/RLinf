@@ -1,0 +1,42 @@
+{
+  "data=old,actor=old,critic=old": {
+    "BC_grad": 0.04556963033974171,
+    "Q_grad": 0.03451376035809517,
+    "ratio": 1.3203309178352356
+  },
+  "data=old,actor=old,critic=new": {
+    "BC_grad": 0.04556963033974171,
+    "Q_grad": 0.006250344798900187,
+    "ratio": 7.290732145309448
+  },
+  "data=old,actor=new,critic=old": {
+    "BC_grad": 0.09015653468668461,
+    "Q_grad": 0.03255749214440584,
+    "ratio": 2.7695448994636536
+  },
+  "data=old,actor=new,critic=new": {
+    "BC_grad": 0.09015653468668461,
+    "Q_grad": 0.00617102871183306,
+    "ratio": 14.609355211257935
+  },
+  "data=new,actor=old,critic=old": {
+    "BC_grad": 0.04324856027960777,
+    "Q_grad": 0.02263612626120448,
+    "ratio": 1.91061270236969
+  },
+  "data=new,actor=old,critic=new": {
+    "BC_grad": 0.04324856027960777,
+    "Q_grad": 0.005028793704696,
+    "ratio": 8.600274801254272
+  },
+  "data=new,actor=new,critic=old": {
+    "BC_grad": 0.05403921753168106,
+    "Q_grad": 0.022817270830273628,
+    "ratio": 2.3683526515960693
+  },
+  "data=new,actor=new,critic=new": {
+    "BC_grad": 0.05403921753168106,
+    "Q_grad": 0.004944875254295766,
+    "ratio": 10.928327560424805
+  }
+}

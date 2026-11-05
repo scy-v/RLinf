@@ -265,23 +265,34 @@ class Inference:
         )
         return latest
 
-    def __init__(self, config_path: Path):
+    def __init__(self, config_path: Path, *, inference_stage: str | None = None):
         # Load YAML config
         with open(config_path, "r") as f:
             cfg = yaml.safe_load(f)
+        if inference_stage is not None:
+            cfg["inference_stage"] = inference_stage
 
         # RLinf checkpoint adaptation; hardware execution below is VLA-Precision's.
         from .policy import load_norm_stats, model_config_from_yaml
 
-        model = cfg["model"]
         robot = cfg["robot"]
         self.remote_policy = False
         self.model_config = model_config_from_yaml(cfg)
-        self.action_chunk = int(self.model_config.openpi.action_chunk)
-        self.checkpoint_dir = Path(model["checkpoint_dir"]).expanduser()
-        self.sample_steps = int(model.get("sample_steps", 10))
-        self.norm_stats_path = Path(model["norm_stats_path"]).expanduser()
+        from rlinf.algorithms.rlt.inference import CriticalPhaseSwitch, is_stage2
+
+        self.stage2_enabled = is_stage2(cfg)
+        self._critical_switch = CriticalPhaseSwitch()
+        self.action_chunk = int(self.model_config.num_action_chunks)
+        self.checkpoint_dir = Path(self.model_config.model_path).expanduser()
+        self.sample_steps = int(self.model_config.num_steps)
+        self.norm_stats_path = Path(
+            self.model_config.openpi_data.norm_stats_path
+        ).expanduser()
         self.norm_stats = load_norm_stats(self.norm_stats_path)
+        from rlinf.utils.keyboard_focus import validate_terminal_keyboard
+
+        # This backend already reads all episode controls from terminal stdin.
+        validate_terminal_keyboard(cfg.get("keyboard_terminal_only", False))
         self._native_config = cfg
 
         # Camera config
@@ -316,7 +327,11 @@ class Inference:
                 path=self.norm_stats_path,
                 padded_action_dim=int(self.model_config.openpi.model_action_dim),
             )
-        self.close_threshold = robot.get("close_threshold", 0.9)
+        self.close_threshold = (
+            cfg["stage2"]["gripper_close_threshold"]
+            if self.stage2_enabled
+            else robot.get("close_threshold", 0.9)
+        )
         self.target_reached_gripper_open_threshold = robot.get(
             "target_reached_gripper_open_threshold",
             self.close_threshold,
@@ -857,6 +872,8 @@ class Inference:
         )
 
     def reset_episode(self):
+        if getattr(self, "_critical_switch", None) is not None:
+            self._critical_switch.reset()
         if getattr(self, "continuous_tracking", False):
             self.stop_force()
         self._clear_action_idle_hold()
@@ -1240,7 +1257,6 @@ class Inference:
         self._last_force_report = now
         timing = controller.drain_timing()
         if timing is not None:
-            logging.info("[PD] %s", timing)
             self._record_timing("controller", **timing)
 
     # --------------------------- OBS TRANSFER --------------------------- #
@@ -1397,34 +1413,11 @@ class Inference:
             cycle_finished = time.perf_counter()
             wait_elapsed = self._action_pace_wait + cycle_finished - processing_finished
             elapsed -= self._action_pace_wait
-            self.fps_action.update(show=self.action_timing_enabled)
+            self.fps_action.update(show=False)
             if timing is not None:
                 gripper = processing_finished - gripper_started
                 other = max(0.0, elapsed - sum(timing.values()) - gripper)
                 cycle = cycle_finished - start_time
-                logging.info(
-                    "[ACTION TIMING] target_hz=%.2f target_interval_ms=%s control_hz=%.2f "
-                    "control_ms=%.3f processing_ms=%.3f state_read_ms=%.3f "
-                    "target_ms=%.3f impedance_ms=%.3f send_ms=%.3f "
-                    "gripper_target_ms=%.3f other_ms=%.3f wait_ms=%.3f "
-                    "overrun_ms=%.3f",
-                    self.action_fps,
-                    "n/a"
-                    if self._target_interval is None
-                    else f"{self._target_interval * 1000:.3f}",
-                    1.0 / cycle,
-                    cycle * 1000,
-                    elapsed * 1000,
-                    timing["state_read"] * 1000,
-                    timing["target"] * 1000,
-                    timing["impedance"] * 1000,
-                    timing["send"] * 1000,
-                    gripper * 1000,
-                    other * 1000,
-                    wait_elapsed * 1000,
-                    max(0.0, (self._target_interval or 0.0) - 1.0 / self.action_fps)
-                    * 1000,
-                )
                 self._record_timing(
                     "action",
                     infer_index=getattr(self, "_infer_index", None),
@@ -1460,20 +1453,28 @@ class Inference:
 
     # --------------------------- KEYBOARD EPISODE CONTROL --------------------------- #
     def _keyboard_episode_control_listener(self):
-        """Request reset on double Enter, or success on double Space within 0.5 seconds."""
+        """Read double-press controls without buffering bytes past select readiness."""
         last_enter_time = None
         last_space_time = None
         old_termios = None
+        input_fd = sys.stdin.fileno()
         if sys.stdin.isatty():
             old_termios = termios.tcgetattr(sys.stdin)
             tty.setcbreak(sys.stdin.fileno())
         try:
             while not self._keyboard_listener_stop.is_set():
-                ready, _, _ = select.select([sys.stdin], [], [], 0.05)
+                ready, _, _ = select.select([input_fd], [], [], 0.05)
                 if not ready:
                     continue
-                char = sys.stdin.read(1)
+                raw = os.read(input_fd, 1)
+                if not raw:
+                    break
+                char = raw.decode("ascii", errors="ignore")
                 now = time.perf_counter()
+                if char == "." and getattr(self, "stage2_enabled", False):
+                    if self._critical_switch.press(now):
+                        logging.info("[RLT] MLP selected for the next inference chunk.")
+                    continue
                 if char in ("\n", "\r"):
                     if last_enter_time is not None and now - last_enter_time <= 0.5:
                         self._reset_requested.set()
@@ -1504,6 +1505,10 @@ class Inference:
             target=self._keyboard_episode_control_listener, daemon=True
         )
         self._keyboard_listener_thread.start()
+        if getattr(self, "stage2_enabled", False):
+            logging.info(
+                "[RLT] Executing VLA actions. Double '.' within 0.5s to select MLP; reset restores VLA."
+            )
         if self.use_target_success:
             logging.info(
                 "[EPISODE] Press Enter twice within 0.5s to fail/reset, or Space twice within 0.5s to request target-checked success."
@@ -1538,7 +1543,9 @@ class Inference:
             if elapsed_sec <= 0:
                 next_elapsed_sec = 1
                 continue
-            print(f"[TIME] Episode {episode_index} elapsed: {elapsed_sec}s", flush=True)
+            self._record_timing(
+                "episode_progress", episode_index=episode_index, elapsed_sec=elapsed_sec
+            )
             next_elapsed_sec = elapsed_sec + 1
 
     def _start_episode_time_printer(self):
@@ -1647,6 +1654,7 @@ class Inference:
             episode_index=self._ep_idx,
             episode_action_count=self._ep_steps,
             action_horizon=len(robot_actions),
+            controller=result.get("controller", "vla"),
         )
         self.recorder.submit_obs(obs)
 
@@ -1671,7 +1679,7 @@ class Inference:
         success_rate = self._success_episodes / total_ended
         failure_rate = self._failed_episodes / total_ended
         logging.info(
-            f"[EPISODE] Success/failure ratio after episode {self._ep_idx}: "
+            f"[EPISODE] {self._ep_idx}: {status}, {duration:.1f}s; "
             f"success {self._success_episodes}/{total_ended} ({success_rate:.1%}), "
             f"failure {self._failed_episodes}/{total_ended} ({failure_rate:.1%})"
         )
@@ -1762,17 +1770,14 @@ class Inference:
                 obs = self.get_obs_state()
                 obs_elapsed = time.perf_counter() - obs_start
                 infer_start = time.perf_counter()
+                if getattr(self, "stage2_enabled", False):
+                    obs["rlt_actor_enabled"] = self._critical_switch.active
                 result = policy.infer(obs)
                 infer_elapsed = time.perf_counter() - infer_start
                 submit_start = time.perf_counter()
                 self._submit_step(result, obs, infer_idx)
                 submit_elapsed = time.perf_counter() - submit_start
                 loop_elapsed = time.perf_counter() - loop_start
-                logging.info(
-                    f"[STATE] Inference loop rate: {1 / loop_elapsed:.1f} HZ "
-                    f"(loop={loop_elapsed:.4f}s, get_obs={obs_elapsed:.4f}s, "
-                    f"infer={infer_elapsed:.4f}s, submit_step={submit_elapsed:.4f}s)"
-                )
                 self._record_timing(
                     "step",
                     infer_index=infer_idx,

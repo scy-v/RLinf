@@ -1,0 +1,21 @@
+{
+  "format": "npz_first_axis_slice_v1",
+  "source": "final/action_output_pairs.npz",
+  "slice": {
+    "start": 0,
+    "stop": 5496
+  },
+  "keys": [
+    "vla",
+    "actor",
+    "version",
+    "time",
+    "critical",
+    "episode"
+  ],
+  "source_sha256": "792609524bfd3eff14911af556680858548ecf8d824c022c78421fdcc4940e90",
+  "original_archive_sha256": "1739e55cff6310de5a3ec22cca4ca00c0ef7e34fe4501ba68efab8fdb1b23b27",
+  "original_bytes": 5836066,
+  "verification": "all prefix arrays have identical shapes, dtypes and C-order bytes",
+  "read": "np.load(source, allow_pickle=False); use archive[key][0:stop] for each key"
+}

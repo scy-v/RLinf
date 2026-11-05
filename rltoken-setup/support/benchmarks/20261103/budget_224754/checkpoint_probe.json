@@ -1,0 +1,422 @@
+{
+  "method": "CPU float32, saved checkpoints within single run; full replay, q_data mean two heads, q_pi Q1. 4 paired seeds with training dropout/noise. No optimizer or GPU execution. Observed returns timeout tail zero, not true TD target.",
+  "run": "logs/online_rltoken/20261103-224754-ur_rlt_stage2_ac_mlp",
+  "replay": {
+    "267": {
+      "records": 387,
+      "ids": [
+        0,
+        386
+      ],
+      "complete_online_episodes": 10,
+      "successes": 10,
+      "mean_online_chunks": 23.7,
+      "online_observed_return": 0.11137912805469806,
+      "labels": {
+        "warmup": 150,
+        "success_far": 207,
+        "success_near30": 30
+      },
+      "intervention_fraction_including_stop": 0.2201550453901291
+    },
+    "1276": {
+      "records": 1396,
+      "ids": [
+        0,
+        1395
+      ],
+      "complete_online_episodes": 49,
+      "successes": 42,
+      "mean_online_chunks": 25.428571428571427,
+      "online_observed_return": 0.08698659632902402,
+      "labels": {
+        "warmup": 150,
+        "success_far": 873,
+        "failed": 247,
+        "success_near30": 126
+      },
+      "intervention_fraction_including_stop": 0.1671203374862671
+    },
+    "1520": {
+      "records": 1640,
+      "ids": [
+        0,
+        1639
+      ],
+      "complete_online_episodes": 60,
+      "successes": 52,
+      "mean_online_chunks": 24.833333333333332,
+      "online_observed_return": 0.09003591920666155,
+      "labels": {
+        "warmup": 150,
+        "success_far": 1049,
+        "failed": 285,
+        "success_near30": 156
+      },
+      "intervention_fraction_including_stop": 0.16701219975948334
+    },
+    "1770": {
+      "records": 1890,
+      "ids": [
+        0,
+        1889
+      ],
+      "complete_online_episodes": 69,
+      "successes": 59,
+      "mean_online_chunks": 25.217391304347824,
+      "online_observed_return": 0.08762726242883118,
+      "labels": {
+        "warmup": 150,
+        "success_far": 1201,
+        "failed": 362,
+        "success_near30": 177
+      },
+      "intervention_fraction_including_stop": 0.16312170028686523
+    },
+    "2003": {
+      "records": 2123,
+      "ids": [
+        0,
+        2122
+      ],
+      "complete_online_episodes": 79,
+      "successes": 68,
+      "mean_online_chunks": 24.974683544303797,
+      "online_observed_return": 0.0887555810486154,
+      "labels": {
+        "warmup": 150,
+        "success_far": 1370,
+        "failed": 399,
+        "success_near30": 204
+      },
+      "intervention_fraction_including_stop": 0.16608573496341705
+    }
+  },
+  "pairs": {
+    "267-1276": {
+      "q_data": [
+        [
+          0.1196461096405983,
+          0.12317908555269241
+        ],
+        [
+          0.08816812187433243,
+          0.0892496109008789
+        ]
+      ],
+      "q_pi_training": [
+        [
+          [
+            0.12239380180835724,
+            0.12105035036802292
+          ],
+          [
+            0.12624292075634003,
+            0.1263456791639328
+          ]
+        ],
+        [
+          [
+            0.08732970803976059,
+            0.0862722173333168
+          ],
+          [
+            0.08925250917673111,
+            0.08954232931137085
+          ]
+        ]
+      ],
+      "q_pi_deterministic": [
+        [
+          [
+            0.12240386009216309,
+            0.12104503810405731
+          ],
+          [
+            0.1262551099061966,
+            0.12635044753551483
+          ]
+        ],
+        [
+          [
+            0.08735374361276627,
+            0.08628415316343307
+          ],
+          [
+            0.08927184343338013,
+            0.08954611420631409
+          ]
+        ]
+      ],
+      "q_pi_contributions": {
+        "data": -0.03591723864277204,
+        "critic": 0.0035760986308256784,
+        "actor": -0.0005103324850400289
+      },
+      "q_by_group": {
+        "267": {
+          "267": {
+            "warmup": 0.1372925490140915,
+            "success_far": 0.031777627766132355,
+            "success_near30": 0.637706458568573
+          },
+          "1276": {
+            "warmup": 0.13975892961025238,
+            "success_far": 0.03863852098584175,
+            "success_near30": 0.623609721660614
+          }
+        },
+        "1276": {
+          "267": {
+            "warmup": 0.1372925490140915,
+            "success_far": 0.029129309579730034,
+            "failed": 0.010301287285983562,
+            "success_near30": 0.5913850665092468
+          },
+          "1276": {
+            "warmup": 0.13975892961025238,
+            "success_far": 0.03236449137330055,
+            "failed": -0.004762099124491215,
+            "success_near30": 0.6075449585914612
+          }
+        }
+      },
+      "old_vs_new_data": {
+        "old_data": {
+          "n": 387,
+          "q_data_old_critic": 0.1196461096405983,
+          "q_data_new_critic": 0.12317908555269241,
+          "failed_chunks": 0,
+          "near_success_chunks": 30,
+          "observed_return_mean_excluding_warmup": 0.11137912805469806
+        },
+        "new_data": {
+          "n": 1009,
+          "q_data_old_critic": 0.07609480619430542,
+          "q_data_new_critic": 0.07623603194952011,
+          "failed_chunks": 247,
+          "near_success_chunks": 96,
+          "observed_return_mean_excluding_warmup": 0.08125713149355847
+        }
+      }
+    },
+    "1276-1520": {
+      "q_data": [
+        [
+          0.0892496109008789,
+          0.09818350523710251
+        ],
+        [
+          0.08919188380241394,
+          0.09918468445539474
+        ]
+      ],
+      "q_pi_training": [
+        [
+          [
+            0.08954232931137085,
+            0.0892273411154747
+          ],
+          [
+            0.10057320445775986,
+            0.10038106143474579
+          ]
+        ],
+        [
+          [
+            0.0894675999879837,
+            0.08913589268922806
+          ],
+          [
+            0.10142400115728378,
+            0.1012226864695549
+          ]
+        ]
+      ],
+      "q_pi_deterministic": [
+        [
+          [
+            0.08954611420631409,
+            0.08923187106847763
+          ],
+          [
+            0.10057711601257324,
+            0.10038354247808456
+          ]
+        ],
+        [
+          [
+            0.0894727036356926,
+            0.0891437828540802
+          ],
+          [
+            0.10142968595027924,
+            0.10122815519571304
+          ]
+        ]
+      ],
+      "q_pi_contributions": {
+        "data": 0.00038218994935353595,
+        "critic": 0.011557576557000479,
+        "actor": -0.0002594093481699626
+      },
+      "q_by_group": {
+        "1276": {
+          "1276": {
+            "warmup": 0.13975892961025238,
+            "success_far": 0.03236449137330055,
+            "failed": -0.004762099124491215,
+            "success_near30": 0.6075449585914612
+          },
+          "1520": {
+            "warmup": 0.14861059188842773,
+            "success_far": 0.04174225777387619,
+            "failed": 0.003283018944784999,
+            "success_near30": 0.6152436137199402
+          }
+        },
+        "1520": {
+          "1276": {
+            "warmup": 0.13975892961025238,
+            "success_far": 0.03179816156625748,
+            "failed": -0.004658260382711887,
+            "success_near30": 0.5979627370834351
+          },
+          "1520": {
+            "warmup": 0.14861059188842773,
+            "success_far": 0.041592445224523544,
+            "failed": 0.0031840854790061712,
+            "success_near30": 0.6143164038658142
+          }
+        }
+      },
+      "old_vs_new_data": {
+        "old_data": {
+          "n": 1396,
+          "q_data_old_critic": 0.0892496109008789,
+          "q_data_new_critic": 0.09818350523710251,
+          "failed_chunks": 247,
+          "near_success_chunks": 126,
+          "observed_return_mean_excluding_warmup": 0.08698659632902402
+        },
+        "new_data": {
+          "n": 244,
+          "q_data_old_critic": 0.0888616070151329,
+          "q_data_new_critic": 0.10491271317005157,
+          "failed_chunks": 38,
+          "near_success_chunks": 30,
+          "observed_return_mean_excluding_warmup": 0.10560746144246642
+        }
+      }
+    },
+    "1520-2003": {
+      "q_data": [
+        [
+          0.09918468445539474,
+          0.09341100603342056
+        ],
+        [
+          0.09537734091281891,
+          0.0902547612786293
+        ]
+      ],
+      "q_pi_training": [
+        [
+          [
+            0.1012226864695549,
+            0.10122625529766083
+          ],
+          [
+            0.09373916685581207,
+            0.09378290921449661
+          ]
+        ],
+        [
+          [
+            0.09725499153137207,
+            0.09724640101194382
+          ],
+          [
+            0.09047023952007294,
+            0.09050437062978745
+          ]
+        ]
+      ],
+      "q_pi_deterministic": [
+        [
+          [
+            0.10122815519571304,
+            0.10122685879468918
+          ],
+          [
+            0.09374473243951797,
+            0.09378327429294586
+          ]
+        ],
+        [
+          [
+            0.09726235270500183,
+            0.09724905341863632
+          ],
+          [
+            0.09047730267047882,
+            0.09050659835338593
+          ]
+        ]
+      ],
+      "q_pi_contributions": {
+        "data": -0.003623541444540024,
+        "critic": -0.007113199681043625,
+        "actor": 1.8425285816192627e-05
+      },
+      "q_by_group": {
+        "1520": {
+          "1520": {
+            "warmup": 0.14861059188842773,
+            "success_far": 0.041592445224523544,
+            "failed": 0.0031840854790061712,
+            "success_near30": 0.6143164038658142
+          },
+          "2003": {
+            "warmup": 0.1416803002357483,
+            "success_far": 0.03625509887933731,
+            "failed": -0.002215987304225564,
+            "success_near30": 0.6060382127761841
+          }
+        },
+        "2003": {
+          "1520": {
+            "warmup": 0.14861059188842773,
+            "success_far": 0.04035555571317673,
+            "failed": 0.004581906367093325,
+            "success_near30": 0.6033295392990112
+          },
+          "2003": {
+            "warmup": 0.1416803002357483,
+            "success_far": 0.03518778830766678,
+            "failed": -0.0021970467641949654,
+            "success_near30": 0.6030792593955994
+          }
+        }
+      },
+      "old_vs_new_data": {
+        "old_data": {
+          "n": 1640,
+          "q_data_old_critic": 0.09918468445539474,
+          "q_data_new_critic": 0.09341100603342056,
+          "failed_chunks": 285,
+          "near_success_chunks": 156,
+          "observed_return_mean_excluding_warmup": 0.09003591920666155
+        },
+        "new_data": {
+          "n": 483,
+          "q_data_old_critic": 0.08244973421096802,
+          "q_data_new_critic": 0.07953791320323944,
+          "failed_chunks": 114,
+          "near_success_chunks": 48,
+          "observed_return_mean_excluding_warmup": 0.08480588362524313
+        }
+      }
+    }
+  }
+}

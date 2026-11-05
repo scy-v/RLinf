@@ -1,3 +1,7 @@
+# false: preserve existing keyboard behavior; true: launching terminal only.
+# true requires a local X11 terminal and python-xlib; focus is window-level, not tab-level.
+keyboard_terminal_only: false
+
 # UR RLT Stage2: Double Dot marks the critical phase; double Space labels success.
 # target_ee_pose anchors safety clipping, not reward calculation.
 defaults:
@@ -86,6 +90,7 @@ runner:
   env_init_after_models: true
   timing_mode: basic  # disabled / basic / detailed; local elapsed time, no timing synchronization.
   log_data: true  # File-only data records, independent of timing_mode.
+  compact_metrics: true  # Complete per-round JSON in metrics.log; no stdout copy.
   task_type: embodied
   logger:
     log_path: ../results
@@ -93,25 +98,28 @@ runner:
     experiment_name: ur_rlt_stage2_ac_mlp
     logger_backends:
       - tensorboard
-  max_epochs: 8000
+  max_epochs: 80000
   max_steps: -1
   only_eval: false
   val_check_interval: -1
-  save_interval: 1000
+  # Completed rounds = cumulative critic updates // algorithm.update_epoch.
+  save_interval: 2500
   resume_dir: null
   ckpt_path: null
 
 algorithm:
-  update_epoch: 8
+  update_epoch: 8  # 当前无额度：每次调用更新 8 次 critic；有额度时表示每个采集周期分配的 critic 更新次数。
   rlt_transition_replay: true
   rlt_schedule:
-    enable: true
-    warmup_min_size: 150
+    enable: true  # 两种模式均保持 true，启用共同 warmup；false 则跳过这套 warmup，直接持续更新。
+    warmup_min_size: 150  # 两种模式相同：初始数据达到 150 条 transition 才开始 warmup 更新。
     # Fresh runs reuse the first 150 transitions; resume ignores this cache.
     # Set null to recollect without caching, or a new path for another task/model.
     warmup_cache_path: /home/suchenyu/RLinf-rltoken/logs/online_rltoken/warmup/insert_black_rack_into_blue_slot.pt
-    warmup_post_collect_updates: 150
-    continuous_updates: true
+    warmup_post_collect_updates: 150  # 两种模式相同：初始额度为 150 次 critic 更新，actor 按 critic_actor_ratio 更新。
+    continuous_updates: true  # 当前无额度持续更新；false 为按新增数据分配额度。只影响 warmup 后的在线阶段。
+    train_every_transitions: 1  # 有额度：每新增 1 条 transition 产生 update_epoch 次额度；无额度模式忽略。
+    # max_updates_per_train_step 不设置：有额度时一次消耗完可用额度；两种模式的 warmup 均一次执行完初始额度。
   actor_weight_schedule:
     enable: true
     warmup_updates: 150
@@ -143,14 +151,14 @@ algorithm:
       clip_grad: 10.0
   replay_buffer:
     enable_cache: true
-    cache_size: 2000
+    cache_size: 5000
     min_buffer_size: 2
-    sample_window_size: 2000
+    sample_window_size: 5000
     auto_save: false
   target_update_freq: 1
   target_update_type: all
   train_actor_steps: 2
-  critic_actor_ratio: 4
+  critic_actor_ratio: 4  # 两种模式均按累计 critic 次数触发 actor；当前每轮更新 8C＋2A。
   critic_subsample_size: 0
   backup_entropy: false
 

@@ -1,0 +1,67 @@
+{
+  "hardware_connected": false,
+  "fixed_noise_injected_for_component_comparison": true,
+  "checkpoint": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261102-232256-ur_rlt_stage2_ac_mlp/ur_rlt_stage2_ac_mlp/checkpoints/global_step_22500/actor/model_state_dict/full_weights.pt",
+  "comparisons": [
+    {
+      "mlp_selected": false,
+      "repeat": 0,
+      "action_max_abs_diff": 0.0,
+      "feature_max_abs_diff": {
+        "z_rl": 0.0,
+        "proprio": 0.0,
+        "ref_chunk": 0.0
+      },
+      "action_shape": [
+        1,
+        10,
+        7
+      ]
+    },
+    {
+      "mlp_selected": false,
+      "repeat": 1,
+      "action_max_abs_diff": 0.0,
+      "feature_max_abs_diff": {
+        "z_rl": 0.0,
+        "proprio": 0.0,
+        "ref_chunk": 0.0
+      },
+      "action_shape": [
+        1,
+        10,
+        7
+      ]
+    },
+    {
+      "mlp_selected": true,
+      "repeat": 0,
+      "action_max_abs_diff": 0.0,
+      "feature_max_abs_diff": {
+        "z_rl": 0.0,
+        "proprio": 0.0,
+        "ref_chunk": 0.0
+      },
+      "action_shape": [
+        1,
+        10,
+        7
+      ]
+    },
+    {
+      "mlp_selected": true,
+      "repeat": 1,
+      "action_max_abs_diff": 0.0,
+      "feature_max_abs_diff": {
+        "z_rl": 0.0,
+        "proprio": 0.0,
+        "ref_chunk": 0.0
+      },
+      "action_shape": [
+        1,
+        10,
+        7
+      ]
+    }
+  ]
+}

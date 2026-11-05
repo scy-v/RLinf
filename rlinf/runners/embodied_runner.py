@@ -169,6 +169,7 @@ class EmbodiedRunner:
                     metrics,
                     start_step,
                     self.metric_logger.log_path,
+                    self.cfg.runner.get("compact_metrics", False),
                 ),
             )
         )

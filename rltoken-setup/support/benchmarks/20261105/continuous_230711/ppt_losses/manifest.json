@@ -1,0 +1,37 @@
+{
+  "source": "/home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-230711-ur_rlt_stage2_ac_mlp/metrics.log",
+  "sha256": "07c23228b13dd0195b50565004ed43768c19baa67b37bd30a7f4f1bc056d0617",
+  "records": 22731,
+  "first_step": 18,
+  "last_step": 22748,
+  "time_origin": "2026-11-04 23:08:12 Asia/Shanghai, first warmup network update",
+  "smoothing": "Arithmetic means in floor(runner_step/250) bins; not TensorBoard EMA. Figures show bin means only; all original scalar records remain in the unchanged source log.",
+  "metrics": [
+    {
+      "file": "negative_q",
+      "key": "train/actor/q_pi",
+      "multiplier": -1,
+      "log_y": false
+    },
+    {
+      "file": "bc_loss",
+      "key": "train/actor/bc_loss",
+      "multiplier": 1,
+      "log_y": true
+    },
+    {
+      "file": "actor_loss",
+      "key": "train/sac/actor_loss",
+      "multiplier": 1,
+      "log_y": false
+    },
+    {
+      "file": "critic_loss",
+      "key": "train/sac/critic_loss",
+      "multiplier": 1,
+      "log_y": true
+    }
+  ],
+  "weights": "Online actor_loss = 5*bc_loss - 0.1*q_pi; plotted BC and -Q are unweighted.",
+  "artifact_bytes": 697098
+}

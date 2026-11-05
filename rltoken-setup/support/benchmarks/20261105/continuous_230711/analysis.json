@@ -1,0 +1,2700 @@
+{
+  "source": "logs/online_rltoken/20261104-230711-ur_rlt_stage2_ac_mlp",
+  "metrics_rows": 22731,
+  "first_metrics": 18,
+  "last_metrics": 22748,
+  "episodes": [
+    {
+      "start": 1793804898.0,
+      "critical": 1793804911.0,
+      "episode": 1,
+      "end": 1793804924.0,
+      "actions": 418,
+      "success": true,
+      "step": 245,
+      "first_id": 150,
+      "last_id": 169,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 117,
+      "autonomous": false
+    },
+    {
+      "start": 1793804930.0,
+      "critical": 1793804943.0,
+      "episode": 2,
+      "end": 1793804958.0,
+      "actions": 447,
+      "success": true,
+      "step": 504,
+      "first_id": 170,
+      "last_id": 192,
+      "chunks": 23,
+      "replay_pre_reward_interventions": 129,
+      "autonomous": false
+    },
+    {
+      "start": 1793804965.0,
+      "critical": 1793804976.0,
+      "episode": 3,
+      "end": 1793804990.0,
+      "actions": 408,
+      "success": true,
+      "step": 748,
+      "first_id": 193,
+      "last_id": 213,
+      "chunks": 21,
+      "replay_pre_reward_interventions": 113,
+      "autonomous": false
+    },
+    {
+      "start": 1793804996.0,
+      "critical": 1793805009.0,
+      "episode": 4,
+      "end": 1793805021.0,
+      "actions": 410,
+      "success": true,
+      "step": 992,
+      "first_id": 214,
+      "last_id": 232,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 131,
+      "autonomous": false
+    },
+    {
+      "start": 1793805029.0,
+      "critical": 1793805043.0,
+      "episode": 5,
+      "end": 1793805054.0,
+      "actions": 418,
+      "success": true,
+      "step": 1230,
+      "first_id": 233,
+      "last_id": 250,
+      "chunks": 18,
+      "replay_pre_reward_interventions": 90,
+      "autonomous": false
+    },
+    {
+      "start": 1793805060.0,
+      "critical": 1793805073.0,
+      "episode": 6,
+      "end": 1793805097.0,
+      "actions": 600,
+      "success": false,
+      "step": 1547,
+      "first_id": 251,
+      "last_id": 289,
+      "chunks": 39,
+      "replay_pre_reward_interventions": 42,
+      "autonomous": false
+    },
+    {
+      "start": 1793805103.0,
+      "critical": 1793805117.0,
+      "episode": 7,
+      "end": 1793805129.0,
+      "actions": 411,
+      "success": true,
+      "step": 1779,
+      "first_id": 290,
+      "last_id": 309,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 110,
+      "autonomous": false
+    },
+    {
+      "start": 1793805134.0,
+      "critical": 1793805147.0,
+      "episode": 8,
+      "end": 1793805158.0,
+      "actions": 387,
+      "success": true,
+      "step": 1995,
+      "first_id": 310,
+      "last_id": 327,
+      "chunks": 18,
+      "replay_pre_reward_interventions": 85,
+      "autonomous": false
+    },
+    {
+      "start": 1793805194.0,
+      "critical": 1793805206.0,
+      "episode": 9,
+      "end": 1793805218.0,
+      "actions": 385,
+      "success": true,
+      "step": 2451,
+      "first_id": 328,
+      "last_id": 346,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 83,
+      "autonomous": false
+    },
+    {
+      "start": 1793805224.0,
+      "critical": 1793805236.0,
+      "episode": 10,
+      "end": 1793805251.0,
+      "actions": 430,
+      "success": true,
+      "step": 2678,
+      "first_id": 347,
+      "last_id": 369,
+      "chunks": 23,
+      "replay_pre_reward_interventions": 122,
+      "autonomous": false
+    },
+    {
+      "start": 1793805255.0,
+      "critical": 1793805269.0,
+      "episode": 11,
+      "end": 1793805280.0,
+      "actions": 404,
+      "success": true,
+      "step": 2889,
+      "first_id": 370,
+      "last_id": 387,
+      "chunks": 18,
+      "replay_pre_reward_interventions": 50,
+      "autonomous": false
+    },
+    {
+      "start": 1793805285.0,
+      "critical": 1793805300.0,
+      "episode": 12,
+      "end": 1793805312.0,
+      "actions": 434,
+      "success": true,
+      "step": 3123,
+      "first_id": 388,
+      "last_id": 407,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 100,
+      "autonomous": false
+    },
+    {
+      "start": 1793805316.0,
+      "critical": 1793805330.0,
+      "episode": 13,
+      "end": 1793805340.0,
+      "actions": 399,
+      "success": true,
+      "step": 3346,
+      "first_id": 408,
+      "last_id": 424,
+      "chunks": 17,
+      "replay_pre_reward_interventions": 55,
+      "autonomous": false
+    },
+    {
+      "start": 1793805344.0,
+      "critical": 1793805358.0,
+      "episode": 14,
+      "end": 1793805369.0,
+      "actions": 412,
+      "success": true,
+      "step": 3565,
+      "first_id": 425,
+      "last_id": 443,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 77,
+      "autonomous": false
+    },
+    {
+      "start": 1793805375.0,
+      "critical": 1793805388.0,
+      "episode": 15,
+      "end": 1793805400.0,
+      "actions": 402,
+      "success": true,
+      "step": 3801,
+      "first_id": 444,
+      "last_id": 463,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 89,
+      "autonomous": false
+    },
+    {
+      "start": 1793805431.0,
+      "critical": 1793805444.0,
+      "episode": 16,
+      "end": 1793805455.0,
+      "actions": 391,
+      "success": true,
+      "step": 4194,
+      "first_id": 464,
+      "last_id": 481,
+      "chunks": 18,
+      "replay_pre_reward_interventions": 81,
+      "autonomous": false
+    },
+    {
+      "start": 1793805461.0,
+      "critical": 1793805474.0,
+      "episode": 17,
+      "end": 1793805487.0,
+      "actions": 420,
+      "success": true,
+      "step": 4426,
+      "first_id": 482,
+      "last_id": 501,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 89,
+      "autonomous": false
+    },
+    {
+      "start": 1793805494.0,
+      "critical": 1793805507.0,
+      "episode": 18,
+      "end": 1793805525.0,
+      "actions": 501,
+      "success": true,
+      "step": 4702,
+      "first_id": 502,
+      "last_id": 530,
+      "chunks": 29,
+      "replay_pre_reward_interventions": 112,
+      "autonomous": false
+    },
+    {
+      "start": 1793805529.0,
+      "critical": 1793805542.0,
+      "episode": 19,
+      "end": 1793805554.0,
+      "actions": 418,
+      "success": true,
+      "step": 4908,
+      "first_id": 531,
+      "last_id": 549,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 94,
+      "autonomous": false
+    },
+    {
+      "start": 1793805565.0,
+      "critical": 1793805579.0,
+      "episode": 20,
+      "end": 1793805592.0,
+      "actions": 420,
+      "success": true,
+      "step": 5176,
+      "first_id": 550,
+      "last_id": 569,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 94,
+      "autonomous": false
+    },
+    {
+      "start": 1793805596.0,
+      "critical": 1793805608.0,
+      "episode": 21,
+      "end": 1793805618.0,
+      "actions": 362,
+      "success": true,
+      "step": 5356,
+      "first_id": 570,
+      "last_id": 586,
+      "chunks": 17,
+      "replay_pre_reward_interventions": 78,
+      "autonomous": false
+    },
+    {
+      "start": 1793805626.0,
+      "critical": 1793805640.0,
+      "episode": 22,
+      "end": 1793805651.0,
+      "actions": 398,
+      "success": true,
+      "step": 5583,
+      "first_id": 587,
+      "last_id": 603,
+      "chunks": 17,
+      "replay_pre_reward_interventions": 81,
+      "autonomous": false
+    },
+    {
+      "start": 1793805655.0,
+      "critical": 1793805669.0,
+      "episode": 23,
+      "end": 1793805681.0,
+      "actions": 424,
+      "success": true,
+      "step": 5802,
+      "first_id": 604,
+      "last_id": 622,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 77,
+      "autonomous": false
+    },
+    {
+      "start": 1793805690.0,
+      "critical": 1793805704.0,
+      "episode": 24,
+      "end": 1793805715.0,
+      "actions": 401,
+      "success": true,
+      "step": 6041,
+      "first_id": 623,
+      "last_id": 641,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 86,
+      "autonomous": false
+    },
+    {
+      "start": 1793805718.0,
+      "critical": 1793805733.0,
+      "episode": 25,
+      "end": 1793805745.0,
+      "actions": 421,
+      "success": true,
+      "step": 6257,
+      "first_id": 642,
+      "last_id": 660,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 77,
+      "autonomous": false
+    },
+    {
+      "start": 1793805760.0,
+      "critical": 1793805773.0,
+      "episode": 26,
+      "end": 1793805784.0,
+      "actions": 398,
+      "success": true,
+      "step": 6562,
+      "first_id": 661,
+      "last_id": 678,
+      "chunks": 18,
+      "replay_pre_reward_interventions": 87,
+      "autonomous": false
+    },
+    {
+      "start": 1793805789.0,
+      "critical": 1793805802.0,
+      "episode": 27,
+      "end": 1793805813.0,
+      "actions": 386,
+      "success": true,
+      "step": 6781,
+      "first_id": 679,
+      "last_id": 696,
+      "chunks": 18,
+      "replay_pre_reward_interventions": 94,
+      "autonomous": false
+    },
+    {
+      "start": 1793805818.0,
+      "critical": 1793805829.0,
+      "episode": 28,
+      "end": 1793805839.0,
+      "actions": 355,
+      "success": true,
+      "step": 6981,
+      "first_id": 697,
+      "last_id": 713,
+      "chunks": 17,
+      "replay_pre_reward_interventions": 60,
+      "autonomous": false
+    },
+    {
+      "start": 1793805844.0,
+      "critical": 1793805858.0,
+      "episode": 29,
+      "end": 1793805869.0,
+      "actions": 402,
+      "success": true,
+      "step": 7204,
+      "first_id": 714,
+      "last_id": 731,
+      "chunks": 18,
+      "replay_pre_reward_interventions": 48,
+      "autonomous": false
+    },
+    {
+      "start": 1793805875.0,
+      "critical": 1793805887.0,
+      "episode": 30,
+      "end": 1793805899.0,
+      "actions": 389,
+      "success": true,
+      "step": 7420,
+      "first_id": 732,
+      "last_id": 750,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 120,
+      "autonomous": false
+    },
+    {
+      "start": 1793805903.0,
+      "critical": 1793805916.0,
+      "episode": 31,
+      "end": 1793805928.0,
+      "actions": 400,
+      "success": true,
+      "step": 7622,
+      "first_id": 751,
+      "last_id": 768,
+      "chunks": 18,
+      "replay_pre_reward_interventions": 95,
+      "autonomous": false
+    },
+    {
+      "start": 1793805933.0,
+      "critical": 1793805947.0,
+      "episode": 32,
+      "end": 1793805957.0,
+      "actions": 388,
+      "success": true,
+      "step": 7830,
+      "first_id": 769,
+      "last_id": 784,
+      "chunks": 16,
+      "replay_pre_reward_interventions": 87,
+      "autonomous": false
+    },
+    {
+      "start": 1793805961.0,
+      "critical": 1793805972.0,
+      "episode": 33,
+      "end": 1793805984.0,
+      "actions": 377,
+      "success": true,
+      "step": 8023,
+      "first_id": 785,
+      "last_id": 803,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 94,
+      "autonomous": false
+    },
+    {
+      "start": 1793805989.0,
+      "critical": 1793806002.0,
+      "episode": 34,
+      "end": 1793806014.0,
+      "actions": 405,
+      "success": true,
+      "step": 8243,
+      "first_id": 804,
+      "last_id": 823,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 48,
+      "autonomous": false
+    },
+    {
+      "start": 1793806018.0,
+      "critical": 1793806031.0,
+      "episode": 35,
+      "end": 1793806046.0,
+      "actions": 450,
+      "success": true,
+      "step": 8471,
+      "first_id": 824,
+      "last_id": 847,
+      "chunks": 24,
+      "replay_pre_reward_interventions": 50,
+      "autonomous": false
+    },
+    {
+      "start": 1793806053.0,
+      "critical": 1793806065.0,
+      "episode": 36,
+      "end": 1793806078.0,
+      "actions": 405,
+      "success": true,
+      "step": 8713,
+      "first_id": 848,
+      "last_id": 868,
+      "chunks": 21,
+      "replay_pre_reward_interventions": 43,
+      "autonomous": false
+    },
+    {
+      "start": 1793806088.0,
+      "critical": 1793806102.0,
+      "episode": 37,
+      "end": 1793806112.0,
+      "actions": 396,
+      "success": true,
+      "step": 8970,
+      "first_id": 869,
+      "last_id": 884,
+      "chunks": 16,
+      "replay_pre_reward_interventions": 23,
+      "autonomous": false
+    },
+    {
+      "start": 1793806121.0,
+      "critical": 1793806134.0,
+      "episode": 38,
+      "end": 1793806145.0,
+      "actions": 394,
+      "success": true,
+      "step": 9205,
+      "first_id": 885,
+      "last_id": 902,
+      "chunks": 18,
+      "replay_pre_reward_interventions": 39,
+      "autonomous": false
+    },
+    {
+      "start": 1793806149.0,
+      "critical": 1793806162.0,
+      "episode": 39,
+      "end": 1793806186.0,
+      "actions": 600,
+      "success": false,
+      "step": 9508,
+      "first_id": 903,
+      "last_id": 941,
+      "chunks": 39,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": false
+    },
+    {
+      "start": 1793806189.0,
+      "critical": 1793806202.0,
+      "episode": 40,
+      "end": 1793806215.0,
+      "actions": 424,
+      "success": true,
+      "step": 9728,
+      "first_id": 942,
+      "last_id": 963,
+      "chunks": 22,
+      "replay_pre_reward_interventions": 58,
+      "autonomous": false
+    },
+    {
+      "start": 1793806219.0,
+      "critical": 1793806232.0,
+      "episode": 41,
+      "end": 1793806243.0,
+      "actions": 395,
+      "success": true,
+      "step": 9930,
+      "first_id": 964,
+      "last_id": 982,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 23,
+      "autonomous": false
+    },
+    {
+      "start": 1793806247.0,
+      "critical": 1793806260.0,
+      "episode": 42,
+      "end": 1793806275.0,
+      "actions": 458,
+      "success": true,
+      "step": 10147,
+      "first_id": 983,
+      "last_id": 1005,
+      "chunks": 23,
+      "replay_pre_reward_interventions": 63,
+      "autonomous": false
+    },
+    {
+      "start": 1793806279.0,
+      "critical": 1793806292.0,
+      "episode": 43,
+      "end": 1793806305.0,
+      "actions": 415,
+      "success": true,
+      "step": 10368,
+      "first_id": 1006,
+      "last_id": 1025,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 36,
+      "autonomous": false
+    },
+    {
+      "start": 1793806308.0,
+      "critical": 1793806320.0,
+      "episode": 44,
+      "end": 1793806332.0,
+      "actions": 384,
+      "success": true,
+      "step": 10567,
+      "first_id": 1026,
+      "last_id": 1044,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 35,
+      "autonomous": false
+    },
+    {
+      "start": 1793806335.0,
+      "critical": 1793806348.0,
+      "episode": 45,
+      "end": 1793806358.0,
+      "actions": 367,
+      "success": true,
+      "step": 10768,
+      "first_id": 1045,
+      "last_id": 1060,
+      "chunks": 16,
+      "replay_pre_reward_interventions": 9,
+      "autonomous": false
+    },
+    {
+      "start": 1793806362.0,
+      "critical": 1793806376.0,
+      "episode": 46,
+      "end": 1793806391.0,
+      "actions": 470,
+      "success": true,
+      "step": 11017,
+      "first_id": 1061,
+      "last_id": 1085,
+      "chunks": 25,
+      "replay_pre_reward_interventions": 53,
+      "autonomous": false
+    },
+    {
+      "start": 1793806395.0,
+      "critical": 1793806408.0,
+      "episode": 47,
+      "end": 1793806421.0,
+      "actions": 433,
+      "success": true,
+      "step": 11232,
+      "first_id": 1086,
+      "last_id": 1107,
+      "chunks": 22,
+      "replay_pre_reward_interventions": 21,
+      "autonomous": false
+    },
+    {
+      "start": 1793806427.0,
+      "critical": 1793806439.0,
+      "episode": 48,
+      "end": 1793806451.0,
+      "actions": 391,
+      "success": true,
+      "step": 11448,
+      "first_id": 1108,
+      "last_id": 1127,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 15,
+      "autonomous": false
+    },
+    {
+      "start": 1793806460.0,
+      "critical": 1793806473.0,
+      "episode": 49,
+      "end": 1793806489.0,
+      "actions": 463,
+      "success": true,
+      "step": 11726,
+      "first_id": 1128,
+      "last_id": 1152,
+      "chunks": 25,
+      "replay_pre_reward_interventions": 93,
+      "autonomous": false
+    },
+    {
+      "start": 1793806516.0,
+      "critical": 1793806529.0,
+      "episode": 50,
+      "end": 1793806540.0,
+      "actions": 388,
+      "success": true,
+      "step": 12118,
+      "first_id": 1153,
+      "last_id": 1171,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 21,
+      "autonomous": false
+    },
+    {
+      "start": 1793806550.0,
+      "critical": 1793806563.0,
+      "episode": 51,
+      "end": 1793806575.0,
+      "actions": 419,
+      "success": true,
+      "step": 12378,
+      "first_id": 1172,
+      "last_id": 1191,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 41,
+      "autonomous": false
+    },
+    {
+      "start": 1793806583.0,
+      "critical": 1793806596.0,
+      "episode": 52,
+      "end": 1793806608.0,
+      "actions": 406,
+      "success": true,
+      "step": 12609,
+      "first_id": 1192,
+      "last_id": 1211,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 22,
+      "autonomous": false
+    },
+    {
+      "start": 1793806612.0,
+      "critical": 1793806626.0,
+      "episode": 53,
+      "end": 1793806637.0,
+      "actions": 412,
+      "success": true,
+      "step": 12816,
+      "first_id": 1212,
+      "last_id": 1230,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 13,
+      "autonomous": false
+    },
+    {
+      "start": 1793806643.0,
+      "critical": 1793806656.0,
+      "episode": 54,
+      "end": 1793806671.0,
+      "actions": 442,
+      "success": true,
+      "step": 13053,
+      "first_id": 1231,
+      "last_id": 1254,
+      "chunks": 24,
+      "replay_pre_reward_interventions": 33,
+      "autonomous": false
+    },
+    {
+      "start": 1793806698.0,
+      "critical": 1793806711.0,
+      "episode": 55,
+      "end": 1793806723.0,
+      "actions": 404,
+      "success": true,
+      "step": 13449,
+      "first_id": 1255,
+      "last_id": 1274,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793806727.0,
+      "critical": 1793806740.0,
+      "episode": 56,
+      "end": 1793806751.0,
+      "actions": 394,
+      "success": true,
+      "step": 13658,
+      "first_id": 1275,
+      "last_id": 1293,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793806757.0,
+      "critical": 1793806769.0,
+      "episode": 57,
+      "end": 1793806783.0,
+      "actions": 424,
+      "success": true,
+      "step": 13883,
+      "first_id": 1294,
+      "last_id": 1316,
+      "chunks": 23,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793806787.0,
+      "critical": 1793806800.0,
+      "episode": 58,
+      "end": 1793806824.0,
+      "actions": 600,
+      "success": false,
+      "step": 14189,
+      "first_id": 1317,
+      "last_id": 1354,
+      "chunks": 38,
+      "replay_pre_reward_interventions": 83,
+      "autonomous": false
+    },
+    {
+      "start": 1793806828.0,
+      "critical": 1793806841.0,
+      "episode": 59,
+      "end": 1793806855.0,
+      "actions": 435,
+      "success": true,
+      "step": 14406,
+      "first_id": 1355,
+      "last_id": 1376,
+      "chunks": 22,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793806858.0,
+      "critical": 1793806871.0,
+      "episode": 60,
+      "end": 1793806884.0,
+      "actions": 419,
+      "success": true,
+      "step": 14615,
+      "first_id": 1377,
+      "last_id": 1396,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793806888.0,
+      "critical": 1793806900.0,
+      "episode": 61,
+      "end": 1793806913.0,
+      "actions": 414,
+      "success": true,
+      "step": 14838,
+      "first_id": 1397,
+      "last_id": 1418,
+      "chunks": 22,
+      "replay_pre_reward_interventions": 17,
+      "autonomous": false
+    },
+    {
+      "start": 1793806917.0,
+      "critical": 1793806930.0,
+      "episode": 62,
+      "end": 1793806942.0,
+      "actions": 406,
+      "success": true,
+      "step": 15042,
+      "first_id": 1419,
+      "last_id": 1437,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793806946.0,
+      "critical": 1793806959.0,
+      "episode": 63,
+      "end": 1793806972.0,
+      "actions": 431,
+      "success": true,
+      "step": 15244,
+      "first_id": 1438,
+      "last_id": 1458,
+      "chunks": 21,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793806975.0,
+      "critical": 1793806989.0,
+      "episode": 64,
+      "end": 1793807001.0,
+      "actions": 414,
+      "success": true,
+      "step": 15449,
+      "first_id": 1459,
+      "last_id": 1477,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807004.0,
+      "critical": 1793807017.0,
+      "episode": 65,
+      "end": 1793807030.0,
+      "actions": 429,
+      "success": true,
+      "step": 15672,
+      "first_id": 1478,
+      "last_id": 1498,
+      "chunks": 21,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807034.0,
+      "critical": 1793807046.0,
+      "episode": 66,
+      "end": 1793807056.0,
+      "actions": 366,
+      "success": true,
+      "step": 15856,
+      "first_id": 1499,
+      "last_id": 1514,
+      "chunks": 16,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807061.0,
+      "critical": 1793807074.0,
+      "episode": 67,
+      "end": 1793807098.0,
+      "actions": 600,
+      "success": false,
+      "step": 16156,
+      "first_id": 1515,
+      "last_id": 1552,
+      "chunks": 38,
+      "replay_pre_reward_interventions": 44,
+      "autonomous": false
+    },
+    {
+      "start": 1793807145.0,
+      "critical": 1793807159.0,
+      "episode": 68,
+      "end": 1793807170.0,
+      "actions": 412,
+      "success": true,
+      "step": 16709,
+      "first_id": 1553,
+      "last_id": 1571,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807174.0,
+      "critical": 1793807188.0,
+      "episode": 69,
+      "end": 1793807200.0,
+      "actions": 415,
+      "success": true,
+      "step": 16912,
+      "first_id": 1572,
+      "last_id": 1590,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807210.0,
+      "critical": 1793807222.0,
+      "episode": 70,
+      "end": 1793807234.0,
+      "actions": 401,
+      "success": true,
+      "step": 17162,
+      "first_id": 1591,
+      "last_id": 1610,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807238.0,
+      "critical": 1793807252.0,
+      "episode": 71,
+      "end": 1793807263.0,
+      "actions": 391,
+      "success": true,
+      "step": 17356,
+      "first_id": 1611,
+      "last_id": 1628,
+      "chunks": 18,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807270.0,
+      "critical": 1793807283.0,
+      "episode": 72,
+      "end": 1793807294.0,
+      "actions": 398,
+      "success": true,
+      "step": 17576,
+      "first_id": 1629,
+      "last_id": 1647,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807298.0,
+      "critical": 1793807311.0,
+      "episode": 73,
+      "end": 1793807330.0,
+      "actions": 520,
+      "success": true,
+      "step": 17829,
+      "first_id": 1648,
+      "last_id": 1677,
+      "chunks": 30,
+      "replay_pre_reward_interventions": 55,
+      "autonomous": false
+    },
+    {
+      "start": 1793807335.0,
+      "critical": 1793807349.0,
+      "episode": 74,
+      "end": 1793807361.0,
+      "actions": 430,
+      "success": true,
+      "step": 18046,
+      "first_id": 1678,
+      "last_id": 1696,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807364.0,
+      "critical": 1793807377.0,
+      "episode": 75,
+      "end": 1793807394.0,
+      "actions": 487,
+      "success": true,
+      "step": 18291,
+      "first_id": 1697,
+      "last_id": 1724,
+      "chunks": 28,
+      "replay_pre_reward_interventions": 65,
+      "autonomous": false
+    },
+    {
+      "start": 1793807398.0,
+      "critical": 1793807410.0,
+      "episode": 76,
+      "end": 1793807421.0,
+      "actions": 370,
+      "success": true,
+      "step": 18480,
+      "first_id": 1725,
+      "last_id": 1741,
+      "chunks": 17,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807424.0,
+      "critical": 1793807437.0,
+      "episode": 77,
+      "end": 1793807453.0,
+      "actions": 467,
+      "success": true,
+      "step": 18717,
+      "first_id": 1742,
+      "last_id": 1766,
+      "chunks": 25,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807456.0,
+      "critical": 1793807469.0,
+      "episode": 78,
+      "end": 1793807483.0,
+      "actions": 422,
+      "success": true,
+      "step": 18936,
+      "first_id": 1767,
+      "last_id": 1788,
+      "chunks": 22,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807490.0,
+      "critical": 1793807502.0,
+      "episode": 79,
+      "end": 1793807527.0,
+      "actions": 600,
+      "success": false,
+      "step": 19251,
+      "first_id": 1789,
+      "last_id": 1827,
+      "chunks": 39,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": false
+    },
+    {
+      "start": 1793807531.0,
+      "critical": 1793807543.0,
+      "episode": 80,
+      "end": 1793807568.0,
+      "actions": 600,
+      "success": false,
+      "step": 19543,
+      "first_id": 1828,
+      "last_id": 1867,
+      "chunks": 40,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": false
+    },
+    {
+      "start": 1793807572.0,
+      "critical": 1793807584.0,
+      "episode": 81,
+      "end": 1793807598.0,
+      "actions": 430,
+      "success": true,
+      "step": 19766,
+      "first_id": 1868,
+      "last_id": 1889,
+      "chunks": 22,
+      "replay_pre_reward_interventions": 46,
+      "autonomous": false
+    },
+    {
+      "start": 1793807607.0,
+      "critical": 1793807620.0,
+      "episode": 82,
+      "end": 1793807633.0,
+      "actions": 411,
+      "success": true,
+      "step": 20001,
+      "first_id": 1890,
+      "last_id": 1909,
+      "chunks": 20,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807636.0,
+      "critical": 1793807648.0,
+      "episode": 83,
+      "end": 1793807667.0,
+      "actions": 507,
+      "success": true,
+      "step": 20248,
+      "first_id": 1910,
+      "last_id": 1939,
+      "chunks": 30,
+      "replay_pre_reward_interventions": 96,
+      "autonomous": false
+    },
+    {
+      "start": 1793807671.0,
+      "critical": 1793807684.0,
+      "episode": 84,
+      "end": 1793807695.0,
+      "actions": 391,
+      "success": true,
+      "step": 20455,
+      "first_id": 1940,
+      "last_id": 1958,
+      "chunks": 19,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807699.0,
+      "critical": 1793807711.0,
+      "episode": 85,
+      "end": 1793807726.0,
+      "actions": 444,
+      "success": true,
+      "step": 20687,
+      "first_id": 1959,
+      "last_id": 1984,
+      "chunks": 26,
+      "replay_pre_reward_interventions": 57,
+      "autonomous": false
+    },
+    {
+      "start": 1793807730.0,
+      "critical": 1793807744.0,
+      "episode": 86,
+      "end": 1793807760.0,
+      "actions": 486,
+      "success": true,
+      "step": 20935,
+      "first_id": 1985,
+      "last_id": 2009,
+      "chunks": 25,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807763.0,
+      "critical": 1793807776.0,
+      "episode": 87,
+      "end": 1793807789.0,
+      "actions": 418,
+      "success": true,
+      "step": 21154,
+      "first_id": 2010,
+      "last_id": 2030,
+      "chunks": 21,
+      "replay_pre_reward_interventions": 16,
+      "autonomous": false
+    },
+    {
+      "start": 1793807804.0,
+      "critical": 1793807817.0,
+      "episode": 88,
+      "end": 1793807831.0,
+      "actions": 425,
+      "success": true,
+      "step": 21455,
+      "first_id": 2031,
+      "last_id": 2052,
+      "chunks": 22,
+      "replay_pre_reward_interventions": 33,
+      "autonomous": false
+    },
+    {
+      "start": 1793807835.0,
+      "critical": 1793807848.0,
+      "episode": 89,
+      "end": 1793807861.0,
+      "actions": 425,
+      "success": true,
+      "step": 21672,
+      "first_id": 2053,
+      "last_id": 2073,
+      "chunks": 21,
+      "replay_pre_reward_interventions": 55,
+      "autonomous": false
+    },
+    {
+      "start": 1793807864.0,
+      "critical": 1793807876.0,
+      "episode": 90,
+      "end": 1793807887.0,
+      "actions": 360,
+      "success": true,
+      "step": 21859,
+      "first_id": 2074,
+      "last_id": 2089,
+      "chunks": 16,
+      "replay_pre_reward_interventions": 46,
+      "autonomous": false
+    },
+    {
+      "start": 1793807890.0,
+      "critical": 1793807902.0,
+      "episode": 91,
+      "end": 1793807915.0,
+      "actions": 408,
+      "success": true,
+      "step": 22060,
+      "first_id": 2090,
+      "last_id": 2111,
+      "chunks": 22,
+      "replay_pre_reward_interventions": 60,
+      "autonomous": false
+    },
+    {
+      "start": 1793807919.0,
+      "critical": 1793807930.0,
+      "episode": 92,
+      "end": 1793807942.0,
+      "actions": 375,
+      "success": true,
+      "step": 22251,
+      "first_id": 2112,
+      "last_id": 2129,
+      "chunks": 18,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807946.0,
+      "critical": 1793807959.0,
+      "episode": 93,
+      "end": 1793807973.0,
+      "actions": 425,
+      "success": true,
+      "step": 22477,
+      "first_id": 2130,
+      "last_id": 2152,
+      "chunks": 23,
+      "replay_pre_reward_interventions": 0,
+      "autonomous": true
+    },
+    {
+      "start": 1793807977.0,
+      "critical": 1793807989.0,
+      "episode": 94,
+      "end": 1793808009.0,
+      "actions": 521,
+      "success": true,
+      "step": 22715
+    }
+  ],
+  "segments": {
+    "1-38": {
+      "start": 1793804898.0,
+      "end": 1793806145.0,
+      "steps": [
+        55,
+        9207
+      ],
+      "successes": 37,
+      "autonomous": 0,
+      "n": 38,
+      "human_steps": {
+        "n": 38,
+        "mean": 82.89473684210526,
+        "median": 86.5,
+        "p95": 123.04999999999998,
+        "max": 131.0,
+        "sum": 3150.0
+      },
+      "critical_sec": {
+        "n": 38,
+        "mean": 12.31578947368421,
+        "median": 12.0,
+        "p95": 15.449999999999996,
+        "max": 24.0,
+        "sum": 468.0
+      },
+      "loss": {
+        "train/actor/q_pi": {
+          "n": 9153,
+          "mean": 0.12005542323325392,
+          "median": 0.11993598192930222,
+          "p95": 0.13958656489849092,
+          "max": 0.1752621829509735,
+          "sum": 1098.8672888539732
+        },
+        "train/critic/q_data": {
+          "n": 9153,
+          "mean": 0.1202102061065998,
+          "median": 0.12028305977582932,
+          "p95": 0.13237225413322448,
+          "max": 0.15316149592399597,
+          "sum": 1100.284016493708
+        },
+        "train/actor/bc_loss": {
+          "n": 9153,
+          "mean": 4.603289988829137e-05,
+          "median": 2.1069368813186884e-05,
+          "p95": 0.0001633319043321534,
+          "max": 0.0010952864540740848,
+          "sum": 0.42133913267753087
+        },
+        "train/actor/bc_human_loss": {
+          "n": 9153,
+          "mean": 3.7954917009877845e-05,
+          "median": 1.9786442862823606e-05,
+          "p95": 0.0001062292634742334,
+          "max": 0.0020801760256290436,
+          "sum": 0.3474013553914119
+        },
+        "train/actor/bc_ref_loss": {
+          "n": 9153,
+          "mean": 4.8746517933367185e-05,
+          "median": 2.2079204427427612e-05,
+          "p95": 0.000169112958246842,
+          "max": 0.001371694728732109,
+          "sum": 0.4461768786441098
+        },
+        "train/sac/critic_loss": {
+          "n": 9153,
+          "mean": 1.0524802489826941e-05,
+          "median": 1.8854450445360271e-06,
+          "p95": 3.1479204335482794e-05,
+          "max": 0.004881476983428001,
+          "sum": 0.09633351718938599
+        },
+        "train/sac/actor_loss": {
+          "n": 9153,
+          "mean": -0.01177537800913794,
+          "median": -0.011812986806035042,
+          "p95": -0.009901585802435876,
+          "max": 0.0007372165564447641,
+          "sum": -107.78003491763957
+        },
+        "train/actor/human_mask_ratio": {
+          "n": 9153,
+          "mean": 0.387930872887259,
+          "median": 0.39570313692092896,
+          "p95": 0.4404296875,
+          "max": 0.48457032442092896,
+          "sum": 3550.7312795370817
+        },
+        "train/actor/grad_norm": {
+          "n": 9153,
+          "mean": 0.8134758927959387,
+          "median": 0.8014735579490662,
+          "p95": 0.9565670013427734,
+          "max": 1.6677831411361694,
+          "sum": 7445.744846761227
+        },
+        "train/critic/grad_norm": {
+          "n": 9153,
+          "mean": 0.03481595483343484,
+          "median": 0.02950543724000454,
+          "p95": 0.06397898197174072,
+          "max": 0.6571071743965149,
+          "sum": 318.67043459042907
+        },
+        "train/actor/weighted_bc": {
+          "n": 9153,
+          "mean": 0.00023016449900345261,
+          "median": 0.00010534684406593442,
+          "p95": 0.00081665952457115,
+          "max": 0.005476431921124458,
+          "sum": 2.1066956593786017
+        },
+        "train/actor/weighted_q": {
+          "n": 9153,
+          "mean": 0.012005542507717697,
+          "median": 0.011993598192930222,
+          "p95": 0.01395865622907877,
+          "max": 0.01752621680498123,
+          "sum": 109.88673057314008
+        }
+      }
+    },
+    "39-54": {
+      "start": 1793806149.0,
+      "end": 1793806671.0,
+      "steps": [
+        9240,
+        13057
+      ],
+      "successes": 15,
+      "autonomous": 0,
+      "n": 16,
+      "human_steps": {
+        "n": 16,
+        "mean": 33.5,
+        "median": 28.0,
+        "p95": 70.5,
+        "max": 93.0,
+        "sum": 536.0
+      },
+      "critical_sec": {
+        "n": 16,
+        "mean": 13.4375,
+        "median": 12.5,
+        "p95": 18.0,
+        "max": 24.0,
+        "sum": 215.0
+      },
+      "loss": {
+        "train/actor/q_pi": {
+          "n": 3818,
+          "mean": 0.1193725208728928,
+          "median": 0.11919525638222694,
+          "p95": 0.13523735180497168,
+          "max": 0.16125380992889404,
+          "sum": 455.7642846927047
+        },
+        "train/critic/q_data": {
+          "n": 3818,
+          "mean": 0.11945264974405093,
+          "median": 0.11932827532291412,
+          "p95": 0.12803959473967552,
+          "max": 0.13635964691638947,
+          "sum": 456.0702167227864
+        },
+        "train/actor/bc_loss": {
+          "n": 3818,
+          "mean": 3.4352096501760276e-05,
+          "median": 2.1249496057862416e-05,
+          "p95": 8.009790253709069e-05,
+          "max": 0.0011472557671368122,
+          "sum": 0.13115630444372073
+        },
+        "train/actor/bc_human_loss": {
+          "n": 3818,
+          "mean": 2.851484696379239e-05,
+          "median": 2.0411458535818383e-05,
+          "p95": 4.610157902789067e-05,
+          "max": 0.0015594083815813065,
+          "sum": 0.10886968570775934
+        },
+        "train/actor/bc_ref_loss": {
+          "n": 3818,
+          "mean": 3.7650976188425607e-05,
+          "median": 2.1554191334871575e-05,
+          "p95": 9.818731996347195e-05,
+          "max": 0.0011860355734825134,
+          "sum": 0.14375142708740896
+        },
+        "train/sac/critic_loss": {
+          "n": 3818,
+          "mean": 3.250089727719882e-06,
+          "median": 9.643696898820053e-07,
+          "p95": 7.885478180469342e-06,
+          "max": 0.00035058107459917665,
+          "sum": 0.01240884258043451
+        },
+        "train/sac/actor_loss": {
+          "n": 3818,
+          "mean": -0.011765491788779498,
+          "median": -0.011751399375498295,
+          "p95": -0.010139340534806252,
+          "max": -0.005831082817167044,
+          "sum": -44.920647649560124
+        },
+        "train/actor/human_mask_ratio": {
+          "n": 3818,
+          "mean": 0.36850814189568687,
+          "median": 0.3666015863418579,
+          "p95": 0.412109375,
+          "max": 0.47148439288139343,
+          "sum": 1406.9640857577324
+        },
+        "train/actor/grad_norm": {
+          "n": 3818,
+          "mean": 0.7096965861701415,
+          "median": 0.7094310522079468,
+          "p95": 0.7284254699945449,
+          "max": 0.7565156817436218,
+          "sum": 2709.6215659976006
+        },
+        "train/critic/grad_norm": {
+          "n": 3818,
+          "mean": 0.03303024115020408,
+          "median": 0.03068593516945839,
+          "p95": 0.046273611299693505,
+          "max": 0.17199617624282837,
+          "sum": 126.10946071147919
+        },
+        "train/actor/weighted_bc": {
+          "n": 3818,
+          "mean": 0.00017176048236206256,
+          "median": 0.00010624748028931208,
+          "p95": 0.00040048952942015596,
+          "max": 0.005736278370022774,
+          "sum": 0.6557815216583549
+        },
+        "train/actor/weighted_q": {
+          "n": 3818,
+          "mean": 0.011937252277554237,
+          "median": 0.011919526383280754,
+          "p95": 0.013523734547197817,
+          "max": 0.016125380992889404,
+          "sum": 45.576429195702076
+        }
+      }
+    },
+    "55-78": {
+      "start": 1793806698.0,
+      "end": 1793807483.0,
+      "steps": [
+        13275,
+        18936
+      ],
+      "successes": 22,
+      "autonomous": 19,
+      "n": 24,
+      "human_steps": {
+        "n": 24,
+        "mean": 11.0,
+        "median": 0.0,
+        "p95": 63.49999999999998,
+        "max": 83.0,
+        "sum": 264.0
+      },
+      "critical_sec": {
+        "n": 24,
+        "mean": 13.791666666666666,
+        "median": 12.5,
+        "p95": 23.24999999999999,
+        "max": 24.0,
+        "sum": 331.0
+      },
+      "loss": {
+        "train/actor/q_pi": {
+          "n": 5662,
+          "mean": 0.11640768236977732,
+          "median": 0.11621726304292679,
+          "p95": 0.13222676441073417,
+          "max": 0.16135334968566895,
+          "sum": 659.1002975776792
+        },
+        "train/critic/q_data": {
+          "n": 5662,
+          "mean": 0.11641556137981283,
+          "median": 0.11639804393053055,
+          "p95": 0.12477396577596664,
+          "max": 0.1331813931465149,
+          "sum": 659.1449085325003
+        },
+        "train/actor/bc_loss": {
+          "n": 5662,
+          "mean": 3.60457198616063e-05,
+          "median": 2.260856763314223e-05,
+          "p95": 9.758748819876913e-05,
+          "max": 0.0010990421287715435,
+          "sum": 0.2040908658564149
+        },
+        "train/actor/bc_human_loss": {
+          "n": 5662,
+          "mean": 2.9954064447296727e-05,
+          "median": 2.1537212887778878e-05,
+          "p95": 5.431625104392876e-05,
+          "max": 0.0023164949379861355,
+          "sum": 0.16959991290059406
+        },
+        "train/actor/bc_ref_loss": {
+          "n": 5662,
+          "mean": 3.865119868486603e-05,
+          "median": 2.3040149244479835e-05,
+          "p95": 0.00011613740643952038,
+          "max": 0.0008143860613927245,
+          "sum": 0.21884308695371146
+        },
+        "train/sac/critic_loss": {
+          "n": 5662,
+          "mean": 2.4729412452671915e-06,
+          "median": 7.302216147309082e-07,
+          "p95": 5.595663651547508e-06,
+          "max": 0.0003010702785104513,
+          "sum": 0.014001793330702839
+        },
+        "train/sac/actor_loss": {
+          "n": 5662,
+          "mean": -0.011460539829433333,
+          "median": -0.011451896745711565,
+          "p95": -0.009877152787521482,
+          "max": -0.007252263370901346,
+          "sum": -64.88957651425153
+        },
+        "train/actor/human_mask_ratio": {
+          "n": 5662,
+          "mean": 0.2962366009781783,
+          "median": 0.29414063692092896,
+          "p95": 0.3460937738418579,
+          "max": 0.384765625,
+          "sum": 1677.2916347384453
+        },
+        "train/actor/grad_norm": {
+          "n": 5662,
+          "mean": 0.6797166113738077,
+          "median": 0.6796912252902985,
+          "p95": 0.6940753877162933,
+          "max": 0.7301144599914551,
+          "sum": 3848.5554535984993
+        },
+        "train/critic/grad_norm": {
+          "n": 5662,
+          "mean": 0.03414026215075078,
+          "median": 0.03188308887183666,
+          "p95": 0.051248169690370556,
+          "max": 0.16727294027805328,
+          "sum": 193.30216429755092
+        },
+        "train/actor/weighted_bc": {
+          "n": 5662,
+          "mean": 0.0001802285990747948,
+          "median": 0.00011304283543722704,
+          "p95": 0.0004879374479060054,
+          "max": 0.0054952106438577175,
+          "sum": 1.0204543279614882
+        },
+        "train/actor/weighted_q": {
+          "n": 5662,
+          "mean": 0.011640768436664345,
+          "median": 0.011621726676821709,
+          "p95": 0.013222676794975996,
+          "max": 0.016135334968566895,
+          "sum": 65.91003088839352
+        }
+      }
+    },
+    "79-93": {
+      "start": 1793807490.0,
+      "end": 1793807973.0,
+      "steps": [
+        18991,
+        22477
+      ],
+      "successes": 13,
+      "autonomous": 5,
+      "n": 15,
+      "human_steps": {
+        "n": 15,
+        "mean": 27.266666666666666,
+        "median": 16.0,
+        "p95": 70.79999999999995,
+        "max": 96.0,
+        "sum": 409.0
+      },
+      "critical_sec": {
+        "n": 15,
+        "mean": 15.2,
+        "median": 14.0,
+        "p95": 25.0,
+        "max": 25.0,
+        "sum": 228.0
+      },
+      "loss": {
+        "train/actor/q_pi": {
+          "n": 3487,
+          "mean": 0.11022397672801842,
+          "median": 0.10999637097120285,
+          "p95": 0.126112025976181,
+          "max": 0.14965808391571045,
+          "sum": 384.35100685060024
+        },
+        "train/critic/q_data": {
+          "n": 3487,
+          "mean": 0.11026241981584908,
+          "median": 0.11017291247844696,
+          "p95": 0.11833386346697808,
+          "max": 0.12900200486183167,
+          "sum": 384.4850578978658
+        },
+        "train/actor/bc_loss": {
+          "n": 3487,
+          "mean": 4.225047013029961e-05,
+          "median": 2.4609082174720243e-05,
+          "p95": 0.00012806013983208655,
+          "max": 0.0010345650371164083,
+          "sum": 0.14732738934435474
+        },
+        "train/actor/bc_human_loss": {
+          "n": 3487,
+          "mean": 3.529587268233431e-05,
+          "median": 2.4137065338436514e-05,
+          "p95": 7.42314507078845e-05,
+          "max": 0.0013198917731642723,
+          "sum": 0.12307670804329973
+        },
+        "train/actor/bc_ref_loss": {
+          "n": 3487,
+          "mean": 4.447788133417295e-05,
+          "median": 2.4820163162075914e-05,
+          "p95": 0.00014332989085232817,
+          "max": 0.0010135392658412457,
+          "sum": 0.15509437221226108
+        },
+        "train/sac/critic_loss": {
+          "n": 3487,
+          "mean": 2.1966749899862537e-06,
+          "median": 6.166517323435983e-07,
+          "p95": 5.501462464962967e-06,
+          "max": 0.0003049170773010701,
+          "sum": 0.007659805690082067
+        },
+        "train/sac/actor_loss": {
+          "n": 3487,
+          "mean": -0.010811145519819041,
+          "median": -0.01081032957881689,
+          "p95": -0.009167414624243975,
+          "max": -0.005041821859776974,
+          "sum": -37.698464427609
+        },
+        "train/actor/human_mask_ratio": {
+          "n": 3487,
+          "mean": 0.2457171880800607,
+          "median": 0.24550780653953552,
+          "p95": 0.27460938692092896,
+          "max": 0.31523439288139343,
+          "sum": 856.8158348351717
+        },
+        "train/actor/grad_norm": {
+          "n": 3487,
+          "mean": 0.6647639086740831,
+          "median": 0.6646621227264404,
+          "p95": 0.6759108066558838,
+          "max": 0.6968285441398621,
+          "sum": 2318.031749546528
+        },
+        "train/critic/grad_norm": {
+          "n": 3487,
+          "mean": 0.03487502826216965,
+          "median": 0.032771315425634384,
+          "p95": 0.051716196909546853,
+          "max": 0.1124231293797493,
+          "sum": 121.60922355018556
+        },
+        "train/actor/weighted_bc": {
+          "n": 3487,
+          "mean": 0.00021125234993110104,
+          "median": 0.0001230454072356224,
+          "p95": 0.0006403006904292836,
+          "max": 0.005172825418412685,
+          "sum": 0.7366369442097493
+        },
+        "train/actor/weighted_q": {
+          "n": 3487,
+          "mean": 0.011022397863179453,
+          "median": 0.010999636724591255,
+          "p95": 0.012611203826963902,
+          "max": 0.014965808019042015,
+          "sum": 38.435101348906755
+        }
+      }
+    }
+  },
+  "timing": {
+    "Env step": {
+      "work_ms": {
+        "n": 4060,
+        "mean": 526.8486691806282,
+        "median": 530.8954960200936,
+        "p95": 541.0890952683985,
+        "max": 624.0653581917286,
+        "sum": 2139005.5968733504
+      },
+      "execute_ms": {
+        "n": 4060,
+        "mean": 522.29005652606,
+        "median": 526.3691151048988,
+        "p95": 536.5042116725817,
+        "max": 616.040529217571,
+        "sum": 2120497.6294958033
+      }
+    },
+    "Learner update": {
+      "work_ms": {
+        "n": 181988,
+        "mean": 10.439208140482524,
+        "median": 8.700900711119175,
+        "p95": 16.08166303485632,
+        "max": 218.82684901356697,
+        "sum": 1899810.6110701337
+      }
+    },
+    "Rollout step": {
+      "work_ms": {
+        "n": 4060,
+        "mean": 82.88962149136961,
+        "median": 81.22352208010852,
+        "p95": 93.59750009607522,
+        "max": 113.27812820672989,
+        "sum": 336531.8632549606
+      },
+      "inference_ms": {
+        "n": 4060,
+        "mean": 80.56556679196014,
+        "median": 78.89488129876554,
+        "p95": 91.10016694758087,
+        "max": 110.911900177598,
+        "sum": 327096.20117535815
+      }
+    }
+  },
+  "checkpoints": {
+    "2500": {
+      "update_step": 20006,
+      "transitions_since_train": 0,
+      "episodes_since_train": 0,
+      "total_transitions_added": 347,
+      "total_episodes_added": 9,
+      "_warmup_ready_total_transitions": 150,
+      "_warmup_ready_total_episodes": 0,
+      "pending_update_budget": 0
+    },
+    "7500": {
+      "update_step": 60006,
+      "transitions_since_train": 0,
+      "episodes_since_train": 0,
+      "total_transitions_added": 751,
+      "total_episodes_added": 30,
+      "_warmup_ready_total_transitions": 150,
+      "_warmup_ready_total_episodes": 0,
+      "pending_update_budget": 0
+    },
+    "12500": {
+      "update_step": 100006,
+      "transitions_since_train": 0,
+      "episodes_since_train": 0,
+      "total_transitions_added": 1192,
+      "total_episodes_added": 51,
+      "_warmup_ready_total_transitions": 150,
+      "_warmup_ready_total_episodes": 0,
+      "pending_update_budget": 0
+    },
+    "15000": {
+      "update_step": 120006,
+      "transitions_since_train": 0,
+      "episodes_since_train": 0,
+      "total_transitions_added": 1419,
+      "total_episodes_added": 61,
+      "_warmup_ready_total_transitions": 150,
+      "_warmup_ready_total_episodes": 0,
+      "pending_update_budget": 0
+    },
+    "17500": {
+      "update_step": 140006,
+      "transitions_since_train": 0,
+      "episodes_since_train": 0,
+      "total_transitions_added": 1629,
+      "total_episodes_added": 71,
+      "_warmup_ready_total_transitions": 150,
+      "_warmup_ready_total_episodes": 0,
+      "pending_update_budget": 0
+    },
+    "20000": {
+      "update_step": 160006,
+      "transitions_since_train": 0,
+      "episodes_since_train": 0,
+      "total_transitions_added": 1890,
+      "total_episodes_added": 81,
+      "_warmup_ready_total_transitions": 150,
+      "_warmup_ready_total_episodes": 0,
+      "pending_update_budget": 0
+    },
+    "22500": {
+      "update_step": 180006,
+      "transitions_since_train": 0,
+      "episodes_since_train": 0,
+      "total_transitions_added": 2153,
+      "total_episodes_added": 93,
+      "_warmup_ready_total_transitions": 150,
+      "_warmup_ready_total_episodes": 0,
+      "pending_update_budget": 0
+    }
+  },
+  "probe": {
+    "2500": {
+      "qpi": 0.07303840667009354,
+      "qref": 0.07302465289831161,
+      "delta_q_abs": 9.409920312464237e-05,
+      "xyz_vs_ref_mm": 7.960241317749023,
+      "rp_rms_degrees": [
+        0.06993306428194046,
+        0.11851485818624496
+      ],
+      "axis_replace_q_drop": {
+        "xyz": 1.6646876247250475e-05,
+        "rp": 1.4018878573551774e-06,
+        "yaw": 9.055424015969038e-06,
+        "gripper": -1.3331596164789516e-05
+      },
+      "gradient_Q_BC_ratio_cos": [
+        0.002493430336471647,
+        0.04844924993813038,
+        19.43073272705078,
+        -0.11457041278481483
+      ]
+    },
+    "7500": {
+      "qpi": 0.07673130184412003,
+      "qref": 0.0767315998673439,
+      "delta_q_abs": 4.745365004055202e-05,
+      "xyz_vs_ref_mm": 6.513449192047119,
+      "rp_rms_degrees": [
+        0.08820869773626328,
+        0.12923970818519592
+      ],
+      "axis_replace_q_drop": {
+        "xyz": 4.454006557352841e-06,
+        "rp": 2.3709192475962482e-07,
+        "yaw": 1.128374947256816e-06,
+        "gripper": -6.111586117185652e-06
+      },
+      "gradient_Q_BC_ratio_cos": [
+        0.0010462735954206437,
+        0.05049311462789774,
+        48.2597770690918,
+        0.015865514054894447
+      ]
+    },
+    "12500": {
+      "qpi": 0.07835140079259872,
+      "qref": 0.07835184782743454,
+      "delta_q_abs": 1.4813827874604613e-05,
+      "xyz_vs_ref_mm": 5.84384298324585,
+      "rp_rms_degrees": [
+        0.07816865295171738,
+        0.09703758358955383
+      ],
+      "axis_replace_q_drop": {
+        "xyz": 2.7686473913490772e-06,
+        "rp": 5.69300027564168e-07,
+        "yaw": 4.941563815918926e-07,
+        "gripper": -4.270429144526133e-06
+      },
+      "gradient_Q_BC_ratio_cos": [
+        0.0008441582758678123,
+        0.03419930022209883,
+        40.51296806335449,
+        -0.022967933677136898
+      ]
+    },
+    "15000": {
+      "qpi": 0.07590650022029877,
+      "qref": 0.0759168267250061,
+      "delta_q_abs": 2.2229132810025476e-05,
+      "xyz_vs_ref_mm": 5.735843658447266,
+      "rp_rms_degrees": [
+        0.09267480671405792,
+        0.09621954709291458
+      ],
+      "axis_replace_q_drop": {
+        "xyz": 1.7332786228507757e-06,
+        "rp": -6.87674983623765e-08,
+        "yaw": 1.4589459169656038e-06,
+        "gripper": -1.3448840945784468e-05
+      },
+      "gradient_Q_BC_ratio_cos": [
+        0.0006854800594737753,
+        0.05524110607802868,
+        80.579909324646,
+        0.06742592435330153
+      ]
+    },
+    "17500": {
+      "qpi": 0.0759001299738884,
+      "qref": 0.07591334730386734,
+      "delta_q_abs": 1.9353572497493587e-05,
+      "xyz_vs_ref_mm": 5.380938529968262,
+      "rp_rms_degrees": [
+        0.1327170729637146,
+        0.08463617414236069
+      ],
+      "axis_replace_q_drop": {
+        "xyz": -1.2931317314723856e-06,
+        "rp": 4.57259972108659e-07,
+        "yaw": -8.206018833334383e-07,
+        "gripper": -1.15494085548562e-05
+      },
+      "gradient_Q_BC_ratio_cos": [
+        0.0005862842226633802,
+        0.04296311363577843,
+        73.28044891357422,
+        0.10623068548738956
+      ]
+    },
+    "20000": {
+      "qpi": 0.07459557056427002,
+      "qref": 0.07460036128759384,
+      "delta_q_abs": 1.1046639883716125e-05,
+      "xyz_vs_ref_mm": 5.437714576721191,
+      "rp_rms_degrees": [
+        0.1022929698228836,
+        0.10158252716064453
+      ],
+      "axis_replace_q_drop": {
+        "xyz": -1.7285250351051218e-06,
+        "rp": 3.559883410275688e-08,
+        "yaw": 9.222664516528312e-07,
+        "gripper": -4.01179340769886e-06
+      },
+      "gradient_Q_BC_ratio_cos": [
+        0.00043687227298505604,
+        0.03996036667376757,
+        91.46929550170898,
+        -0.12265633046627045
+      ]
+    },
+    "22500": {
+      "qpi": 0.07354798913002014,
+      "qref": 0.073555588722229,
+      "delta_q_abs": 1.6560899894102477e-05,
+      "xyz_vs_ref_mm": 5.176287651062012,
+      "rp_rms_degrees": [
+        0.08751119673252106,
+        0.12797130644321442
+      ],
+      "axis_replace_q_drop": {
+        "xyz": 1.0060223765151477e-08,
+        "rp": 9.264234535066862e-08,
+        "yaw": -1.325194443069222e-08,
+        "gripper": -7.683862349949777e-06
+      },
+      "gradient_Q_BC_ratio_cos": [
+        0.0004223260475555435,
+        0.03981096763163805,
+        94.26546669006348,
+        -0.09506012313067913
+      ]
+    }
+  },
+  "q_cross": {
+    "12500-17500": {
+      "qpi_cube": [
+        [
+          [
+            0.1190270469492714,
+            0.11902278661727905
+          ],
+          [
+            0.11889754685779545,
+            0.11889565791059661
+          ]
+        ],
+        [
+          [
+            0.11432724367847759,
+            0.1143470691566163
+          ],
+          [
+            0.11594998873107047,
+            0.11597829380234445
+          ]
+        ]
+      ],
+      "contributions": {
+        "data": -0.003809601724246612,
+        "critic": 0.0007498442424024773,
+        "actor": 1.1004334917190847e-05
+      }
+    },
+    "17500-22500": {
+      "qpi_cube": [
+        [
+          [
+            0.11597829380234445,
+            0.11595856301838668
+          ],
+          [
+            0.11552411709335261,
+            0.11550846401352763
+          ]
+        ],
+        [
+          [
+            0.10963414205931202,
+            0.10962103302402382
+          ],
+          [
+            0.10947187368780086,
+            0.10946089391978574
+          ]
+        ]
+      ],
+      "contributions": {
+        "data": -0.006195536178910545,
+        "critic": -0.0003068331671383419,
+        "actor": -1.5030536509826517e-05
+      }
+    }
+  },
+  "action_drift": {
+    "7500-12500": {
+      "xyz_mm": 6.290925025939941,
+      "xyz_bias_mm": [
+        0.008245596662163734,
+        -0.6886832118034363,
+        1.325193166732788
+      ]
+    },
+    "12500-15000": {
+      "xyz_mm": 6.323339939117432,
+      "xyz_bias_mm": [
+        1.3752052783966064,
+        2.2349960803985596,
+        -1.6834207773208618
+      ]
+    },
+    "15000-17500": {
+      "xyz_mm": 5.268228054046631,
+      "xyz_bias_mm": [
+        -0.741584837436676,
+        -1.1221181154251099,
+        -1.7224116325378418
+      ]
+    },
+    "17500-20000": {
+      "xyz_mm": 6.158428192138672,
+      "xyz_bias_mm": [
+        0.08604808896780014,
+        -0.06999750435352325,
+        3.3046648502349854
+      ]
+    },
+    "20000-22500": {
+      "xyz_mm": 5.772590160369873,
+      "xyz_bias_mm": [
+        -0.7358501553535461,
+        -0.1805088371038437,
+        -1.7946940660476685
+      ]
+    },
+    "17500-22500": {
+      "xyz_mm": 5.4241108894348145,
+      "xyz_bias_mm": [
+        -0.649802029132843,
+        -0.25050634145736694,
+        1.5099706649780273
+      ]
+    }
+  },
+  "autonomy_audit": {
+    "mismatches": []
+  },
+  "nonfinite_metrics": [],
+  "all_time": {
+    "network_first_last_seconds": 3119.745635509491,
+    "rollout_seconds": 2480.0,
+    "last_update": 181990.0
+  },
+  "timing_by_phase": {
+    "1-38": {
+      "Env step": {
+        "work_ms": {
+          "n": 1580,
+          "mean": 527.9659458792686,
+          "median": 531.3215868081897,
+          "p95": 542.9107743315399,
+          "max": 597.6938041858375,
+          "sum": 834186.1944892444
+        },
+        "execute_ms": {
+          "n": 1580,
+          "mean": 523.4223923516236,
+          "median": 526.7677535302937,
+          "p95": 538.0879375850782,
+          "max": 592.7739646285772,
+          "sum": 827007.3799155653
+        }
+      },
+      "Learner update": {
+        "work_ms": {
+          "n": 73226,
+          "mean": 10.249951504965493,
+          "median": 8.493647444993258,
+          "p95": 15.784825780428946,
+          "max": 153.3910627476871,
+          "sum": 750562.9489026032
+        }
+      },
+      "Rollout step": {
+        "work_ms": {
+          "n": 1581,
+          "mean": 83.27984786135893,
+          "median": 81.80689439177513,
+          "p95": 94.16464017704129,
+          "max": 113.27812820672989,
+          "sum": 131665.43946880847
+        },
+        "inference_ms": {
+          "n": 1581,
+          "mean": 80.95470550372858,
+          "median": 79.47853486984968,
+          "p95": 91.60181600600481,
+          "max": 110.911900177598,
+          "sum": 127989.38940139487
+        }
+      }
+    },
+    "39-54": {
+      "Env step": {
+        "work_ms": {
+          "n": 693,
+          "mean": 526.4552445923654,
+          "median": 530.5698662996292,
+          "p95": 539.4440225325525,
+          "max": 624.0653581917286,
+          "sum": 364833.48450250924
+        },
+        "execute_ms": {
+          "n": 693,
+          "mean": 521.9551578216513,
+          "median": 526.1444440111518,
+          "p95": 535.541769862175,
+          "max": 569.7276522405446,
+          "sum": 361714.92437040433
+        }
+      },
+      "Learner update": {
+        "work_ms": {
+          "n": 30535,
+          "mean": 10.422257137954093,
+          "median": 8.727116044610739,
+          "p95": 16.023579612374302,
+          "max": 130.9555028565228,
+          "sum": 318243.62170742825
+        }
+      },
+      "Rollout step": {
+        "work_ms": {
+          "n": 694,
+          "mean": 82.53638866701048,
+          "median": 80.86343272589147,
+          "p95": 93.8914248486981,
+          "max": 101.31846135482192,
+          "sum": 57280.25373490527
+        },
+        "inference_ms": {
+          "n": 694,
+          "mean": 80.19560533750169,
+          "median": 78.61670502461493,
+          "p95": 91.33113159332424,
+          "max": 98.5431857407093,
+          "sum": 55655.75010422617
+        }
+      }
+    },
+    "55-78": {
+      "Env step": {
+        "work_ms": {
+          "n": 1054,
+          "mean": 526.7355070856755,
+          "median": 530.890767229721,
+          "p95": 537.9074474563822,
+          "max": 619.7044774889946,
+          "sum": 555179.224468302
+        },
+        "execute_ms": {
+          "n": 1054,
+          "mean": 522.0767082672998,
+          "median": 526.2053476180881,
+          "p95": 532.8827239340171,
+          "max": 616.040529217571,
+          "sum": 550268.8505137339
+        }
+      },
+      "Learner update": {
+        "work_ms": {
+          "n": 45296,
+          "mean": 10.625603000742144,
+          "median": 8.845715085044503,
+          "p95": 16.451026313006878,
+          "max": 122.15100321918726,
+          "sum": 481297.31352161616
+        }
+      },
+      "Rollout step": {
+        "work_ms": {
+          "n": 1055,
+          "mean": 82.5633887545828,
+          "median": 80.87006863206625,
+          "p95": 92.76533564552665,
+          "max": 104.60589826107025,
+          "sum": 87104.37513608485
+        },
+        "inference_ms": {
+          "n": 1055,
+          "mean": 80.24629897204056,
+          "median": 78.55436066165566,
+          "p95": 90.3834265191108,
+          "max": 101.97323467582464,
+          "sum": 84659.84541550279
+        }
+      }
+    },
+    "79-93": {
+      "Env step": {
+        "work_ms": {
+          "n": 675,
+          "mean": 527.3802540830716,
+          "median": 530.5888610891998,
+          "p95": 539.6957427728921,
+          "max": 599.8383429832757,
+          "sum": 355981.6715060733
+        },
+        "execute_ms": {
+          "n": 675,
+          "mean": 522.8707331467282,
+          "median": 526.1745569296181,
+          "p95": 534.9279510322958,
+          "max": 594.6139991283417,
+          "sum": 352937.7448740415
+        }
+      },
+      "Learner update": {
+        "work_ms": {
+          "n": 27888,
+          "mean": 10.715076717685927,
+          "median": 8.93165753223002,
+          "p95": 16.57969870138913,
+          "max": 122.73462675511837,
+          "sum": 298822.05950282514
+        }
+      },
+      "Rollout step": {
+        "work_ms": {
+          "n": 676,
+          "mean": 82.89192731426093,
+          "median": 81.05645142495632,
+          "p95": 93.1975117418915,
+          "max": 102.40742936730385,
+          "sum": 56034.94286444038
+        },
+        "inference_ms": {
+          "n": 676,
+          "mean": 80.57445731115963,
+          "median": 78.721844824031,
+          "p95": 90.64809628762305,
+          "max": 99.50310317799449,
+          "sum": 54468.33314234391
+        }
+      }
+    }
+  },
+  "fixed_sample_ids": [
+    150,
+    168,
+    195,
+    241,
+    253,
+    259,
+    278,
+    316,
+    351,
+    367,
+    372,
+    386,
+    418,
+    442,
+    474,
+    498,
+    510,
+    528,
+    547,
+    574,
+    596,
+    600,
+    620,
+    653,
+    694,
+    705,
+    723,
+    781,
+    790,
+    818,
+    830,
+    835,
+    857,
+    863,
+    867,
+    877,
+    889,
+    896,
+    908,
+    913,
+    918,
+    923,
+    928,
+    933,
+    937,
+    947,
+    960,
+    970,
+    978,
+    997,
+    1011,
+    1022,
+    1029,
+    1047,
+    1055,
+    1062,
+    1067,
+    1072,
+    1088,
+    1093,
+    1101,
+    1113,
+    1120,
+    1131,
+    1146,
+    1156,
+    1165,
+    1184,
+    1194,
+    1199,
+    1214,
+    1220,
+    1225,
+    1238,
+    1244,
+    1256,
+    1257,
+    1262,
+    1267,
+    1279,
+    1284,
+    1292,
+    1302,
+    1307,
+    1314,
+    1315,
+    1324,
+    1329,
+    1355,
+    1362,
+    1367,
+    1381,
+    1386,
+    1395,
+    1399,
+    1404,
+    1411,
+    1421,
+    1425,
+    1430,
+    1445,
+    1450,
+    1459,
+    1461,
+    1466,
+    1471,
+    1484,
+    1489,
+    1501,
+    1506,
+    1512,
+    1513,
+    1522,
+    1545,
+    1556,
+    1561,
+    1566,
+    1578,
+    1583,
+    1587,
+    1595,
+    1600,
+    1609,
+    1618,
+    1629,
+    1632,
+    1636,
+    1641,
+    1654,
+    1659,
+    1664,
+    1683,
+    1688,
+    1693,
+    1697,
+    1703,
+    1708,
+    1730,
+    1734,
+    1744,
+    1747,
+    1752,
+    1757,
+    1770,
+    1775,
+    1780,
+    1793,
+    1798,
+    1805,
+    1821,
+    1831,
+    1836,
+    1840,
+    1845,
+    1850,
+    1855,
+    1860,
+    1865,
+    1875,
+    1891,
+    1892,
+    1897,
+    1902,
+    1915,
+    1920,
+    1942,
+    1947,
+    1952,
+    1956,
+    1965,
+    1970,
+    1989,
+    1994,
+    1999,
+    2004,
+    2016,
+    2024,
+    2028,
+    2034,
+    2039,
+    2055,
+    2064,
+    2082,
+    2087,
+    2097,
+    2117,
+    2122,
+    2134,
+    2139,
+    2144,
+    2150,
+    2151
+  ],
+  "fixed_near_count": 160,
+  "replay_stages": {
+    "2500": {
+      "records": 347,
+      "episodes": 9,
+      "autonomous": 0,
+      "labels": {
+        "failure": 39,
+        "success_far": 134,
+        "success_near30": 24,
+        "warmup": 150
+      },
+      "human_slot_ratio": 0.37146973609924316
+    },
+    "7500": {
+      "records": 751,
+      "episodes": 30,
+      "autonomous": 0,
+      "labels": {
+        "failure": 39,
+        "success_far": 475,
+        "success_near30": 87,
+        "warmup": 150
+      },
+      "human_slot_ratio": 0.42170438170433044
+    },
+    "12500": {
+      "records": 1192,
+      "episodes": 51,
+      "autonomous": 0,
+      "labels": {
+        "failure": 78,
+        "success_far": 817,
+        "success_near30": 147,
+        "warmup": 150
+      },
+      "human_slot_ratio": 0.35176175832748413
+    },
+    "15000": {
+      "records": 1419,
+      "episodes": 61,
+      "autonomous": 5,
+      "labels": {
+        "failure": 116,
+        "success_far": 979,
+        "success_near30": 174,
+        "warmup": 150
+      },
+      "human_slot_ratio": 0.31085270643234253
+    },
+    "17500": {
+      "records": 1629,
+      "episodes": 71,
+      "autonomous": 14,
+      "labels": {
+        "failure": 154,
+        "success_far": 1124,
+        "success_near30": 201,
+        "warmup": 150
+      },
+      "human_slot_ratio": 0.27691835165023804
+    },
+    "20000": {
+      "records": 1890,
+      "episodes": 81,
+      "autonomous": 19,
+      "labels": {
+        "failure": 233,
+        "success_far": 1282,
+        "success_near30": 225,
+        "warmup": 150
+      },
+      "human_slot_ratio": 0.24830688536167145
+    },
+    "22500": {
+      "records": 2153,
+      "episodes": 93,
+      "autonomous": 24,
+      "labels": {
+        "failure": 233,
+        "success_far": 1509,
+        "success_near30": 261,
+        "warmup": 150
+      },
+      "human_slot_ratio": 0.23748257756233215
+    }
+  },
+  "rp_observed_rms_degrees": [
+    0.01363159529864788,
+    0.014598829671740532
+  ],
+  "source_sha256": {
+    "metrics.log": "07c23228b13dd0195b50565004ed43768c19baa67b37bd30a7f4f1bc056d0617",
+    "tensorboard/config.yaml": "b29f3ad2013194ed1f0014c3527604bc928974b60e17315da4488f70ed2e163b",
+    "run_embodiment.log": "f45df07f5c6e0308847468245d19ced72a7ac633b8e10584ee8b3d82721b3486"
+  }
+}

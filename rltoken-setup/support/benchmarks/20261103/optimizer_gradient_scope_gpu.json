@@ -1,0 +1,27 @@
+{
+  "device": "RTX 4090 D",
+  "world_size": 1,
+  "hardware_connected": false,
+  "results": [
+    {
+      "backend": "fsdp1_orig",
+      "actor_grad_norm": 2.392760992050171,
+      "critic_grad_norm": 33.08470153808594,
+      "optimizer_results": "match independent parameter clipping"
+    },
+    {
+      "backend": "fsdp1_flat",
+      "actor_grad_norm": 2.392760992050171,
+      "critic_grad_norm": 33.08470153808594,
+      "optimizer_results": "match independent parameter clipping"
+    },
+    {
+      "backend": "fsdp2",
+      "actor_grad_norm": 2.392760992050171,
+      "critic_grad_norm": 33.08470153808594,
+      "optimizer_results": "match independent parameter clipping"
+    }
+  ],
+  "status": "experimental_change_reverted",
+  "current_behavior": "Upstream global gradient norm and clipping retained at user request."
+}
