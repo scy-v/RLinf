@@ -49,6 +49,7 @@ class UR5eEnvConfig(CartesianEnvConfig):
     )
 
     reference_frame: str = "tcp"
+    step_frequency: float = 25.0
     action_idle_hold_enabled: bool = True
     action_idle_position_threshold: float = 0.0001
     action_idle_rotation_threshold: float = 0.001
@@ -98,7 +99,8 @@ class UR5eEnv(CartesianEnv):
         self._reference_ee_pose: np.ndarray | None = None
         self._tcp_offset = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
         self._gripper_target: float | None = None
-        self._chunk_steps_remaining = 0
+        self._camera_steps_remaining = 0
+        self._camera_refresh_on_request = False
         self._action_trace_enabled = True
         self._last_action_started: float | None = None
         self._last_target_sent: float | None = None
@@ -166,13 +168,28 @@ class UR5eEnv(CartesianEnv):
         return self._arm.drain_control_timing()
 
     def begin_action_chunk(self, size: int, infer_index: int | None = None) -> None:
-        """Refresh camera observations after the final action of a sync chunk."""
+        """Refresh images at the chunk boundary and associate action records."""
         if size < 1:
             raise ValueError(f"Expected positive UR action chunk size, got {size}.")
-        self._chunk_steps_remaining = size
         self._infer_index = infer_index
+        self._camera_steps_remaining = size
         self._chunk_action_index = 0
         self._last_target_sent = None
+
+    def defer_camera_refresh(self) -> None:
+        """Let RTC requests own image refreshes instead of individual actions."""
+        self._camera_refresh_on_request = True
+
+    def refresh_camera_observation(self) -> dict[str, Any]:
+        """Refresh policy images without sending an action or changing proprioception."""
+        if self.config.is_dummy:
+            obs = self._get_observation()
+            return {key: obs[key] for key in ("frames", "depths") if key in obs}
+        reading = {
+            name: camera.get_observation() for name, camera in self._cameras.items()
+        }
+        self._last_frames, self._last_depths = self._frames_from(reading)
+        return copy.deepcopy({"frames": self._last_frames, "depths": self._last_depths})
 
     @staticmethod
     def episode_wrappers(cfg: Mapping[str, Any]) -> tuple:
@@ -328,24 +345,7 @@ class UR5eEnv(CartesianEnv):
         action = np.asarray(action, dtype=np.float64)
         if action.shape != (7,) or not np.isfinite(action).all():
             raise ValueError("Expected seven finite UR action values.")
-        self._target_pace_wait = 0.0
         self._target_interval = None
-        # Wait before sampling state, leaving the previous preparation time available.
-        # The send gate below handles preparation jitter without publishing early.
-        if self._last_target_sent is not None:
-            wait_started = time.monotonic()
-            ready = self._last_target_sent + 1.0 / self.config.step_frequency
-            time.sleep(
-                max(
-                    0.0,
-                    ready
-                    - getattr(self, "_target_preparation_sec", 0.0)
-                    - wait_started,
-                )
-            )
-        self._target_preparation_started = time.monotonic()
-        if record_trace and self._last_target_sent is not None:
-            self._target_pace_wait += self._target_preparation_started - wait_started
         if not self.config.is_dummy:
             gripper_position = self._robot_state.gripper_position
             self._robot_state = self._arm.get_state()
@@ -372,36 +372,38 @@ class UR5eEnv(CartesianEnv):
             self._move_action(self.next_position)
             self._end_effector_action(action[6:])
         if self.config.is_dummy:
-            self._pace_target_submission()
-        pace_wait = self._target_pace_wait
+            self._record_target_submission()
         target_interval = self._target_interval
         self._num_steps += 1
-        # Keep the final target active for one period before reading the chunk result.
-        if self._chunk_steps_remaining <= 1:
-            wait_started = time.monotonic()
-            time.sleep(
-                max(
-                    0.0,
-                    (self._last_target_sent or started)
-                    + 1.0 / self.config.step_frequency
-                    - wait_started,
-                )
-            )
-            if record_trace:
-                pace_wait += time.monotonic() - wait_started
-        paced = time.monotonic() if record_trace else 0.0
-        self._chunk_steps_remaining = max(0, self._chunk_steps_remaining - 1)
-        fresh_observation = (
-            not self.config.is_dummy and self._chunk_steps_remaining == 0
+        # Match CartesianEnv: action processing shares the period; observation follows.
+        wait_started = time.monotonic()
+        time.sleep(
+            max(0.0, 1.0 / self.config.step_frequency - (wait_started - started))
         )
+        paced = time.monotonic() if record_trace else 0.0
+        pace_wait = paced - wait_started if record_trace else 0.0
+        refresh_cameras = (
+            not self._camera_refresh_on_request and self._camera_steps_remaining <= 1
+        )
+        self._camera_steps_remaining = max(0, self._camera_steps_remaining - 1)
+        fresh_observation = not self.config.is_dummy
         if fresh_observation:
-            self._robot_state = self._read_robot()
+            self._robot_state = self._read_robot(refresh_cameras=refresh_cameras)
         observation = self._get_observation()
         reward = self._calc_step_reward(observation, True)
         terminated = (
             reward == 1.0
             and self._success_hold_counter >= self.config.success_hold_steps
         )
+        truncated = self._num_steps >= self.config.max_num_steps
+        if (
+            (terminated or truncated)
+            and not self.config.manual_episode_control_only
+            and not refresh_cameras
+        ):
+            self.refresh_camera_observation()
+            observation = self._get_observation()
+            refresh_cameras = True
         if record_trace:
             trace.update(
                 infer_index=self._infer_index,
@@ -420,6 +422,7 @@ class UR5eEnv(CartesianEnv):
                 target_interval_sec=target_interval,
                 observation_sec=time.monotonic() - paced,
                 fresh_observation=fresh_observation,
+                camera_refreshed=refresh_cameras and fresh_observation,
             )
             measurement = current_worker_timing()
             if measurement is not None:
@@ -434,20 +437,15 @@ class UR5eEnv(CartesianEnv):
             observation,
             reward * self.config.reward_scale,
             terminated,
-            self._num_steps >= self.config.max_num_steps,
+            truncated,
             {"ur_action_trace": trace} if record_trace else {},
         )
 
-    def _pace_target_submission(self) -> None:
-        """Schedule local target sends; missed deadlines never cause catch-up bursts."""
-        started = time.monotonic()
+    def _record_target_submission(self) -> None:
+        """Record target publication intervals without pacing the controller."""
         previous = self._last_target_sent
-        self._target_preparation_sec = started - self._target_preparation_started
-        if previous is not None:
-            time.sleep(max(0.0, previous + 1.0 / self.config.step_frequency - started))
         sent = time.monotonic()
         if self._action_trace_enabled:
-            self._target_pace_wait += sent - started
             self._target_interval = None if previous is None else sent - previous
         self._last_target_sent = sent
 
@@ -460,7 +458,7 @@ class UR5eEnv(CartesianEnv):
         self._arm.send_action_from_state(
             {"tcp_pose": position.astype(np.float32)},
             self._robot_state,
-            before_send=self._pace_target_submission,
+            before_send=self._record_target_submission,
         )
 
     def _interpolate_move(self, pose: np.ndarray, timeout: float = 1.5) -> None:
@@ -503,7 +501,7 @@ class UR5eEnv(CartesianEnv):
         gym.Env.reset(self, seed=seed)
         self._composer.clear()
         self._gripper_target = None
-        self._chunk_steps_remaining = 0
+        self._camera_steps_remaining = 0
         self._last_action_started = None
         self._last_target_sent = None
         seed_sampled_spaces(seed, self._base_observation_space)
@@ -558,9 +556,17 @@ class UR5eEnv(CartesianEnv):
             else EndEffector.backend(self.hardware.end_effector_type)
         )
 
-    def _read_robot(self) -> UR5eRobotState:
-        """Expose measured gripper position in the dataset's raw/1000 units."""
-        state = super()._read_robot()
+    def _read_robot(self, refresh_cameras: bool = True) -> UR5eRobotState:
+        """Read current robot state, optionally refreshing the policy images."""
+        if refresh_cameras:
+            state = super()._read_robot()
+        else:
+            state = self._state_from(
+                {
+                    "arm": self._arm.get_observation(),
+                    "end_effector": self._end_effector.get_observation(),
+                }
+            )
         state.gripper_position /= self._end_effector.max_width
         return state
 
@@ -682,6 +688,22 @@ class URTrainingEpisodeWrapper(gym.Wrapper):
                 self.unwrapped.start_motion()
                 self._active = True
             obs, reward, terminated, truncated, info = self.env.step(action)
+            if (
+                self.max_episode_steps is not None
+                and self._steps + 1 >= self.max_episode_steps
+                and not (terminated or truncated)
+                and self.unwrapped._camera_steps_remaining > 0
+            ):
+                refresh_started = time.monotonic()
+                obs = self.unwrapped.observe()
+                trace = info.get("ur_action_trace")
+                if trace is not None:
+                    trace["observation_sec"] += time.monotonic() - refresh_started
+                    trace["camera_refreshed"] = not self.unwrapped.config.is_dummy
+                    trace["tcp_after"] = self.unwrapped._robot_state.tcp_pose.tolist()
+                    trace["velocity_after"] = (
+                        self.unwrapped._robot_state.tcp_vel.tolist()
+                    )
             if self._timing_enabled:
                 trace = info.get("ur_action_trace", {})
                 if trace:

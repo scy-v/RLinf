@@ -4746,13 +4746,12 @@ def test_ur5e_local_delta_binary_gripper_and_moveL_reset(continuous_tracking):
                     max(0, (trace["target_interval_sec"] or 0) - 1 / trace["target_hz"])
                 )
                 np.testing.assert_array_equal(trace["action"], action)
-                assert trace["fresh_observation"] == (index == 2)
-                assert ("tcp_after" in trace) == (index == 2)
-                if index > 0:
-                    assert trace["target_interval_sec"] >= 1 / env.config.step_frequency
-                assert len(reads) == (2 if index == 2 else 0)
+                assert trace["fresh_observation"] is True
+                assert "tcp_after" in trace
+                assert trace["control_sec"] >= 1 / env.config.step_frequency
+                assert len(reads) == 2 * (index + 1)
                 if not continuous_tracking:
-                    assert len(pose_reads) == index + 1 + (index == 2)
+                    assert len(pose_reads) == 2 * (index + 1)
             env.reset(seed=123)
             state = sdks["rtde_control"].states["192.0.2.6"]
             offset = np.random.default_rng(123).uniform(-0.03, 0.03, 3)
@@ -4903,8 +4902,8 @@ def test_ur5e_rlt_keyboard_uses_policy_units_and_shared_controls(
             wrapped.get_wrapper_attr("on_action_chunk_begin")()
             for index in range(3):
                 wrapped.step(np.r_[np.zeros(6), 1.0])
-                # Teleop reads gripper status; only the last step reads the whole robot.
-                assert len(serial_reads) == index + 1 + (2 if index == 2 else 0)
+                # Teleop reads gripper status; every step also refreshes the whole robot.
+                assert len(serial_reads) == 3 * (index + 1)
             env.begin_action_chunk(1)
             wrapped.get_wrapper_attr("on_action_chunk_begin")()
 
@@ -4976,8 +4975,11 @@ def test_ur5e_rlt_keyboard_uses_policy_units_and_shared_controls(
             wrapped.close()
 
 
-@pytest.mark.parametrize("rtc_enabled", [False, True])
-def test_ur5e_eval_config_compose(monkeypatch, rtc_enabled):
+@pytest.mark.parametrize(
+    "async_enabled,rtc_enabled",
+    [(False, False), (True, False), (True, True), (False, True)],
+)
+def test_ur5e_eval_config_compose(monkeypatch, async_enabled, rtc_enabled):
     from hydra import compose, initialize_config_dir
 
     root = Path(__file__).resolve().parents[2]
@@ -4987,9 +4989,20 @@ def test_ur5e_eval_config_compose(monkeypatch, rtc_enabled):
     ):
         cfg = compose(
             config_name="realworld_ur5e_eval_pi05_sft",
-            overrides=[f"runner.rtc.enabled={str(rtc_enabled).lower()}"],
+            overrides=[
+                f"runner.async_inference.enabled={str(async_enabled).lower()}",
+                f"rollout.model.openpi.rtc_enabled={str(rtc_enabled).lower()}",
+            ],
         )
+    from evaluations.realworld.eval_ur5e import prepare_inference_config
+
+    if rtc_enabled and not async_enabled:
+        with pytest.raises(ValueError, match="RTC guidance requires"):
+            prepare_inference_config(cfg)
+        return
+    assert prepare_inference_config(cfg) == cfg
     assert cfg.env.eval.init_params.id == "UR5eEnv-v1"
+    assert cfg.env.eval.override_cfg.step_frequency == 25.0
     impedance = cfg.cluster.node_groups[0].hardware.configs[0].impedance
     assert "rtde_frequency" not in impedance
     assert impedance.frequency == 100.0
@@ -5079,6 +5092,19 @@ def test_ur5e_rlt_lengths_follow_prediction_and_policy_settings(
     }
     actions, _ = model.predict_action_batch(obs, mode="eval")
     assert actions.shape == (1, chunk_size, 7)
+
+
+def test_ur5e_online_rl_step_frequency(monkeypatch):
+    from hydra import compose, initialize_config_dir
+
+    root = Path(__file__).resolve().parents[2]
+    monkeypatch.setenv("EMBODIED_PATH", str(root / "examples/embodiment"))
+    with initialize_config_dir(
+        config_dir=str(root / "examples/embodiment/config"), version_base="1.3"
+    ):
+        cfg = compose(config_name="ur_rlt_stage2_ac_mlp")
+    assert cfg.env.train.override_cfg.step_frequency == 25.0
+    assert cfg.env.eval.override_cfg.step_frequency == 25.0
 
 
 def test_ur5e_rlt_config_shares_franka_training_contract(monkeypatch):
@@ -6296,6 +6322,63 @@ def test_ur5e_sync_worker_stops_after_episode_budget(
     assert env._closed
 
 
+@pytest.mark.parametrize("save_logs", [False, True])
+@pytest.mark.parametrize("action_timing_enabled", [False, True])
+def test_ur5e_rtc_detail_logging(tmp_path, save_logs, action_timing_enabled):
+    import json
+
+    from rlinf.workers.env.ur5e_eval_worker import URRTCEnvWorker, record_timing
+
+    worker = object.__new__(URRTCEnvWorker)
+    worker.cfg = OmegaConf.create(
+        {
+            "env": {
+                "eval": {
+                    "ur_evaluation": {
+                        "save_logs": save_logs,
+                        "action_timing_enabled": action_timing_enabled,
+                    }
+                }
+            },
+            "runner": {"logger": {"log_path": str(tmp_path / "run")}},
+        }
+    )
+    messages = []
+    worker.log_info = messages.append
+    worker._record_rtc_event(
+        "adopt",
+        chunk_id=3,
+        observed_delay_steps=2,
+        start_action_index=2,
+    )
+    worker._record_rtc_event(
+        "action",
+        chunk_id=3,
+        requested_action_index=10,
+        action_index=9,
+        chunk_exhausted=True,
+    )
+    path = tmp_path / "run" / "logs" / "latest.jsonl"
+    if save_logs and action_timing_enabled:
+        rows = [json.loads(line) for line in path.read_text().splitlines()]
+        assert [row["event"] for row in rows] == ["rtc_adopt", "rtc_action"]
+        assert rows[0]["observed_delay_steps"] == rows[0]["start_action_index"] == 2
+        assert rows[1]["chunk_exhausted"] is True
+        assert rows[1]["requested_action_index"] == 10
+        assert rows[1]["action_index"] == 9
+        assert rows[1]["monotonic_sec"] >= rows[0]["monotonic_sec"]
+    else:
+        assert not (tmp_path / "run").exists()
+    record_timing(worker, "env", "rtc_step", action_steps=14, action_hz=13.2)
+    if save_logs:
+        last = json.loads(path.read_text().splitlines()[-1])
+        assert last["event"] == "rtc_step"
+        assert last["action_steps"] == 14
+    else:
+        assert not (tmp_path / "run").exists()
+    assert messages == []
+
+
 def test_ur5e_rtc_worker_ends_only_after_final_episode(keyboard_reset_env):
     from rlinf.workers.env.ur5e_eval_worker import URRTCEnvWorker
 
@@ -6309,6 +6392,129 @@ def test_ur5e_rtc_worker_ends_only_after_final_episode(keyboard_reset_env):
         output, _ = worker._evaluate_rtc_action(np.zeros((1, 7), dtype=np.float32), 0)
         assert output.dones.all()
         assert env.manual_episode_control_only is (not complete)
+
+
+@pytest.mark.parametrize("rtc", [False, True])
+def test_ur5e_camera_refresh_at_inference_boundaries(
+    keyboard_reset_env, monkeypatch, rtc
+):
+    import warnings
+    from dataclasses import replace
+
+    from robot_mocks import mocked_sdks
+    from robot_mocks.cameras import SERIALS
+
+    from rlinf.data.schema.embodied_types import RTCRequest
+    from rlinf.envs.real.utils.video import VideoPlayer
+    from rlinf.robotics import UR5eRobot
+    from rlinf.robotics.parts.arms.ur5e import UR5eArm
+    from rlinf.robotics.parts.cameras import Camera
+    from rlinf.robotics.parts.end_effectors.grippers.pgi import PGIGripper
+    from rlinf.workers.env.ur5e_eval_worker import URRTCEnvWorker
+
+    env, _ = keyboard_reset_env(rlt_mode=True)
+    raw = env.env.envs[0].unwrapped
+    with mocked_sdks() as sdks:
+        source = SimpleNamespace(value=11)
+        pipeline = sdks["pyrealsense2"].pipeline
+        original_wait = pipeline.wait_for_frames
+
+        def wait_for_frames(device):
+            frame = original_wait(device)
+            value = source.value
+            frame.get_color_frame = lambda: SimpleNamespace(
+                is_video_frame=lambda: True,
+                get_data=lambda: np.full((64, 64, 3), value, dtype=np.uint8),
+            )
+            return frame
+
+        monkeypatch.setattr(pipeline, "wait_for_frames", wait_for_frames)
+        cameras = {
+            info.name: Camera.of(replace(info, serial_number=serial))
+            for info, serial in zip(raw._camera_infos, SERIALS)
+        }
+        arm = UR5eArm("192.0.2.6", impedance={"continuous_tracking": False})
+        gripper = PGIGripper("/tmp/ur5e-camera-gripper")
+        robot = UR5eRobot(arm=arm, end_effector=gripper, **cameras)
+        robot.connect()
+        raw.config.is_dummy = False
+        raw.camera_player = VideoPlayer(False)
+        raw.robot, raw._arm, raw._end_effector, raw._cameras = (
+            robot,
+            arm,
+            gripper,
+            cameras,
+        )
+        try:
+            raw._robot_state = raw._read_robot()
+            raw._gripper_target = 1.0
+            action = np.array([[0, 0, 0, 0, 0, 0, 1]], dtype=np.float32)
+            obs, *_ = env.step(action)
+            assert torch.all(obs["main_images"] == 11)
+            source.value = 22
+            sdks["rtde_control"].states["192.0.2.6"]["speed"] = [0.123, 0, 0, 0, 0, 0]
+            time.sleep(0.15)
+            if rtc:
+                raw.defer_camera_refresh()
+                cached, *_ = env.step(action)
+                assert torch.all(cached["main_images"] == 11)
+                assert cached["states"][0, 6].item() == pytest.approx(0.123)
+                worker = object.__new__(URRTCEnvWorker)
+                worker.cfg = OmegaConf.create(
+                    {
+                        "env": {
+                            "eval": {
+                                "total_num_envs": 1,
+                                "ur_evaluation": {"save_logs": False},
+                            }
+                        },
+                        "rollout": {"group_name": "rollout"},
+                    }
+                )
+                worker.eval_env_list = [gym.Wrapper(env)]
+                sent = []
+                worker.send_to = lambda **kwargs: sent.append(kwargs["data"])
+                worker.send_rtc_request(
+                    None, RTCRequest(obs=cached, request_type="bootstrap")
+                )
+                assert torch.all(sent[-1].obs["main_images"] == 11)
+                with warnings.catch_warnings():
+                    warnings.filterwarnings(
+                        "error", message=".*refresh_camera_observation.*deprecated.*"
+                    )
+                    worker.send_rtc_request(
+                        None, RTCRequest(obs=cached, request_type="replan")
+                    )
+                assert torch.all(sent[-1].obs["main_images"] == 22)
+                torch.testing.assert_close(sent[-1].obs["states"], cached["states"])
+                assert sent[-1].obs["task_descriptions"] == cached["task_descriptions"]
+                assert torch.all(cached["main_images"] == 11)
+                assert torch.all(sent[-1].obs["wrist_images"] == 22)
+                assert torch.all(sent[-1].obs["extra_view_images"] == 22)
+            else:
+                observations, *_ = env.chunk_step(np.tile(action[:, None], (1, 3, 1)))
+                assert observations[0]["states"][0, 6].item() == pytest.approx(0.123)
+                assert [int(x["main_images"][0, 0, 0, 0]) for x in observations] == [
+                    11,
+                    11,
+                    22,
+                ]
+                # A subsequent chunk must keep the preceding transition's images intact.
+                source.value = 33
+                time.sleep(0.15)
+                next_obs, *_ = env.chunk_step(np.tile(action[:, None], (1, 2, 1)))
+                assert torch.all(next_obs[-1]["main_images"] == 33)
+                assert torch.all(observations[-1]["main_images"] == 22)
+                source.value = 44
+                time.sleep(0.15)
+                raw.config.manual_episode_control_only = False
+                raw.config.max_num_steps = raw.num_steps + 1
+                raw.begin_action_chunk(3)
+                terminal, _, _, truncated, _ = raw.step(action[0])
+                assert truncated
+                assert np.all(terminal["frames"][env.main_image_key] == 44)
+        finally:
+            env.close()
 
 
 def test_ur5e_camera_input_keeps_full_view_and_matches_openpi_letterbox():
@@ -7551,10 +7757,11 @@ def test_ur5e_profiles_use_direct_rotational_gains(profile, frequency):
             arm.disconnect()
 
 
-@pytest.mark.parametrize("frequency", [20.0, 50.0])
+@pytest.mark.parametrize("frequency", [25.0, 50.0])
 @pytest.mark.parametrize("detailed", [False, True])
-def test_ur5e_chunk_target_cadence_includes_outer_processing(
-    keyboard_reset_env, monkeypatch, frequency, detailed
+@pytest.mark.parametrize("chunk_size", [None, 1, 4])
+def test_ur5e_step_period_starts_at_entry(
+    keyboard_reset_env, monkeypatch, frequency, detailed, chunk_size
 ):
     from rlinf.envs.real.ur5e import base
 
@@ -7577,11 +7784,14 @@ def test_ur5e_chunk_target_cadence_includes_outer_processing(
         SimpleNamespace(monotonic=monotonic, sleep=sleep, time=time.time),
     )
     period = 1.0 / frequency
-    raw.begin_action_chunk(4)
+    if chunk_size is not None:
+        raw.begin_action_chunk(chunk_size)
     sends = []
     for delay in [0.0, period * 0.3, period * 1.6, period * 0.2]:
         sleep(delay)
+        started = clock.value
         _, _, _, _, info = raw.step(np.zeros(7))
+        assert clock.value - started == pytest.approx(period, abs=1e-6)
         sends.append(raw._last_target_sent)
         if detailed:
             interval = info["ur_action_trace"]["target_interval_sec"]
@@ -7590,15 +7800,98 @@ def test_ur5e_chunk_target_cadence_includes_outer_processing(
             )
         else:
             assert raw._target_interval is None
-            assert raw._target_pace_wait == 0
     np.testing.assert_allclose(
-        np.diff(sends), [period, period * 1.6, period], atol=1e-6
+        np.diff(sends), [period * 1.3, period * 2.6, period * 1.2], atol=1e-6
     )
-    # The final action retains one period before its observation is returned.
-    assert clock.value == pytest.approx(sends[-1] + period)
     raw.begin_action_chunk(1)
     raw.step(np.zeros(7))
     assert raw._last_target_sent == pytest.approx(sends[-1] + period)
+
+
+@pytest.mark.parametrize("state_read_sec", [0.013, 0.060])
+def test_ur5e_step_includes_command_latency_but_excludes_observation(
+    monkeypatch, state_read_sec
+):
+    from robot_mocks import mocked_sdks
+
+    from rlinf.envs.real.ur5e import UR5eEnv, base
+    from rlinf.envs.real.utils.video import VideoPlayer
+    from rlinf.robotics import RobotInfo, UR5eConfig, UR5eRobot
+    from rlinf.robotics.parts.arms.ur5e import UR5eArm
+    from rlinf.robotics.parts.end_effectors.grippers.pgi import PGIGripper
+
+    clock = SimpleNamespace(value=1.0)
+
+    def sleep(duration):
+        clock.value += duration
+
+    with mocked_sdks() as sdks:
+        arm = UR5eArm("192.0.2.6", impedance={"continuous_tracking": False})
+        gripper = PGIGripper("/tmp/ur5e-step-gripper")
+        robot = UR5eRobot(arm=arm, end_effector=gripper)
+        robot.connect()
+        env = UR5eEnv(
+            {
+                "is_dummy": True,
+                "enable_camera_player": False,
+                "ee_pose_limit_min": [-1] * 6,
+                "ee_pose_limit_max": [1] * 6,
+            },
+            robot_info=RobotInfo(
+                type="UR5e",
+                model="UR5e",
+                config=UR5eConfig(node_rank=0, camera_serials=["dummy"]),
+            ),
+        )
+        env.config.is_dummy = False
+        env.robot, env._arm, env._end_effector = robot, arm, gripper
+        env._cameras = {}
+        env.camera_player = VideoPlayer(False)
+        env._robot_state = arm.get_state()
+        env._gripper_target = 1.0
+        receive = arm._device[1]
+        original_pose = receive.getActualTCPPose
+        device = sdks["pyDHgripper"].PGE.instances[-1]
+        original_position = device.read_pos
+
+        def read_pose():
+            sleep(state_read_sec)
+            return original_pose()
+
+        def read_position():
+            sleep(0.004)
+            return original_position()
+
+        monkeypatch.setattr(receive, "getActualTCPPose", read_pose)
+        monkeypatch.setattr(device, "read_pos", read_position)
+        monkeypatch.setattr(
+            base,
+            "time",
+            SimpleNamespace(
+                monotonic=lambda: clock.value,
+                sleep=sleep,
+                time=time.time,
+            ),
+        )
+        try:
+            env.begin_action_chunk(2)
+            # Cover both chunk positions and a subsequent RTC-style single step.
+            for _ in range(3):
+                started = clock.value
+                _, _, _, _, info = env.step(np.array([0, 0, 0, 0, 0, 0, 1]))
+                trace = info["ur_action_trace"]
+                assert trace["command_sec"] == pytest.approx(state_read_sec)
+                assert trace["control_sec"] == pytest.approx(max(0.04, state_read_sec))
+                assert trace["pace_wait_sec"] == pytest.approx(
+                    max(0, 0.04 - state_read_sec)
+                )
+                assert trace["observation_sec"] == pytest.approx(state_read_sec + 0.008)
+                assert clock.value - started == pytest.approx(
+                    max(0.04, state_read_sec) + state_read_sec + 0.008
+                )
+                assert trace["fresh_observation"] is True
+        finally:
+            env.close()
 
 
 @pytest.mark.parametrize("frequency", [20.0, 50.0])
@@ -7715,10 +8008,14 @@ def test_ur_stage2_profiles_preserve_stage1_and_select_training_pair(
     standalone = yaml.safe_load(
         (_ROOT / "evaluations/realworld/vla_precision_ur.yaml").read_text()
     )
+    assert native.runner.async_inference.enabled
+    assert native.rollout.model.openpi.rtc_enabled
     native.inference_stage = standalone["inference_stage"] = "stage1"
     assert prepare_inference_config(native) == native
     assert model_config_from_yaml(standalone).num_steps == 4
     native.inference_stage = standalone["inference_stage"] = "stage2"
+    native.runner.async_inference.enabled = False
+    native.rollout.model.openpi.rtc_enabled = False
     native.stage2 = OmegaConf.create(stage2_eval_options)
     standalone["stage2"] = stage2_eval_options
     before_native, before_standalone = copy.deepcopy(native), copy.deepcopy(standalone)
@@ -7732,7 +8029,7 @@ def test_ur_stage2_profiles_preserve_stage1_and_select_training_pair(
     assert selected.env.eval.ur_evaluation.stage2_enabled
     assert selected.env.eval.override_cfg.gripper_close_threshold == 0.5
     assert other.openpi_data.norm_stats_path.endswith("norm_stats.json")
-    native.runner.rtc.enabled = True
+    native.runner.async_inference.enabled = True
     with pytest.raises(ValueError, match="synchronous"):
         prepare_inference_config(native)
 

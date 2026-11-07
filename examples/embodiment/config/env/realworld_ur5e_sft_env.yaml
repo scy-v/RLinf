@@ -64,7 +64,7 @@ override_cfg:
   # Keep the continuous Euler interval across -pi; do not wrap these bounds.
   ee_pose_limit_min: [0.0, -0.45, 0.0, -3.663598775598, -0.523598775598, -3.140796326795]
   ee_pose_limit_max: [0.9, 0.45, 0.6, -2.616401224402, 0.523598775598, 0.000796326795]
-  step_frequency: 20.0
+  step_frequency: 25.0
   enable_random_reset: False
   # XYZ offsets in metres; Euler XYZ offsets in degrees, matching VLA-Precision.
   reset_pose_range: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

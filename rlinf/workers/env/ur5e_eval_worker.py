@@ -24,6 +24,7 @@ import numpy as np
 import torch
 
 from rlinf.data.schema.embodied_types import EnvOutput, RTCRequest
+from rlinf.envs.utils import get_env_attr
 from rlinf.scheduler import Channel
 from rlinf.utils.progress import ElapsedTime
 from rlinf.utils.startup_timing import (
@@ -57,6 +58,28 @@ def run_log_paths(worker: Any) -> tuple[Path, Path] | None:
         directory = Path(settings.get("log_dir") or Path(log_path) / "logs")
         worker._ur_run_log_paths = prepare_run_logs(directory, Path(log_path).name)
     return worker._ur_run_log_paths
+
+
+def record_rtc_detail(worker: Any, component: str, event: str, **values: Any) -> None:
+    """Write RTC details only when action timing and file logging are enabled.
+
+    Action indices and rollout steps are zero-based; delays are action steps.
+    """
+    settings = worker.cfg.get("env", {}).get("eval", {}).get("ur_evaluation", {})
+    if not settings.get("action_timing_enabled", False):
+        return
+    paths = run_log_paths(worker)
+    if paths is not None:
+        append_record(
+            paths[1],
+            {
+                "component": component,
+                "event": f"rtc_{event}",
+                "timestamp": time.time(),
+                "monotonic_sec": time.perf_counter(),
+                **values,
+            },
+        )
 
 
 def record_prediction(
@@ -105,7 +128,7 @@ def record_timing(worker: Any, component: str, event: str, **values: Any) -> Non
                 **values,
             },
         )
-    if event != "step":
+    if event not in {"step", "rtc_step"}:
         worker.log_info(f"[TIMING] {component} {event}: {values}")
 
 
@@ -143,6 +166,8 @@ class URRolloutTiming:
                     self.hf_model.sample_actions = torch.compile(
                         self.hf_model.sample_actions, mode=mode
                     )
+                    if self.cfg.rollout.model.openpi.rtc_enabled:
+                        self.hf_model.enable_rtc_torch_compile(mode=mode)
         record_timing(self, "rollout", "load", duration_sec=timer.duration)
 
     @torch.inference_mode()
@@ -424,10 +449,29 @@ class URSyncRolloutWorker(URRolloutTiming, MultiStepRolloutWorker):
 class URRTCEnvWorker(RTCEnvWorker):
     """Retain RTC replanning and stop after the final UR outcome."""
 
+    def _record_rtc_event(self, event: str, **values: Any) -> None:
+        record_rtc_detail(self, "env", event, **values)
+
     def init_worker(self) -> None:
         super().init_worker()
         for env in self.eval_env_list:
             env.manual_episode_control_only = env.unwrapped.manual_episode_control_only
+            env.unwrapped.env.envs[0].get_wrapper_attr("defer_camera_refresh")()
+
+    def send_rtc_request(
+        self, rollout_channel: Channel, rtc_request: RTCRequest, mode: str = "eval"
+    ) -> None:
+        """Acquire new images only when dispatching a replan; reset supplies bootstrap."""
+        if rtc_request.request_type == "replan":
+            started = time.perf_counter()
+            refresh = get_env_attr(self.eval_env_list[0], "refresh_camera_observation")
+            rtc_request.obs = refresh(rtc_request.obs)
+            self._record_rtc_event(
+                "observation",
+                chunk_id=rtc_request.chunk_id,
+                observation_sec=time.perf_counter() - started,
+            )
+        super().send_rtc_request(rollout_channel, rtc_request, mode)
 
     def _evaluate_rtc_action(self, env_action: Any, stage_id: int) -> tuple:
         started = time.perf_counter()
@@ -476,12 +520,20 @@ class URRTCEnvWorker(RTCEnvWorker):
 
 
 class URRTCRolloutWorker(URRolloutTiming, RTCMultiStepRolloutWorker):
-    """Keep RTC guidance while warming up before operator-controlled episodes."""
+    """Warm up async inference before operator-controlled episodes."""
+
+    show_eval_progress = False
 
     @torch.inference_mode()
     def _predict_rtc(self, request: RTCRequest) -> Any:
         started = time.perf_counter()
         if request.request_type == "warmup":
+            sampling_mode = (
+                "RTC guidance"
+                if self.cfg.rollout.model.openpi.rtc_enabled
+                else "ordinary sampling"
+            )
+            self.log_info(f"Async inference enabled; {sampling_mode}.")
             with (
                 ElapsedTime(
                     "WARMUP",
@@ -495,16 +547,43 @@ class URRTCRolloutWorker(URRolloutTiming, RTCMultiStepRolloutWorker):
                         self, "rollout", event, **fields
                     ),
                     synchronize=synchronize_startup_device,
-                    profile="rlinf_ur_rtc",
+                    profile="rlinf_ur_async",
                 ),
             ):
-                response = super()._predict_rtc(request)
+                try:
+                    response = super()._predict_rtc(request)
+                    if self.cfg.rollout.model.openpi.rtc_enabled:
+                        rtc_cfg = self.cfg.runner.get(
+                            "async_inference", self.cfg.runner.get("rtc", {})
+                        )
+                        # Replanning uses a different sampler from bootstrap inference.
+                        super()._predict_rtc(
+                            RTCRequest(
+                                obs=request.obs,
+                                request_type="replan",
+                                executed_horizon=int(rtc_cfg.min_exec_horizon),
+                                predicted_delay_steps=int(rtc_cfg.initial_delay_steps),
+                            )
+                        )
+                finally:
+                    self._rtc_eval_model_actions = None
             record_timing(
                 self, "rollout", "warmup", duration_sec=time.perf_counter() - started
             )
             return response
         response = super()._predict_rtc(request)
         elapsed = time.perf_counter() - started
+        record_rtc_detail(
+            self,
+            "rollout",
+            "prediction",
+            request_type=request.request_type,
+            sampling_mode="rtc" if response.guidance_applied else "ordinary",
+            chunk_id=request.chunk_id,
+            executed_horizon=request.executed_horizon,
+            predicted_delay_steps=request.predicted_delay_steps,
+            infer_sec=elapsed,
+        )
         infer_index = getattr(self, "_ur_infer_index", 0) + 1
         self._ur_infer_index = infer_index
         record_prediction(

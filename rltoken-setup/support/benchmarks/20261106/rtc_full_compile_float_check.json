@@ -1,0 +1,140 @@
+{
+  "metadata": {
+    "reference_commit": "5ba46cc0f133933fd21459eaa7773915a55c38ef",
+    "seed": 20261106,
+    "num_steps": 10,
+    "warmup": 5,
+    "timed_calls": 30,
+    "hardware": "NVIDIA GeForce RTX 4090 D",
+    "torch": "2.11.0+cu130",
+    "model_config": {
+      "model_type": "openpi",
+      "precision": "bf16",
+      "pi05": true,
+      "is_lora": false,
+      "lora_rank": 32,
+      "num_action_chunks": 10,
+      "action_dim": 7,
+      "use_proprio": true,
+      "num_steps": 10,
+      "add_value_head": false,
+      "openpi": {
+        "task": "eval",
+        "config_name": "pi05_ur_state",
+        "num_images_in_input": 2,
+        "noise_level": 0.5,
+        "action_chunk": 10,
+        "num_steps": 10,
+        "train_expert_only": false,
+        "action_env_dim": 7,
+        "noise_method": "flow_sde",
+        "add_value_head": false,
+        "value_after_vlm": false,
+        "value_vlm_mode": "mean_token",
+        "detach_critic_input": false,
+        "model_action_dim": 32,
+        "paligemma_variant": "gemma_2b",
+        "action_expert_variant": "gemma_300m",
+        "max_token_len": 200,
+        "torch_compile": true,
+        "rtc_enabled": true,
+        "rtc_guidance_mode": "approx",
+        "rtc_guidance_clip": 5.0,
+        "embed_dtype": "bf16",
+        "action_horizon": 20,
+        "use_rlt": true,
+        "rlt_prefix_seq_len": 1024,
+        "rlt_image_only": false,
+        "rlt_use_mask": true
+      },
+      "model_path": "/home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_5000/actor",
+      "openpi_data": {
+        "repo_id": "scylearning/insert_black_rack_into_blue_slot_20260916_v01",
+        "norm_stats_path": "/home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/norm_stats.json",
+        "obs_indices": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19
+        ]
+      }
+    },
+    "scope": "model only; synthetic zero images; GPU synchronized; no robot or Ray; fixed-noise parity; fixed previous plan"
+  },
+  "cases": [
+    {
+      "executed": 2,
+      "delay": 1,
+      "call_sec": 312.42855080999993,
+      "model_max_abs": 0.00884672999382019,
+      "action_max_abs": 0.0036054998636245728,
+      "unique_graphs": {
+        "calls_captured": 28237,
+        "unique_graphs": 8
+      }
+    },
+    {
+      "executed": 2,
+      "delay": 2,
+      "call_sec": 0.1144691239999247,
+      "model_max_abs": 0.022099435329437256,
+      "action_max_abs": 0.003041863441467285,
+      "unique_graphs": {
+        "calls_captured": 28237,
+        "unique_graphs": 8
+      }
+    },
+    {
+      "executed": 3,
+      "delay": 3,
+      "call_sec": 0.06372376200010876,
+      "model_max_abs": 0.019772112369537354,
+      "action_max_abs": 0.0031796693801879883,
+      "unique_graphs": {
+        "calls_captured": 28237,
+        "unique_graphs": 8
+      }
+    },
+    {
+      "executed": 4,
+      "delay": 4,
+      "call_sec": 0.06390142800000831,
+      "model_max_abs": 0.0115223228931427,
+      "action_max_abs": 0.004007220268249512,
+      "unique_graphs": {
+        "calls_captured": 28237,
+        "unique_graphs": 8
+      }
+    },
+    {
+      "executed": 20,
+      "delay": 2,
+      "call_sec": 0.06513787000017146,
+      "model_max_abs": 0.03175392746925354,
+      "action_max_abs": 0.0036733001470565796,
+      "unique_graphs": {
+        "calls_captured": 28237,
+        "unique_graphs": 8
+      }
+    }
+  ],
+  "benchmark": {},
+  "eager_legacy_exact_and_rng_parity": true,
+  "status": "uniform_float_check_failed_before_benchmark",
+  "failure": "gripper float differed by 0.0036733 at decoded action index (0,7,6); arm checks passed; benchmark not reached"
+}

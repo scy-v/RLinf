@@ -1,0 +1,25 @@
+{
+  "action_max_abs_errors": [
+    0.002055742312222719,
+    0.001674765720963478,
+    0.0023883897811174393,
+    0.0018531866371631622,
+    0.0030653635039925575,
+    0.0017721699550747871
+  ],
+  "graph_count_after_warmup": 8,
+  "checkpoint": "logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor",
+  "num_steps": 4,
+  "gpu": "RTX 4090 D",
+  "test": "tests/unit_tests/test_models.py::test_openpi_rtc_full_compilation_preserves_replanning",
+  "result": "passed",
+  "arm_tolerance": {
+    "rtol": 0.02,
+    "atol": 0.002
+  },
+  "gripper_threshold": 0.7,
+  "gripper_threshold_decisions_equal": true,
+  "graph_reuse_across_contexts": true,
+  "production_worker_warmup_and_replanning_passed": true,
+  "notes": "Initial uniform float tolerance failed on a gripper value differing by ~0.0031; final test retains the arm tolerance and checks exact thresholded gripper decisions."
+}

@@ -37,10 +37,17 @@ from rlinf.workers.env.ur5e_eval_worker import (
 
 def prepare_inference_config(cfg):
     """Select a Stage2 profile without changing the Stage1 configuration."""
+    async_enabled = cfg.runner.async_inference.enabled
+    if "rtc" in cfg.runner:
+        raise ValueError(
+            "Use runner.async_inference and rollout.model.openpi.rtc_enabled instead of runner.rtc."
+        )
+    if cfg.rollout.model.openpi.rtc_enabled and not async_enabled:
+        raise ValueError("RTC guidance requires runner.async_inference.enabled=true.")
     if is_stage2(cfg):
-        if cfg.runner.rtc.enabled or cfg.runner.get("ckpt_path"):
+        if async_enabled or cfg.runner.get("ckpt_path"):
             raise ValueError(
-                "Stage2 uses synchronous inference and stage2.checkpoint_path; disable RTC and runner.ckpt_path."
+                "Stage2 uses synchronous inference and stage2.checkpoint_path; disable async inference and runner.ckpt_path."
             )
         feature, head = stage2_configs(cfg.stage2)
         cfg = OmegaConf.merge(
@@ -66,7 +73,7 @@ def prepare_inference_config(cfg):
     version_base="1.1", config_path=".", config_name="realworld_ur5e_eval_pi05_sft"
 )
 def main(cfg) -> None:
-    """Launch a single UR environment and its sync or RTC model worker."""
+    """Launch a single UR environment and its sync or async model worker."""
     mp.set_start_method("spawn", force=True)
     cfg = prepare_inference_config(cfg)
     cfg = validate_cfg(cfg)
@@ -81,9 +88,9 @@ def main(cfg) -> None:
         )
     cluster = Cluster(cluster_cfg=cfg.cluster)
     placement = HybridComponentPlacement(cfg, cluster)
-    rtc = cfg.runner.rtc.enabled
-    env_cls = URRTCEnvWorker if rtc else URSyncEnvWorker
-    rollout_cls = URRTCRolloutWorker if rtc else URSyncRolloutWorker
+    async_enabled = cfg.runner.async_inference.enabled
+    env_cls = URRTCEnvWorker if async_enabled else URSyncEnvWorker
+    rollout_cls = URRTCRolloutWorker if async_enabled else URSyncRolloutWorker
     with termination_signals(), ExitStack() as cleanup:
         rollout = rollout_cls.create_group(cfg).launch(
             cluster,

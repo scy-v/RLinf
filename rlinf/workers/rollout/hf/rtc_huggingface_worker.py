@@ -40,10 +40,12 @@ class RTCMultiStepRolloutWorker(MultiStepRolloutWorker):
     carries data sent to the env worker (RTC action responses).
     """
 
+    show_eval_progress = True
+
     def __init__(self, cfg: DictConfig):
         super().__init__(cfg)
         self._rtc_eval_model_actions: torch.Tensor | None = None
-        rtc_cfg = self.cfg.runner.get("rtc", {})
+        rtc_cfg = self.cfg.runner.get("async_inference", self.cfg.runner.get("rtc", {}))
         self.inject_delay_ms = float(rtc_cfg.get("inject_delay_ms", 0.0))
         self.fixed_delay_steps = int(rtc_cfg.get("fixed_delay_steps", 0))
         self.eval_chunk_pause_seconds = float(rtc_cfg.get("chunk_pause_seconds", 0.0))
@@ -55,7 +57,10 @@ class RTCMultiStepRolloutWorker(MultiStepRolloutWorker):
 
         self._rtc_eval_model_actions = None
 
-        pbar = tqdm(desc="Evaluating RTC Rollout", disable=(self._rank != 0))
+        pbar = tqdm(
+            desc="Evaluating RTC Rollout",
+            disable=(self._rank != 0 or not self.show_eval_progress),
+        )
         try:
             while True:
                 rtc_request: RTCRequest = await self.recv_rtc_request(input_channel)
@@ -79,7 +84,8 @@ class RTCMultiStepRolloutWorker(MultiStepRolloutWorker):
         rtc_context = None
         guidance_applied = False
         if (
-            rtc_request.request_type == "replan"
+            self.cfg.rollout.model.openpi.get("rtc_enabled", False)
+            and rtc_request.request_type == "replan"
             and self._rtc_eval_model_actions is not None
         ):
             from rlinf.models.embodiment.openpi.sampling.rtc_guidance import (

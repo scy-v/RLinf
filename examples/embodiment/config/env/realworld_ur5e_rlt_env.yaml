@@ -80,7 +80,7 @@ override_cfg:
     - -2.616401224402
     - 0.523598775598
     - 0.000796326795
-  step_frequency: 20.0
+  step_frequency: 25.0
   enable_random_reset: false
   reset_pose_range:
     - 0.0

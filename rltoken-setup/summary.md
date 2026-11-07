@@ -21,33 +21,60 @@
 
 - **训练完成**：联合 SFT 共 30,000 步，累计耗时 **36:06:15**。
 
-# 2. Torch 编译推理延迟（2026-10-29 统一 10 步复测）
+# 2. Torch 编译推理延迟（2026-11-07，统一 10 步复测）
 
 ## 测试条件
 
-- **测试配置**：RTX 4090 D · π0.5 step 5,000 · batch=1 · 合成图像 · 10 步去噪 · 每组预热 5 次、计时 30 次；原路径保留源码局部算子编译，新增编译使用 `max-autotune`。
-- **计时口径**：统一使用 `torch.inference_mode()`，预热后 GPU 同步计时，取模型调用均值；在线 RLT 包含特征提取、MLP 和路由，不含 Env、Ray 通信及动作执行，未连接机械臂。
+- **共同条件**：RTX 4090 D · π0.5 step5000 · batch=1 · BF16 模型 · CPU 4 线程 · 两路 224×224 全零图像和全零 state · 10 步去噪。各组预热 5 次、GPU 同步计时 30 次，采用 `torch.inference_mode()`，计入模型输入／输出转换；不含 Env、Ray、相机、动作执行或训练更新，未连接机械臂。三类模型路径依次测试，不并行占用 GPU。
+- **PI05／RTC PI05**：预测 20 步、解码返回 10 步；不执行 RLT encoder／decoder，也不执行 MLP。RTC 使用 `approx`、`clip=5`、固定 bootstrap 前序动作、`executed_horizon=2`、`delay_steps=2`。
+- **RLT**：冻结 step5000 提取特征、生成 20 步参考动作并计算 `z_rl`，配套在线运行 `20261104-230711` 的 step15000 MLP 输出 10 步动作；包含 MLP 与路由，不运行 RLT decoder。沿用历史基准的 `mode="train"` rollout 采样口径，但不做梯度计算或训练更新；Stage2 评测的均值动作模式与此有区别。
 
 ## 核心结果
 
-| 路径 | 去噪步数 | 新增编译范围 | 平均耗时 | 测量次数 |
+以下 11 项全部为本次重测，不混用历史测量值。
+
+| 路径 | 去噪步数 | 编译范围 | 平均耗时 | 测量次数 |
 |---|---:|---|---:|---:|
-| 纯推理 | 10 | 无（原路径） | 155.58 ms | 30 |
-| 纯推理 | 10 | 整个 `sample_actions`，含前缀/KV cache 和去噪 | 60.53 ms | 30 |
-| 在线 RLT | 10 | 无（原路径） | 167.68 ms | 30 |
-| 在线 RLT | 10 | 仅参考动作去噪 | 80.98 ms | 30 |
-| 在线 RLT | 10 | 前缀 + 去噪 | 74.06 ms | 30 |
-| 在线 RLT | 10 | 前缀 + `z_rl` 编码 + 去噪 | 74.66 ms | 30 |
+| PI05推理 | 10 | 完全不使用 torch.compile | 158.09 ms | 30 |
+| PI05推理 | 10 | RLinf的局部算子编译 | 171.34 ms | 30 |
+| PI05推理 | 10 | 整段采样编译（前缀/KV cache＋全部去噪） | 62.55 ms | 30 |
+| RLT推理 | 10 | 完全不使用 torch.compile | 174.75 ms | 30 |
+| RLT推理 | 10 | RLinf的局部算子编译 | 182.45 ms | 30 |
+| RLT推理 | 10 | 参考动作去噪编译 | 96.95 ms | 30 |
+| RLT推理 | 10 | 前缀/KV cache＋参考动作去噪编译 | 80.04 ms | 30 |
+| RLT推理 | 10 | 前缀/KV cache＋z_rl 编码＋参考动作去噪编译 | 87.45 ms | 30 |
+| RTC PI05推理 | 10 | 完全不使用 torch.compile | 160.70 ms | 30 |
+| RTC PI05推理 | 10 | RLinf的局部算子编译 | 169.93 ms | 30 |
+| RTC PI05推理 | 10 | 整段采样编译（前缀/KV cache＋全部去噪） | 64.59 ms | 30 |
 
-- **此前 4 步数值对照**：原路径、仅去噪、三部分编译分别测试 8 组固定噪声观测，每组重复 3 次，同一路径输出一致；三部分编译的 `z_rl` 最大绝对差为 0.068～0.116，仅去噪时为 0，但参考动作仍有最大约 0.0035 的差异。
-- **稳定性复测**：同一测试末尾再次测量 30 次，在线 RLT 原路径 168.27 ms、仅去噪编译 81.41 ms。本次仅复测 10 步延迟，数值误差沿用上述已注明条件的历史结果。
+- **编译范围用语**：“RLinf的局部算子编译”统一替代旧表的“无／原路径”，指 RoPE、门控残差、GELU 等局部算子；整段采样和 RLT 分段编译行也保留这些局部算子设置。“完全不使用 torch.compile”关闭局部算子编译、不包装 sampler 或 MLP，三组推理的 Dynamo 新增图计数均为 0。
+- **整段采样设置**：PI05 与 RTC PI05 均使用 `mode="max-autotune"`，不传 `fullgraph`，即默认 `False`；与 [OpenPI 官方 PyTorch 入口](https://github.com/Physical-Intelligence/openpi/blob/main/src/openpi/models_pytorch/pi0_pytorch.py) 的参数方式一致。两行编译范围使用相同名称；RTC 的去噪内部额外包含引导计算，重叠目标／掩码及随机输入仍在图外准备。本次 PI05、RTC 的整段采样各新增一个计算图。
+- **MLP 编译说明纠正**：此前“RLT 的 MLP 已编译”的说法不准确。继承的 `enable_torch_compile()` 包装 `_sample_actions`，而 `RLTMLPPolicy.predict_action_batch()` 实际直接调用 `sac_forward`，不经过它。本次单独检查，启用该开关后 MLP 调用新增图仍为 0。因此上述 RLT 行的 MLP 实际均为 eager 执行，表格列出实际生效的特征模型编译范围；本轮没有修改这一执行逻辑。
+- **统计边界**：保留全部 30 次计时，没有删除慢样本。PI05 局部算子行有一次约 295.62 ms 的慢样本；本次局部算子编译的均值略高于完全不编译，不能预设所有编译范围都会提速。原始 JSON 保留逐次计时、P95 和最大值。
+- **历史结果追溯**：原 PI05 的 **155.58／60.53 ms** 确实不含 RLT 编解码或 MLP；历史 RTC **66.20 ms** 来自显式 `fullgraph=True`，不再作为当前配置结果。历史原始文件保留：[10/29 基准](support/benchmarks/20261029/rlt_compile_scope_10steps.json)、[首次 RTC 补测](support/benchmarks/20261106/rtc_compile_10steps.json)、[显式 fullgraph 基准](support/benchmarks/20261106/rtc_full_compile_validation.json)。不同轮次的差值不能单独归因于 `fullgraph` 参数。
+- **正确性验证边界**：本轮延迟测试逐次检查动作形状与有限值。此前对齐参数后的 step30000／4 步 GPU 回归已通过单图、6 组上下文复用、生产预热与连续重规划验证，见[参数对齐验证](support/benchmarks/20261106/rtc_openpi_compile_alignment.json)。此前 10 步固定噪声的机械臂动作通过 `rtol=0.02, atol=0.002`，夹爪按实际阈值检查开／关决策一致；BF16 编译结果不保证逐位相等，详见[验证记录](support/benchmarks/20261106/rtc_full_compile_validation.json)。
 
-- **数据来源**：[10 步统一对照](support/benchmarks/20261029/rlt_compile_scope_10steps.json)、[复测脚本](support/benchmarks/20261029/rlt_compile_scope_10steps.py)、[此前 4 步数值对照](support/benchmarks/20261028/rlt_repeat_compare.json)。
+- **本次数据与复算**：[PI05／RTC 逐次计时](support/benchmarks/20261107/inference_compile_pi05_rtc.json)、[RLT 逐次计时](support/benchmarks/20261107/inference_compile_rlt.json)、[统一脚本](support/benchmarks/20261107/inference_compile_matrix.py)。从仓库根目录使用 `.venv/bin/python`，设置 `PYTHONPATH=$PWD`，依次运行脚本参数 `pi05_rtc`、`rlt`；需要模型资产和 GPU。只保存脚本、配置来源及少量统计 JSON，不复制权重、图像或另存重复 NPZ。
+
+### 完全不编译复测确认
+
+随后按要求只重测完全不编译，使用新进程重新加载相同配置与权重，每条路径测 3 轮，每轮预热 5 次、计时 30 次；PI05 与 RTC PI05 在第 2 轮交换顺序。全部保持 10 步去噪，未运行局部算子或整段编译测试。
+
+| 路径 | 第 1 轮均值 | 第 2 轮均值 | 第 3 轮均值 | 合计 90 次均值 |
+|---|---:|---:|---:|---:|
+| PI05推理 | 154.65 ms | 153.46 ms | 154.54 ms | 154.21 ms |
+| RLT推理 | 170.77 ms | 170.76 ms | 170.13 ms | 170.55 ms |
+| RTC PI05推理 | 156.86 ms | 156.07 ms | 155.86 ms | 156.26 ms |
+
+各轮新增 Dynamo 图均为 0，全部动作形状和有限值检查通过；配置与前次记录一致。复测支持未编译延迟约为 PI05 154 ms、RLT 171 ms、RTC PI05 156 ms；本轮没有重新比较局部编译，因此不据此判定局部编译稳定更慢。上方 11 项表格保留原轮次，避免把不同轮次混成同场对照。
+
+复算使用同一脚本追加 `--none-only`，原始结果：[PI05／RTC 三轮](support/benchmarks/20261107/inference_compile_pi05_rtc_none_recheck.json)、[RLT 三轮](support/benchmarks/20261107/inference_compile_rlt_none_recheck.json)。
 
 ## 结论与采用方案
 
-- **纯推理**：保留整个 `sample_actions` 编译，包含前缀/KV cache 和去噪。
-- **在线 RLT**：采用 `rollout.rlt_feature_compile_mode=max-autotune`，仅编译参考动作去噪，保留原路径的 `z_rl`；在线训练配置仍为 4 步，本次 10 步基准不修改训练参数，真实任务效果仍需在线验证。
+- **PI05推理／RTC PI05推理**：均采用整段采样编译，RTC 在启动时另行预热重规划路径；当前均不显式设置 `fullgraph=True`。
+- **RLT推理**：保持 `rollout.rlt_feature_compile_mode=max-autotune`，仅编译参考动作去噪，保留原路径的 `z_rl`。MLP 编译入口未覆盖实际 RLT 前向的问题本轮仅记录。
+- **配置保持不变**：本次统一基准使用 step5000／10 步；真机默认仍为 Stage1 step30000／4 步、异步＋RTC，在线训练参数不变。模型基准不等于完整机器人循环耗时。
 
 # 3. 权重同步后清理耗时（2026-10-28）
 

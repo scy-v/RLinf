@@ -58,6 +58,24 @@ class Pi0Eval(EnvIO, Pi0):
         self.rtc_guidance_mode = rtc_guidance_mode
         self.rtc_guidance_clip = rtc_guidance_clip
         self._rlt_compile_mode: str | None = None
+        self._rtc_sampler = None
+        self._rtc_compile_mode: str | None = None
+
+    def enable_rtc_torch_compile(self, mode: str = "max-autotune") -> None:
+        """Compile the complete RTC prefix and guided denoising computation."""
+        from rlinf.models.embodiment.openpi.sampling.rtc_guidance import (
+            sample_rtc_actions,
+        )
+
+        if self._rtc_compile_mode is not None:
+            if self._rtc_compile_mode != mode:
+                raise ValueError(
+                    f"RTC sampler already compiled with {self._rtc_compile_mode!r}, "
+                    f"cannot switch to {mode!r}."
+                )
+            return
+        self._rtc_sampler = torch.compile(sample_rtc_actions, mode=mode)
+        self._rtc_compile_mode = mode
 
     def enable_rlt_torch_compile(self, mode: str = "max-autotune") -> None:
         """Compile only reference-action denoising in the frozen RLT model."""
@@ -128,6 +146,7 @@ class Pi0Eval(EnvIO, Pi0):
                 noise=noise,
                 rng=rng,
                 guidance_clip=self.rtc_guidance_clip,
+                sampler=self._rtc_sampler,
             )
         with startup_section("inference.decode"):
             actions = self.decode_actions(model_actions, observation.state)

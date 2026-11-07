@@ -328,7 +328,15 @@ class RealWorldEnv(gym.Env):
             )
         full_states = np.concatenate([state[k] for k in state_keys], axis=-1)
         obs["states"] = full_states
+        obs.update(self._wrap_images(raw_obs))
+        obs = to_tensor(obs)
+        obs["task_descriptions"] = self.task_descriptions
+        return obs
 
+    def _wrap_images(self, raw_obs: Mapping[str, Any]) -> dict[str, Any]:
+        """Format camera observations identically for steps and explicit refreshes."""
+        obs = {}
+        cfg = getattr(self, "cfg", {})
         frames = raw_obs["frames"]
         if self.main_image_key not in frames:
             raise KeyError(
@@ -357,9 +365,22 @@ class RealWorldEnv(gym.Env):
             if extra_depths:
                 obs["extra_view_depths"] = np.stack(list(extra_depths.values()), axis=1)
 
-        obs = to_tensor(obs)
-        obs["task_descriptions"] = self.task_descriptions
         return obs
+
+    def refresh_camera_observation(self, obs: Observation) -> Observation:
+        """Replace only images in a policy observation without stepping the env."""
+        readings = [
+            env.get_wrapper_attr("refresh_camera_observation")()
+            for env in self.env.envs
+        ]
+        raw = {
+            kind: {
+                name: np.stack([reading[kind][name] for reading in readings])
+                for name in readings[0].get(kind, {})
+            }
+            for kind in ("frames", "depths")
+        }
+        return {**obs, **to_tensor(self._wrap_images(raw))}
 
     def step(
         self,

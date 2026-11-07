@@ -1,0 +1,118 @@
+{
+  "run": "20261107-175847-ur5e-eval",
+  "stats": {
+    "bootstrap": {
+      "n": 2,
+      "mean_ms": 68.1838389996301,
+      "p95_ms": 78.76580409933922,
+      "max_ms": 79.9415779993069
+    },
+    "replan": {
+      "n": 550,
+      "mean_ms": 53.52757126360964,
+      "p95_ms": 54.0349258999413,
+      "max_ms": 81.49166399925889
+    },
+    "control_sec": {
+      "n": 1102,
+      "mean_ms": 40.058316077134414,
+      "p95_ms": 40.07163335027144,
+      "max_ms": 40.269961999911175
+    },
+    "command_sec": {
+      "n": 1102,
+      "mean_ms": 19.187632708717945,
+      "p95_ms": 23.60856249938479,
+      "max_ms": 24.693034000847547
+    },
+    "pace_wait_sec": {
+      "n": 1102,
+      "mean_ms": 20.87068336841647,
+      "p95_ms": 24.90661744955105,
+      "max_ms": 25.556442999913997
+    },
+    "target_interval_sec": {
+      "n": 1100,
+      "mean_ms": 48.94142281545431,
+      "p95_ms": 58.157391350550824,
+      "max_ms": 66.18591299957188
+    },
+    "observation_sec": {
+      "n": 1102,
+      "mean_ms": 0.6347214174302066,
+      "p95_ms": 0.940502800176546,
+      "max_ms": 1.459405999412411
+    },
+    "control_overrun_sec": {
+      "n": 1102,
+      "mean_ms": 8.931751889292606,
+      "p95_ms": 18.157221350575128,
+      "max_ms": 26.185912999571883
+    },
+    "camera": {
+      "n": 550,
+      "mean_ms": 7.095117379989957,
+      "p95_ms": 8.094155699563997,
+      "max_ms": 12.91527600005793
+    },
+    "request_to_prediction": {
+      "n": 550,
+      "mean_ms": 58.31295249999378,
+      "p95_ms": 59.830436599850145,
+      "max_ms": 86.85541999966517
+    },
+    "request_to_adopt": {
+      "n": 548,
+      "mean_ms": 90.59163678832364,
+      "p95_ms": 92.76509095002439,
+      "max_ms": 137.35285399980057
+    },
+    "prediction_to_adopt": {
+      "n": 548,
+      "mean_ms": 32.28232571533777,
+      "p95_ms": 34.457085449821534,
+      "max_ms": 50.4974340001354
+    },
+    "adopt_delay": {
+      "3": 1,
+      "2": 547
+    },
+    "adopt_start_index": {
+      "3": 1,
+      "2": 547
+    },
+    "delay_mismatch": 10,
+    "exhausted": 0,
+    "force_hz": 99.10923390706189,
+    "force_overruns": 131
+  },
+  "sources": [
+    "results/rlinf-ur/logs/all_logs/timing_20261107-175847-ur5e-eval.jsonl",
+    "results/rlinf-ur/runs/20261107-175847-ur5e-eval/ur5e-actions.jsonl",
+    "results/rlinf-ur/runs/20261107-175847-ur5e-eval/tensorboard/config.yaml",
+    "results/rlinf-ur/runs/20261107-175847-ur5e-eval/ur5e-evaluation.json"
+  ],
+  "scope": "Completed run; all recorded predictions and physical action rows; bootstrap separate from replans. Delays joined by chunk_id using monotonic_sec. Quantiles use linear interpolation.",
+  "notes": {
+    "delay_estimate_mismatches_chunk_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      340
+    ],
+    "requested_vs_actual_action_index_mismatches": 0,
+    "target_hz": 20.43258946048108,
+    "episodes": 2,
+    "manual_success": 2,
+    "actual_actions": 1102,
+    "num_denoise_steps": 4,
+    "checkpoint_step": 30000,
+    "continuous_tracking": true
+  }
+}

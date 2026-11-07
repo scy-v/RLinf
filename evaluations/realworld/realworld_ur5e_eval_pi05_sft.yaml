@@ -6,8 +6,8 @@ keyboard_terminal_only: false
 inference_stage: stage1
 stage2:
   # Must describe the Stage1/MLP pair used to train the selected online checkpoint.
-  training_config: /home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261102-232256-ur_rlt_stage2_ac_mlp/tensorboard/config.yaml
-  checkpoint_path: /home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261102-232256-ur_rlt_stage2_ac_mlp/ur_rlt_stage2_ac_mlp/checkpoints/global_step_22500/actor/model_state_dict/full_weights.pt
+  training_config: /home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-230711-ur_rlt_stage2_ac_mlp/tensorboard/config.yaml
+  checkpoint_path: /home/suchenyu/RLinf-rltoken/logs/online_rltoken/20261104-230711-ur_rlt_stage2_ac_mlp/ur_rlt_stage2_ac_mlp/checkpoints/global_step_15000/actor/model_state_dict/full_weights.pt
   num_steps: 4  # Stage2 reference denoising; Stage1 also defaults to 4 steps.
   compile_mode: max-autotune  # Online RLT denoising scope; null disables this compilation.
   mlp_compile_mode: max-autotune-no-cudagraphs  # Same MLP compile hook as online rollout.
@@ -73,8 +73,9 @@ cluster:
           payload_cog: [0.011, -0.002, 0.052]
 runner:
   task_type: embodied_eval
-  rtc:
-    enabled: false
+  # Scheduling is independent of rollout.model.openpi.rtc_enabled.
+  async_inference:
+    enabled: true
     inject_delay_ms: 0
     min_exec_horizon: 2
     initial_delay_steps: 1
@@ -110,7 +111,7 @@ rollout:
   sampler_compile_mode: max-autotune
   model:
     model_type: openpi
-    model_path: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_5000/actor
+    model_path: /home/suchenyu/RLinf-rltoken/logs/20261018-22:40:04-ur_rlt_stage1_sft_openpi_pi05/ur_rlt_stage1_sft_openpi_pi05/checkpoints/global_step_30000/actor
     precision: bf16
     is_lora: false
     num_action_chunks: ${.openpi.action_chunk}
@@ -142,7 +143,8 @@ rollout:
       - 19
     openpi:
       task: eval
-      rtc_enabled: ${runner.rtc.enabled}
+      # Guidance requires async_inference.enabled; false uses ordinary sampling.
+      rtc_enabled: true
       rtc_guidance_mode: approx
       rtc_guidance_clip: 5.0
       config_name: pi05_ur_state

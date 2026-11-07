@@ -1,0 +1,765 @@
+{
+  "scope": "all action rows in listed completed runs; 2026-11-06 session includes runs past midnight",
+  "runs": [
+    {
+      "run": "20261106-214118-ur5e-eval",
+      "sources": [
+        "results/rlinf-ur/runs/20261106-214118-ur5e-eval/ur5e-actions.jsonl",
+        "results/rlinf-ur/runs/20261106-214118-ur5e-eval/tensorboard/config.yaml",
+        "results/rlinf-ur/logs/all_logs/log_20261106-214118-ur5e-eval.yaml",
+        "results/rlinf-ur/logs/all_logs/timing_20261106-214118-ur5e-eval.jsonl"
+      ],
+      "continuous_tracking": true,
+      "async": true,
+      "rtc_enabled": true,
+      "threshold": 0.7,
+      "actions": 1071,
+      "close_open_close": [],
+      "replan_model_ms": null,
+      "model_ms": {
+        "n": 538,
+        "mean_ms": 106.78391567289441,
+        "p95_ms": 116.25087279826403,
+        "max_ms": 127.83284718170762
+      },
+      "target_interval": {
+        "n": 1068,
+        "mean_ms": 75.9226468061219,
+        "p95_ms": 80.13301766477525,
+        "max_ms": 84.35565326362848
+      },
+      "control": {
+        "n": 1071,
+        "mean_ms": 63.14568586358809,
+        "p95_ms": 64.66840114444494,
+        "max_ms": 65.0820517912507
+      }
+    },
+    {
+      "run": "20261106-221411-ur5e-eval",
+      "sources": [
+        "results/rlinf-ur/runs/20261106-221411-ur5e-eval/ur5e-actions.jsonl",
+        "results/rlinf-ur/runs/20261106-221411-ur5e-eval/tensorboard/config.yaml",
+        "results/rlinf-ur/logs/all_logs/log_20261106-221411-ur5e-eval.yaml",
+        "results/rlinf-ur/logs/all_logs/timing_20261106-221411-ur5e-eval.jsonl"
+      ],
+      "continuous_tracking": true,
+      "async": true,
+      "rtc_enabled": true,
+      "threshold": 0.7,
+      "actions": 605,
+      "close_open_close": [],
+      "replan_model_ms": {
+        "n": 302,
+        "mean_ms": 106.72567404084994,
+        "p95_ms": 115.88547283317894,
+        "max_ms": 120.88166270405054
+      },
+      "model_ms": {
+        "n": 304,
+        "mean_ms": 106.46734087832125,
+        "p95_ms": 115.87184474337846,
+        "max_ms": 120.88166270405054
+      },
+      "target_interval": {
+        "n": 603,
+        "mean_ms": 75.83627512965778,
+        "p95_ms": 80.20885190926492,
+        "max_ms": 86.23200608417392
+      },
+      "control": {
+        "n": 605,
+        "mean_ms": 62.99004588152998,
+        "p95_ms": 64.74001603201032,
+        "max_ms": 65.13591622933745
+      }
+    },
+    {
+      "run": "20261106-235158-ur5e-eval",
+      "sources": [
+        "results/rlinf-ur/runs/20261106-235158-ur5e-eval/ur5e-actions.jsonl",
+        "results/rlinf-ur/runs/20261106-235158-ur5e-eval/tensorboard/config.yaml",
+        "results/rlinf-ur/logs/all_logs/log_20261106-235158-ur5e-eval.yaml",
+        "results/rlinf-ur/logs/all_logs/timing_20261106-235158-ur5e-eval.jsonl"
+      ],
+      "continuous_tracking": true,
+      "async": false,
+      "rtc_enabled": false,
+      "threshold": 0.7,
+      "actions": 1223,
+      "close_open_close": [],
+      "replan_model_ms": null,
+      "model_ms": {
+        "n": 124,
+        "mean_ms": 56.10594675019984,
+        "p95_ms": 57.150774076581,
+        "max_ms": 79.51494213193655
+      },
+      "target_interval": {
+        "n": 1099,
+        "mean_ms": 62.001893412935345,
+        "p95_ms": 70.06944729946554,
+        "max_ms": 76.17526920512319
+      },
+      "control": {
+        "n": 1223,
+        "mean_ms": 40.059660192813574,
+        "p95_ms": 40.073264949023724,
+        "max_ms": 42.13590361177921
+      }
+    },
+    {
+      "run": "20261106-235503-ur5e-eval",
+      "sources": [
+        "results/rlinf-ur/runs/20261106-235503-ur5e-eval/ur5e-actions.jsonl",
+        "results/rlinf-ur/runs/20261106-235503-ur5e-eval/tensorboard/config.yaml",
+        "results/rlinf-ur/logs/all_logs/log_20261106-235503-ur5e-eval.yaml",
+        "results/rlinf-ur/logs/all_logs/timing_20261106-235503-ur5e-eval.jsonl"
+      ],
+      "continuous_tracking": false,
+      "async": false,
+      "rtc_enabled": false,
+      "threshold": 0.7,
+      "actions": 315,
+      "close_open_close": [],
+      "replan_model_ms": null,
+      "model_ms": {
+        "n": 32,
+        "mean_ms": 60.776191370678134,
+        "p95_ms": 62.49704137444496,
+        "max_ms": 79.31789429858327
+      },
+      "target_interval": {
+        "n": 283,
+        "mean_ms": 61.8735682614174,
+        "p95_ms": 68.26282972469926,
+        "max_ms": 72.31540093198419
+      },
+      "control": {
+        "n": 315,
+        "mean_ms": 40.060225464699286,
+        "p95_ms": 40.07269595749676,
+        "max_ms": 40.18289688974619
+      }
+    },
+    {
+      "run": "20261107-000915-ur5e-eval",
+      "sources": [
+        "results/rlinf-ur/runs/20261107-000915-ur5e-eval/ur5e-actions.jsonl",
+        "results/rlinf-ur/runs/20261107-000915-ur5e-eval/tensorboard/config.yaml",
+        "results/rlinf-ur/logs/all_logs/log_20261107-000915-ur5e-eval.yaml",
+        "results/rlinf-ur/logs/all_logs/timing_20261107-000915-ur5e-eval.jsonl"
+      ],
+      "continuous_tracking": true,
+      "async": false,
+      "rtc_enabled": false,
+      "threshold": 0.7,
+      "actions": 869,
+      "close_open_close": [],
+      "replan_model_ms": null,
+      "model_ms": {
+        "n": 88,
+        "mean_ms": 52.73520887236703,
+        "p95_ms": 53.09005763847381,
+        "max_ms": 82.19073293730617
+      },
+      "target_interval": {
+        "n": 782,
+        "mean_ms": 41.25424704866965,
+        "p95_ms": 44.15379976853728,
+        "max_ms": 46.181393787264824
+      },
+      "control": {
+        "n": 869,
+        "mean_ms": 40.0567496113985,
+        "p95_ms": 40.07030110806227,
+        "max_ms": 40.222635958343744
+      }
+    },
+    {
+      "run": "20261107-001310-ur5e-eval",
+      "sources": [
+        "results/rlinf-ur/runs/20261107-001310-ur5e-eval/ur5e-actions.jsonl",
+        "results/rlinf-ur/runs/20261107-001310-ur5e-eval/tensorboard/config.yaml",
+        "results/rlinf-ur/logs/all_logs/log_20261107-001310-ur5e-eval.yaml",
+        "results/rlinf-ur/logs/all_logs/timing_20261107-001310-ur5e-eval.jsonl"
+      ],
+      "continuous_tracking": false,
+      "async": false,
+      "rtc_enabled": false,
+      "threshold": 0.7,
+      "actions": 875,
+      "close_open_close": [
+        {
+          "episode": 1,
+          "open_steps": [
+            131,
+            137
+          ],
+          "open_actions": 7,
+          "open_interval_ms": 290.09103775024414,
+          "trace": [
+            {
+              "step": 130,
+              "action_index": 10,
+              "timestamp": 1793981643.6859307,
+              "gripper_action": -0.00859786756336689
+            },
+            {
+              "step": 131,
+              "action_index": 1,
+              "timestamp": 1793981643.798931,
+              "gripper_action": 1.004362940788269
+            },
+            {
+              "step": 132,
+              "action_index": 2,
+              "timestamp": 1793981643.840203,
+              "gripper_action": 0.9978383779525757
+            },
+            {
+              "step": 133,
+              "action_index": 3,
+              "timestamp": 1793981643.8814158,
+              "gripper_action": 0.9970765113830566
+            },
+            {
+              "step": 134,
+              "action_index": 4,
+              "timestamp": 1793981643.9226105,
+              "gripper_action": 0.9951694011688232
+            },
+            {
+              "step": 135,
+              "action_index": 5,
+              "timestamp": 1793981643.9638689,
+              "gripper_action": 0.9953852891921997
+            },
+            {
+              "step": 136,
+              "action_index": 6,
+              "timestamp": 1793981644.0057225,
+              "gripper_action": 0.9945114254951477
+            },
+            {
+              "step": 137,
+              "action_index": 7,
+              "timestamp": 1793981644.0478363,
+              "gripper_action": 1.0019198656082153
+            },
+            {
+              "step": 138,
+              "action_index": 8,
+              "timestamp": 1793981644.089022,
+              "gripper_action": -0.005394219420850277
+            }
+          ]
+        },
+        {
+          "episode": 1,
+          "open_steps": [
+            359,
+            360
+          ],
+          "open_actions": 2,
+          "open_interval_ms": 163.38229179382324,
+          "trace": [
+            {
+              "step": 358,
+              "action_index": 8,
+              "timestamp": 1793981654.9498467,
+              "gripper_action": -0.0022534416057169437
+            },
+            {
+              "step": 359,
+              "action_index": 9,
+              "timestamp": 1793981654.9909728,
+              "gripper_action": 0.995462954044342
+            },
+            {
+              "step": 360,
+              "action_index": 10,
+              "timestamp": 1793981655.040004,
+              "gripper_action": 1.0018377304077148
+            },
+            {
+              "step": 361,
+              "action_index": 1,
+              "timestamp": 1793981655.154355,
+              "gripper_action": 0.00731915608048439
+            }
+          ]
+        },
+        {
+          "episode": 2,
+          "open_steps": [
+            161,
+            162
+          ],
+          "open_actions": 2,
+          "open_interval_ms": 82.70955085754395,
+          "trace": [
+            {
+              "step": 160,
+              "action_index": 10,
+              "timestamp": 1793981669.9392135,
+              "gripper_action": 0.0006602582288905978
+            },
+            {
+              "step": 161,
+              "action_index": 1,
+              "timestamp": 1793981670.0536315,
+              "gripper_action": 0.9972578883171082
+            },
+            {
+              "step": 162,
+              "action_index": 2,
+              "timestamp": 1793981670.094956,
+              "gripper_action": 0.992644727230072
+            },
+            {
+              "step": 163,
+              "action_index": 3,
+              "timestamp": 1793981670.136341,
+              "gripper_action": -0.004419162403792143
+            }
+          ]
+        }
+      ],
+      "replan_model_ms": null,
+      "model_ms": {
+        "n": 89,
+        "mean_ms": 52.81094992742612,
+        "p95_ms": 53.33222923800349,
+        "max_ms": 77.551803085953
+      },
+      "target_interval": {
+        "n": 787,
+        "mean_ms": 41.21652046358154,
+        "p95_ms": 42.13291546329856,
+        "max_ms": 43.71309606358409
+      },
+      "control": {
+        "n": 875,
+        "mean_ms": 40.057745734495775,
+        "p95_ms": 40.07027130573988,
+        "max_ms": 40.321122854948044
+      },
+      "closure_chunks": [
+        {
+          "episode": 1,
+          "chunk": 13,
+          "infer_index": 13,
+          "input_gripper": 1.0,
+          "predicted_gripper": [
+            1.001413,
+            0.994841,
+            0.996415,
+            0.9999,
+            1.000337,
+            1.000637,
+            1.008135,
+            1.004918,
+            -0.010254,
+            -0.008598
+          ]
+        },
+        {
+          "episode": 1,
+          "chunk": 14,
+          "infer_index": 14,
+          "input_gripper": 1.0,
+          "predicted_gripper": [
+            1.004363,
+            0.997838,
+            0.997077,
+            0.995169,
+            0.995385,
+            0.994511,
+            1.00192,
+            -0.005394,
+            -0.003954,
+            -0.001218
+          ]
+        },
+        {
+          "episode": 1,
+          "chunk": 15,
+          "infer_index": 15,
+          "input_gripper": 0.992,
+          "predicted_gripper": [
+            -0.001147,
+            0.001605,
+            0.002386,
+            0.005861,
+            0.004184,
+            0.001834,
+            -0.000361,
+            0.00144,
+            -2.2e-05,
+            -0.001061
+          ]
+        },
+        {
+          "episode": 1,
+          "chunk": 36,
+          "infer_index": 36,
+          "input_gripper": 0.345,
+          "predicted_gripper": [
+            0.013447,
+            -0.002658,
+            -0.003126,
+            -0.002572,
+            0.000864,
+            0.001666,
+            -0.001427,
+            -0.002253,
+            0.995463,
+            1.001838
+          ]
+        },
+        {
+          "episode": 1,
+          "chunk": 37,
+          "infer_index": 37,
+          "input_gripper": 0.345,
+          "predicted_gripper": [
+            0.007319,
+            1.000111,
+            0.998232,
+            0.998044,
+            1.000926,
+            0.99995,
+            1.001868,
+            0.997985,
+            1.001985,
+            1.002697
+          ]
+        },
+        {
+          "episode": 2,
+          "chunk": 16,
+          "infer_index": 57,
+          "input_gripper": 1.0,
+          "predicted_gripper": [
+            0.997568,
+            0.999457,
+            0.997909,
+            0.998148,
+            1.000904,
+            1.00247,
+            -0.003214,
+            -0.00282,
+            -0.000759,
+            0.00066
+          ]
+        },
+        {
+          "episode": 2,
+          "chunk": 17,
+          "infer_index": 58,
+          "input_gripper": 1.0,
+          "predicted_gripper": [
+            0.997258,
+            0.992645,
+            -0.004419,
+            -0.005918,
+            -0.003093,
+            -0.003187,
+            -0.002696,
+            -0.002696,
+            2.7e-05,
+            -1.4e-05
+          ]
+        },
+        {
+          "episode": 2,
+          "chunk": 18,
+          "infer_index": 59,
+          "input_gripper": 0.878,
+          "predicted_gripper": [
+            -0.002797,
+            -0.002645,
+            -0.003324,
+            -0.005098,
+            -0.002959,
+            -0.003813,
+            -0.002833,
+            -0.005123,
+            -0.007189,
+            -0.001942
+          ]
+        }
+      ]
+    },
+    {
+      "run": "20261107-001537-ur5e-eval",
+      "sources": [
+        "results/rlinf-ur/runs/20261107-001537-ur5e-eval/ur5e-actions.jsonl",
+        "results/rlinf-ur/runs/20261107-001537-ur5e-eval/tensorboard/config.yaml",
+        "results/rlinf-ur/logs/all_logs/log_20261107-001537-ur5e-eval.yaml",
+        "results/rlinf-ur/logs/all_logs/timing_20261107-001537-ur5e-eval.jsonl"
+      ],
+      "continuous_tracking": true,
+      "async": true,
+      "rtc_enabled": true,
+      "threshold": 0.7,
+      "actions": 1561,
+      "close_open_close": [
+        {
+          "episode": 3,
+          "open_steps": [
+            141,
+            142
+          ],
+          "open_actions": 2,
+          "open_interval_ms": 88.44637870788574,
+          "trace": [
+            {
+              "step": 140,
+              "action_index": 1284,
+              "timestamp": 1793981854.5387945,
+              "gripper_action": 0.5523366332054138
+            },
+            {
+              "step": 141,
+              "action_index": 1285,
+              "timestamp": 1793981854.593627,
+              "gripper_action": 0.9662971496582031
+            },
+            {
+              "step": 142,
+              "action_index": 1286,
+              "timestamp": 1793981854.6381085,
+              "gripper_action": 0.9829906225204468
+            },
+            {
+              "step": 143,
+              "action_index": 1287,
+              "timestamp": 1793981854.6820734,
+              "gripper_action": 0.06232284754514694
+            }
+          ]
+        }
+      ],
+      "replan_model_ms": {
+        "n": 511,
+        "mean_ms": 110.3160731000516,
+        "p95_ms": 120.81021559424698,
+        "max_ms": 184.39087690785527
+      },
+      "model_ms": {
+        "n": 514,
+        "mean_ms": 110.06014966333451,
+        "p95_ms": 120.80118849407881,
+        "max_ms": 184.39087690785527
+      },
+      "target_interval": {
+        "n": 1558,
+        "mean_ms": 46.928358409525075,
+        "p95_ms": 58.128194557502866,
+        "max_ms": 66.55051186680794
+      },
+      "control": {
+        "n": 1561,
+        "mean_ms": 40.059142804201656,
+        "p95_ms": 40.0710953399539,
+        "max_ms": 40.279991924762726
+      }
+    },
+    {
+      "run": "20261107-002952-ur5e-eval",
+      "sources": [
+        "results/rlinf-ur/runs/20261107-002952-ur5e-eval/ur5e-actions.jsonl",
+        "results/rlinf-ur/runs/20261107-002952-ur5e-eval/tensorboard/config.yaml",
+        "results/rlinf-ur/logs/all_logs/log_20261107-002952-ur5e-eval.yaml",
+        "results/rlinf-ur/logs/all_logs/timing_20261107-002952-ur5e-eval.jsonl"
+      ],
+      "continuous_tracking": false,
+      "async": true,
+      "rtc_enabled": true,
+      "threshold": 0.7,
+      "actions": 1164,
+      "close_open_close": [
+        {
+          "episode": 2,
+          "open_steps": [
+            175,
+            178
+          ],
+          "open_actions": 4,
+          "open_interval_ms": 181.58817291259766,
+          "trace": [
+            {
+              "step": 174,
+              "action_index": 881,
+              "timestamp": 1793982682.454166,
+              "gripper_action": 0.1709812879562378
+            },
+            {
+              "step": 175,
+              "action_index": 882,
+              "timestamp": 1793982682.4968128,
+              "gripper_action": 0.8504275679588318
+            },
+            {
+              "step": 176,
+              "action_index": 883,
+              "timestamp": 1793982682.539278,
+              "gripper_action": 0.9252462387084961
+            },
+            {
+              "step": 177,
+              "action_index": 884,
+              "timestamp": 1793982682.5929422,
+              "gripper_action": 0.7282707095146179
+            },
+            {
+              "step": 178,
+              "action_index": 885,
+              "timestamp": 1793982682.635926,
+              "gripper_action": 0.8251916766166687
+            },
+            {
+              "step": 179,
+              "action_index": 886,
+              "timestamp": 1793982682.678401,
+              "gripper_action": 0.5323816537857056
+            }
+          ]
+        },
+        {
+          "episode": 2,
+          "open_steps": [
+            422,
+            422
+          ],
+          "open_actions": 1,
+          "open_interval_ms": 54.266929626464844,
+          "trace": [
+            {
+              "step": 421,
+              "action_index": 1128,
+              "timestamp": 1793982693.9411104,
+              "gripper_action": 0.02293607033789158
+            },
+            {
+              "step": 422,
+              "action_index": 1129,
+              "timestamp": 1793982693.9835756,
+              "gripper_action": 0.832988440990448
+            },
+            {
+              "step": 423,
+              "action_index": 1130,
+              "timestamp": 1793982694.0378425,
+              "gripper_action": 0.31096842885017395
+            }
+          ]
+        }
+      ],
+      "replan_model_ms": {
+        "n": 387,
+        "mean_ms": 104.95343591262242,
+        "p95_ms": 115.73883020319045,
+        "max_ms": 120.96740631386638
+      },
+      "model_ms": {
+        "n": 389,
+        "mean_ms": 104.77014165132242,
+        "p95_ms": 115.72294561192393,
+        "max_ms": 120.96740631386638
+      },
+      "target_interval": {
+        "n": 1162,
+        "mean_ms": 46.617714865710234,
+        "p95_ms": 56.00613751448691,
+        "max_ms": 62.0737480930984
+      },
+      "control": {
+        "n": 1164,
+        "mean_ms": 40.06675370213579,
+        "p95_ms": 40.17784995958209,
+        "max_ms": 40.30216298997402
+      }
+    },
+    {
+      "run": "20261107-003722-ur5e-eval",
+      "sources": [
+        "results/rlinf-ur/runs/20261107-003722-ur5e-eval/ur5e-actions.jsonl",
+        "results/rlinf-ur/runs/20261107-003722-ur5e-eval/tensorboard/config.yaml",
+        "results/rlinf-ur/logs/all_logs/log_20261107-003722-ur5e-eval.yaml",
+        "results/rlinf-ur/logs/all_logs/timing_20261107-003722-ur5e-eval.jsonl"
+      ],
+      "continuous_tracking": true,
+      "async": true,
+      "rtc_enabled": true,
+      "threshold": 0.7,
+      "actions": 1010,
+      "close_open_close": [],
+      "replan_model_ms": {
+        "n": 336,
+        "mean_ms": 104.94524638523303,
+        "p95_ms": 114.68163400422782,
+        "max_ms": 119.9159249663353
+      },
+      "model_ms": {
+        "n": 338,
+        "mean_ms": 104.72527493518838,
+        "p95_ms": 114.61370598990469,
+        "max_ms": 119.9159249663353
+      },
+      "target_interval": {
+        "n": 1008,
+        "mean_ms": 46.791821195732894,
+        "p95_ms": 56.27179006114602,
+        "max_ms": 64.21437580138445
+      },
+      "control": {
+        "n": 1010,
+        "mean_ms": 40.05933227847413,
+        "p95_ms": 40.074025094509125,
+        "max_ms": 40.294714737683535
+      }
+    },
+    {
+      "run": "20261107-005403-ur5e-eval",
+      "sources": [
+        "results/rlinf-ur/runs/20261107-005403-ur5e-eval/ur5e-actions.jsonl",
+        "results/rlinf-ur/runs/20261107-005403-ur5e-eval/tensorboard/config.yaml",
+        "results/rlinf-ur/logs/all_logs/log_20261107-005403-ur5e-eval.yaml",
+        "results/rlinf-ur/logs/all_logs/timing_20261107-005403-ur5e-eval.jsonl"
+      ],
+      "continuous_tracking": true,
+      "async": true,
+      "rtc_enabled": false,
+      "threshold": 0.7,
+      "actions": 1013,
+      "close_open_close": [],
+      "replan_model_ms": {
+        "n": 506,
+        "mean_ms": 50.21307391405341,
+        "p95_ms": 50.92210113070905,
+        "max_ms": 52.77950083836913
+      },
+      "model_ms": {
+        "n": 508,
+        "mean_ms": 50.26995225288854,
+        "p95_ms": 50.9339856216684,
+        "max_ms": 76.52202900499105
+      },
+      "target_interval": {
+        "n": 1011,
+        "mean_ms": 48.846882435425925,
+        "p95_ms": 58.12678765505552,
+        "max_ms": 65.13837911188602
+      },
+      "control": {
+        "n": 1013,
+        "mean_ms": 40.0580769397414,
+        "p95_ms": 40.070450492203236,
+        "max_ms": 40.28071602806449
+      }
+    }
+  ]
+}

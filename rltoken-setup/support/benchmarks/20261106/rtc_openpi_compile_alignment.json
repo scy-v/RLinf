@@ -1,0 +1,49 @@
+{
+  "action_max_abs_errors": [
+    0.0016970238648355007,
+    0.0019096210598945618,
+    0.0017060227692127228,
+    0.0024824868887662888,
+    0.003385615535080433,
+    0.0013387519866228104
+  ],
+  "graph_count_after_warmup": 8,
+  "compile_mode": "max-autotune",
+  "fullgraph_argument": "omitted",
+  "effective_fullgraph": false,
+  "rtc_graphs_created": 1,
+  "contexts": [
+    [
+      2,
+      1
+    ],
+    [
+      2,
+      2
+    ],
+    [
+      3,
+      3
+    ],
+    [
+      4,
+      4
+    ],
+    [
+      20,
+      2
+    ],
+    [
+      0,
+      0
+    ]
+  ],
+  "checkpoint_step": 30000,
+  "denoising_steps": 4,
+  "gripper_threshold_decisions_equal": true,
+  "production_worker_warmup_and_replanning_passed": true,
+  "test_result": "1 passed",
+  "hardware": "RTX 4090 D",
+  "reference_url": "https://github.com/Physical-Intelligence/openpi/blob/main/src/openpi/models_pytorch/pi0_pytorch.py",
+  "scope": "model-only synthetic observations; no robot connection; no new latency benchmark"
+}
