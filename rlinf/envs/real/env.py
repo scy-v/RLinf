@@ -149,8 +149,8 @@ class RealWorldEnv(gym.Env):
         """Close the vector env and its physical robot/camera resources."""
         if getattr(self, "_closed", False):
             return
-        self.env.close()
         self._closed = True
+        self.env.close()
 
     def get_hold_actions(
         self, fallback_actions: np.ndarray | None = None
@@ -287,15 +287,35 @@ class RealWorldEnv(gym.Env):
         obs = {}
 
         state = raw_obs["state"]
-        full_states = np.concatenate([state[k] for k in sorted(state)], axis=-1)
+        cfg = getattr(self, "cfg", {})
+        state_keys = cfg.get("state_keys", None)
+        if state_keys is None:
+            state_keys = sorted(state)
+        elif len(state_keys) != len(set(state_keys)) or set(state_keys) != set(state):
+            raise ValueError(
+                f"Expected state_keys to list each observation field once: {sorted(state)}; "
+                f"got {list(state_keys)}."
+            )
+        full_states = np.concatenate([state[k] for k in state_keys], axis=-1)
         obs["states"] = full_states
+        obs.update(self._wrap_images(raw_obs))
+        obs = to_tensor(obs)
+        obs["task_descriptions"] = self.task_descriptions
+        return obs
 
+    def _wrap_images(self, raw_obs: Mapping[str, Any]) -> dict[str, Any]:
+        """Format camera observations identically for steps and explicit refreshes."""
+        obs = {}
+        cfg = getattr(self, "cfg", {})
         frames = raw_obs["frames"]
         if self.main_image_key not in frames:
             raise KeyError(
                 f"main_image_key {self.main_image_key!r} not in {list(frames)}"
             )
         obs["main_images"] = frames[self.main_image_key]
+        wrist_image_key = cfg.get("wrist_image_key", None)
+        if wrist_image_key is not None:
+            obs["wrist_images"] = frames[wrist_image_key]
         raw_images = OrderedDict(sorted(frames.items()))
         raw_images.pop(self.main_image_key)
 
@@ -315,9 +335,22 @@ class RealWorldEnv(gym.Env):
             if extra_depths:
                 obs["extra_view_depths"] = np.stack(list(extra_depths.values()), axis=1)
 
-        obs = to_tensor(obs)
-        obs["task_descriptions"] = self.task_descriptions
         return obs
+
+    def refresh_camera_observation(self, obs: Observation) -> Observation:
+        """Replace only images in a policy observation without stepping the env."""
+        readings = [
+            env.get_wrapper_attr("refresh_camera_observation")()
+            for env in self.env.envs
+        ]
+        raw = {
+            kind: {
+                name: np.stack([reading[kind][name] for reading in readings])
+                for name in readings[0].get(kind, {})
+            }
+            for kind in ("frames", "depths")
+        }
+        return {**obs, **to_tensor(self._wrap_images(raw))}
 
     def step(
         self,
@@ -382,9 +415,15 @@ class RealWorldEnv(gym.Env):
             infos,
         )
 
-    def _notify_action_chunk_begin(self) -> None:
-        """Tell intervention wrappers a new action chunk is starting."""
+    def _notify_action_chunk_begin(self, chunk_size: int) -> None:
+        """Notify the environment and intervention wrappers of a new chunk."""
         for env in self.env.envs:
+            try:
+                begin_chunk = env.get_wrapper_attr("begin_action_chunk")
+            except AttributeError:
+                begin_chunk = None
+            if callable(begin_chunk):
+                begin_chunk(chunk_size)
             try:
                 on_begin = env.get_wrapper_attr("on_action_chunk_begin")
             except AttributeError:
@@ -406,7 +445,7 @@ class RealWorldEnv(gym.Env):
         raw_chunk_intervene_actions = []
         raw_chunk_intervene_flag = []
         raw_chunk_rlt_switch_flags = []
-        self._notify_action_chunk_begin()
+        self._notify_action_chunk_begin(chunk_size)
         for i in range(chunk_size):
             actions = chunk_actions[:, i]
             extracted_obs, step_reward, terminations, truncations, infos = self.step(

@@ -138,5 +138,8 @@ def load_task_descriptions(dataset_path: str | Path) -> dict[int, str]:
         df = pd.read_parquet(parquet)
         if "task_index" in df.columns and "task" in df.columns:
             return {int(r["task_index"]): str(r["task"]) for _, r in df.iterrows()}
+        if "task_index" in df.columns:
+            # LeRobot v3 stores the task text in the DataFrame index.
+            return {int(r["task_index"]): str(task) for task, r in df.iterrows()}
 
     return {}

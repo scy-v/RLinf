@@ -16,7 +16,7 @@
 Compute returns for LeRobot datasets.
 
 Writes `return`, `reward`, and `prompt` as a sidecar parquet at
-``meta/returns_{tag}.parquet``. Updates meta/stats.json and meta/info.json.
+``meta/returns_{tag}.parquet``. Updates meta/stats.json while preserving meta/info.json.
 Does not modify original per-episode parquet files.
 
 Return computation:
@@ -32,7 +32,7 @@ import logging
 import math
 import shutil
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import hydra
@@ -108,33 +108,25 @@ def get_episode_boundaries(episode_indices: np.ndarray) -> list[tuple[int, int, 
     return list(zip(ep_ids.tolist(), starts.tolist(), ends.tolist()))
 
 
-def _process_single_parquet(
-    pq_file: str,
+def _read_metadata(pq_file: str) -> pa.Table:
+    """Read only the small columns required for return labeling."""
+    if Path(pq_file).stat().st_size == 0:
+        raise RuntimeError(f"Expected a nonempty parquet file, got {pq_file}.")
+    available = set(pq.ParquetFile(pq_file).schema_arrow.names)
+    return pq.read_table(pq_file, columns=[c for c in _READ_COLUMNS if c in available])
+
+
+def _compute_table_returns(
+    table: pa.Table,
     dataset_type: str,
     gamma: float,
     failure_reward: float,
     tasks: dict[int, str],
 ) -> pa.Table | None:
-    """Process a single parquet file: read only metadata columns, compute returns.
-
-    Only reads episode_index, frame_index, is_success, task_index — no images.
-
-    Returns:
-        Arrow table with (episode_index, frame_index, return, reward, prompt)
-        columns, or None if the file is empty.
-    """
-    file_size = Path(pq_file).stat().st_size
-    if file_size == 0:
-        raise RuntimeError(
-            f"Corrupted 0-byte parquet file: {pq_file}. "
-            "Please fix or remove this file before running compute_returns."
-        )
-
-    pf = pq.ParquetFile(pq_file)
-    available = set(pf.schema_arrow.names)
-    cols_to_read = [c for c in _READ_COLUMNS if c in available]
-
-    table = pq.read_table(pq_file, columns=cols_to_read)
+    """Label whole episodes; v3 episodes can span multiple parquet files."""
+    table = table.sort_by(
+        [("episode_index", "ascending"), ("frame_index", "ascending")]
+    )
     n = table.num_rows
     if n == 0:
         return None
@@ -150,7 +142,7 @@ def _process_single_parquet(
         is_success_col = table.column("is_success").to_pylist()
     elif dataset_type != "sft":
         raise ValueError(
-            f"Column 'is_success' not found in {pq_file}. "
+            "Column 'is_success' not found in rollout data. "
             f"Non-SFT datasets (dataset_type={dataset_type!r}) require 'is_success' "
             "to correctly distinguish successful and failed episodes."
         )
@@ -160,11 +152,20 @@ def _process_single_parquet(
 
     for _, ep_start, ep_end in episodes:
         ep_length = ep_end - ep_start
+        if not np.array_equal(frame_indices[ep_start:ep_end], np.arange(ep_length)):
+            raise ValueError(
+                "Expected complete episodes with unique frame indices starting at zero."
+            )
 
         if dataset_type == "sft":
             is_success = True
         else:
-            is_success = bool(is_success_col[ep_end - 1])
+            outcome = np.asarray(is_success_col[ep_end - 1])
+            if outcome.size != 1 or outcome.dtype.kind != "b":
+                raise ValueError(
+                    f"Expected one boolean is_success per frame, got {outcome!r}."
+                )
+            is_success = bool(outcome.reshape(-1)[0])
 
         ep_returns, ep_rewards = compute_returns_for_episode(
             episode_length=ep_length,
@@ -243,60 +244,25 @@ def process_dataset(
     parquet_files = sorted(str(p) for p in data_dir.rglob("*.parquet"))
     logger.info(f"Found {len(parquet_files)} parquet files")
 
-    tasks: dict[int, str] = {}
-    tasks_path = output_path / "meta" / "tasks.jsonl"
-    if tasks_path.exists():
-        with open(tasks_path, "r") as f:
-            for line in f:
-                entry = json.loads(line.strip())
-                task_idx = entry.get("task_index", len(tasks))
-                task_desc = entry.get("task", "")
-                tasks[task_idx] = task_desc
+    from rlinf.data.datasets.recap.utils import load_task_descriptions
 
-    # PyArrow releases GIL during I/O, so threads achieve true parallelism
-    result_tables: list[pa.Table] = []
-
-    effective_workers = min(num_workers, len(parquet_files))
-    if effective_workers <= 1:
-        for pq_file in tqdm(parquet_files, desc="Processing parquet files"):
-            tbl = _process_single_parquet(
-                pq_file, dataset_type, gamma, failure_reward, tasks
+    tasks = load_task_descriptions(output_path)
+    effective_workers = max(1, min(num_workers, len(parquet_files)))
+    with ThreadPoolExecutor(max_workers=effective_workers) as pool:
+        tables = list(
+            tqdm(
+                pool.map(_read_metadata, parquet_files),
+                total=len(parquet_files),
+                desc="Reading metadata",
             )
-            if tbl is not None:
-                result_tables.append(tbl)
-    else:
-        logger.info(f"Using {effective_workers} parallel threads")
-        futures = {}
-        with ThreadPoolExecutor(max_workers=effective_workers) as pool:
-            for pq_file in parquet_files:
-                fut = pool.submit(
-                    _process_single_parquet,
-                    pq_file,
-                    dataset_type,
-                    gamma,
-                    failure_reward,
-                    tasks,
-                )
-                futures[fut] = pq_file
-
-            with tqdm(total=len(futures), desc="Processing parquet files") as pbar:
-                for fut in as_completed(futures):
-                    try:
-                        tbl = fut.result()
-                    except Exception as e:
-                        failed_file = futures[fut]
-                        raise RuntimeError(f"Failed to process {failed_file}") from e
-                    if tbl is not None:
-                        result_tables.append(tbl)
-                    pbar.update(1)
-
-    if not result_tables:
-        raise ValueError(
-            f"No data found in dataset: {output_path}. "
-            "All parquet files are empty or missing."
         )
-
-    combined = pa.concat_tables(result_tables)
+    if not tables:
+        raise ValueError(f"No parquet data found in {output_path}.")
+    combined = _compute_table_returns(
+        pa.concat_tables(tables), dataset_type, gamma, failure_reward, tasks
+    )
+    if combined is None:
+        raise ValueError(f"No frames found in {output_path}.")
     sidecar_filename = f"returns_{tag}.parquet" if tag else "returns.parquet"
     sidecar_path = output_path / "meta" / sidecar_filename
     sidecar_path.parent.mkdir(parents=True, exist_ok=True)
@@ -354,31 +320,6 @@ def process_dataset(
     with open(stats_path, "w") as f:
         json.dump(existing_stats, f, indent=2)
     logger.info("Updated stats.json")
-
-    info_path = output_path / "meta" / "info.json"
-    if info_path.exists():
-        with open(info_path, "r") as f:
-            info = json.load(f)
-
-        info["features"]["return"] = {
-            "dtype": "float32",
-            "shape": [1],
-            "names": None,
-        }
-        info["features"]["reward"] = {
-            "dtype": "float32",
-            "shape": [1],
-            "names": None,
-        }
-        info["features"]["prompt"] = {
-            "dtype": "string",
-            "shape": [1],
-            "names": None,
-        }
-
-        with open(info_path, "w") as f:
-            json.dump(info, f, indent=2)
-        logger.info("Updated info.json with new features")
 
     return stats
 

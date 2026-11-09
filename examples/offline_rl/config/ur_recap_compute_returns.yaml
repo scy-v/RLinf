@@ -1,0 +1,21 @@
+# Step 1 for the first UR rollout collection. SFT demonstrations are successful.
+data:
+  data_root: null
+  train_data_paths:
+    - dataset_path: /home/suchenyu/.cache/huggingface/lerobot/scylearning/insert_black_rack_into_blue_slot_20260916_v01
+      type: sft
+    # Set the exact timestamped dataset path printed by the collector.
+    - dataset_path: ???
+      type: rollout
+  dataset_type: rollout
+  gamma: 1.0
+  failure_reward: -300.0
+  tag: ur_round_001
+  num_workers: 8
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job:
+    chdir: false

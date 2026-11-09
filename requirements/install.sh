@@ -567,8 +567,13 @@ configure_nvidia() {
     PLATFORM_TORCH_PACKAGES=()
     PLATFORM_VENV_EXPORTS=(
         "export NVIDIA_DRIVER_CAPABILITIES=all"
-        "export VK_DRIVER_FILES=/etc/vulkan/icd.d/nvidia_icd.json"
-        "export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json"
+        "if [ -f /etc/vulkan/icd.d/nvidia_icd.json ]; then
+    export VK_DRIVER_FILES=/etc/vulkan/icd.d/nvidia_icd.json
+    export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json
+elif [ -f /usr/share/vulkan/icd.d/nvidia_icd.json ]; then
+    export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json
+    export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json
+fi"
     )
     PLATFORM_FLASH_ATTN_INSTALL=1
     PLATFORM_FLASH_ATTN_PREBUILT=1

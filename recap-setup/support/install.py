@@ -51,6 +51,10 @@ if use_local_wheel:
     script += "\n" + shlex.join(
         ["uv", "pip", "install", "--python", str(python), "--no-deps", str(wheel)]
     )
+# Finalize after every dependency installer so OpenPI cannot overwrite GUI OpenCV.
+script += "\n" + shlex.join(
+    ["bash", str(REPO / "recap-setup/support/install-ur-runtime.sh")]
+)
 (REPO / "recap-setup/support/generated-install.sh").write_text(script + "\n")
 print("Official CI job:", job.name, flush=True)
 sys.exit(driver._run_shell(script, args.dry_run))

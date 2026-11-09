@@ -27,6 +27,7 @@ from rlinf.models.embodiment.openpi.transforms.apply import (
     apply_output_transform,
 )
 from rlinf.models.embodiment.openpi.transforms.env import repack_env_obs
+from rlinf.utils.startup_timing import startup_section
 
 
 class EnvIO:
@@ -128,13 +129,14 @@ class EnvIO:
     def env_obs_to_observation(self, env_obs: dict[str, Any]) -> Observation:
         """Repack env obs through the transform pipeline onto this device."""
         self._ensure_transforms()
-        repacked = repack_env_obs(
-            self.config_name,
-            env_obs,
-            select_state=self._select_configured_state,
-        )
-        processed = self.input_transform(repacked, transpose=False)
-        return self._observation_dict_to_device(processed)
+        with startup_section("inference.input"):
+            repacked = repack_env_obs(
+                self.config_name,
+                env_obs,
+                select_state=self._select_configured_state,
+            )
+            processed = self.input_transform(repacked, transpose=False)
+            return self._observation_dict_to_device(processed)
 
     def _predict_eval(
         self,
@@ -144,10 +146,12 @@ class EnvIO:
         rng: torch.Generator | None = None,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """Deterministic Euler ODE sampler shared by eval / RL eval / DAgger."""
-        model_actions = self.sample_actions(
-            observation, num_steps=self.num_steps, noise=noise, rng=rng
-        )
-        actions = self.decode_actions(model_actions, observation.state)
+        with startup_section("inference.sample", num_steps=self.num_steps):
+            model_actions = self.sample_actions(
+                observation, num_steps=self.num_steps, noise=noise, rng=rng
+            )
+        with startup_section("inference.decode"):
+            actions = self.decode_actions(model_actions, observation.state)
         B = actions.shape[0]
         result = {
             "prev_logprobs": None,

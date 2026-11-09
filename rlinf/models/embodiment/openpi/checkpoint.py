@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import zipfile
 from typing import Any
 
 from rlinf.utils.logging import get_logger
@@ -149,19 +150,25 @@ def load_full_weights(model, weights_path, *, expect_rlt: bool) -> None:
     import torch
 
     from rlinf.utils.ckpt_convertor.openpi._core import as_state_dict
+    from rlinf.utils.startup_timing import startup_section
 
-    loaded = torch.load(str(weights_path), map_location="cpu", weights_only=False)
-    state_dict = _convert_official_openpi_keys(
-        _normalize_state_dict(as_state_dict(loaded)),
-        weights_path,
-    )
+    mapped = zipfile.is_zipfile(weights_path)
+    with startup_section("checkpoint.read", path=str(weights_path), mmap=mapped):
+        loaded = torch.load(
+            str(weights_path), map_location="cpu", weights_only=False, mmap=mapped
+        )
+    with startup_section("checkpoint.keys"):
+        state_dict = _convert_official_openpi_keys(
+            _normalize_state_dict(as_state_dict(loaded)), weights_path
+        )
     if expect_rlt and not any(key.startswith("rlt_module.") for key in state_dict):
         raise ValueError(
             "openpi RLT checkpoint has no rlt_module.* weights. "
             "Stage2 must consume a Stage1 checkpoint trained with openpi.use_rlt=True."
         )
 
-    incompatible = model.load_state_dict(state_dict, strict=False)
+    with startup_section("checkpoint.apply"):
+        incompatible = model.load_state_dict(state_dict, strict=False)
     unexpected = list(incompatible.unexpected_keys)
     missing = list(incompatible.missing_keys)
     matched = len(state_dict) - len(unexpected)

@@ -14,11 +14,13 @@
 
 import errno
 import os
+import select
 import threading
 import time
 from collections import deque
 from typing import Any
 
+from rlinf.utils.keyboard_focus import FOCUS_LOST, TerminalKeyboardFocus
 from rlinf.utils.logging import get_logger
 
 _logger = get_logger()
@@ -45,8 +47,17 @@ class KeyboardListener:
         self.state_lock = threading.Lock()
         self.latest_data = {"key": None}
         # Queue press edges so short taps are not lost between polls.
-        self._press_events: deque[str] = deque()
-        self.device = self._open_keyboard_device()
+        self._press_events: deque[tuple[str, float]] = deque()
+        self._pressed_keys: set[str] = set()
+        self._closed = threading.Event()
+        self._focus = TerminalKeyboardFocus()
+        try:
+            self.device = self._open_keyboard_device()
+        except Exception:
+            self._focus.close()
+            raise
+        self._focused = True
+        self._accept_after = 0.0
 
         self.listener = threading.Thread(
             target=self._listen_loop,
@@ -152,9 +163,26 @@ class KeyboardListener:
     def _listen_loop(self) -> None:
         # Retain the path so the listener can recover after USB disconnects.
         device_path = self.device.path
-        while True:
+        while not self._closed.is_set():
             try:
-                for event in self.device.read_loop():
+                focused = self._focus.accepts_input()
+                with self.state_lock:
+                    if focused != self._focused:
+                        self._accept_after = time.time()
+                        self._pressed_keys.clear()
+                        self.latest_data["key"] = None
+                        self._press_events.clear()
+                        self._press_events.append((FOCUS_LOST, self._accept_after))
+                    self._focused = focused
+                readable, _, _ = select.select([self.device], [], [], 0.02)
+                if not readable:
+                    continue
+                for event in self.device.read():
+                    if (
+                        not self._focus.accepts_input()
+                        or event.timestamp() < self._accept_after
+                    ):
+                        continue
                     if event.type != self._ecodes.EV_KEY:
                         continue
 
@@ -166,21 +194,23 @@ class KeyboardListener:
                         # Enqueue the initial press only, not key-repeat events.
                         with self.state_lock:
                             self.latest_data["key"] = key
-                            self._press_events.append(key)
+                            self._pressed_keys.add(key)
+                            self._press_events.append((key, event.timestamp()))
                     elif event.value == 2:
                         with self.state_lock:
-                            self.latest_data["key"] = key
+                            if not self._focus.window_id or key in self._pressed_keys:
+                                self.latest_data["key"] = key
                     elif event.value == 0:
                         with self.state_lock:
+                            self._pressed_keys.discard(key)
                             if self.latest_data["key"] == key:
                                 self.latest_data["key"] = None
-            except OSError as exc:
-                if exc.errno != errno.ENODEV:
+            except (OSError, ValueError) as exc:
+                if self._closed.is_set():
+                    return
+                if not isinstance(exc, OSError) or exc.errno != errno.ENODEV:
                     _logger.error(
-                        "Keyboard device %s read failed (errno=%s): %s",
-                        device_path,
-                        exc.errno,
-                        exc,
+                        "Keyboard device %s read failed: %s", device_path, exc
                     )
                     raise
                 _logger.warning(
@@ -190,18 +220,20 @@ class KeyboardListener:
                 )
                 with self.state_lock:
                     self.latest_data["key"] = None
+                    self._pressed_keys.clear()
                 try:
                     self.device.close()
                 except Exception:
                     pass
                 # Keep retrying until the device returns or the process exits.
-                while True:
-                    time.sleep(0.5)
+                while not self._closed.wait(0.5):
                     try:
                         self.device = self._input_device_cls(device_path)
                         break
                     except (FileNotFoundError, OSError):
                         continue
+                if self._closed.is_set():
+                    return
                 _logger.info("Keyboard device %s reopened.", device_path)
 
     def _event_to_key(self, key_code: int) -> str | None:
@@ -218,6 +250,11 @@ class KeyboardListener:
             return f"Key.{normalized_key}"
         return key_name.lower()
 
+    def get_pressed_keys(self) -> frozenset[str]:
+        """Return all currently held keys, excluding released keys and repeats."""
+        with self.state_lock:
+            return frozenset(self._pressed_keys)
+
     def get_key(self) -> str | None:
         """Return the currently held key, or ``None``.
 
@@ -233,9 +270,20 @@ class KeyboardListener:
         Key-repeat events are omitted. The operation is thread-safe and
         non-blocking.
         """
+        return [key for key, _ in self.pop_pressed_events()]
+
+    def pop_pressed_events(self) -> list[tuple[str, float]]:
+        """Return and clear press edges with their kernel event timestamps."""
         with self.state_lock:
-            if not self._press_events:
-                return []
             pressed = list(self._press_events)
             self._press_events.clear()
             return pressed
+
+    def close(self) -> None:
+        """Stop capturing input and release the keyboard device."""
+        if self._closed.is_set():
+            return
+        self._closed.set()
+        self.listener.join()
+        self.device.close()
+        self._focus.close()

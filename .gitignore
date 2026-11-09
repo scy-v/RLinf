@@ -19,6 +19,7 @@ outputs/*
 .venv-*
 .docs-venv
 uv.lock
+results/
 rlinf/envs/sim/maniskill/assets
 PKG-INFO
 *.egg-info/

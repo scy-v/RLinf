@@ -42,6 +42,4 @@ if [[ ! -s "$WHEEL" ]]; then
 fi
 uv pip install --no-deps "$WHEEL"
 bash requirements/embodied/download_assets.sh --assets openpi
-# Camera previews need the GUI wheel; OpenPI also brings a headless wheel.
-uv pip uninstall opencv-python-headless opencv-python
-uv pip install --no-deps opencv-python==4.11.0.86
+bash "$SETUP_DIR/support/install-ur-rollout.sh"

@@ -50,12 +50,12 @@ class RTCEnvWorker(EnvWorker):
 
     def __init__(self, cfg: DictConfig):
         super().__init__(cfg)
-        rtc_cfg = self.cfg.runner.get("rtc", {})
+        rtc_cfg = self.cfg.runner.get("async_inference", self.cfg.runner.get("rtc", {}))
         self.eval_chunk_pause_seconds = float(rtc_cfg.get("chunk_pause_seconds", 0.0))
         self._assert_rtc_eval_supported()
 
     def _assert_rtc_eval_supported(self):
-        rtc_cfg = self.cfg.runner.get("rtc", {})
+        rtc_cfg = self.cfg.runner.get("async_inference", self.cfg.runner.get("rtc", {}))
         if not rtc_cfg.get("enabled", False):
             return
         assert str(self.cfg.actor.model.model_type) == "openpi", (
@@ -89,11 +89,21 @@ class RTCEnvWorker(EnvWorker):
                 f"(use chunk_pause_seconds to simulate delay instead), got {inject_delay_ms}."
             )
 
+    def _record_rtc_event(self, event: str, **values: Any) -> None:
+        """Observe RTC scheduling without changing action selection."""
+
     def send_rtc_request(
         self, rollout_channel: Channel, rtc_request: RTCRequest, mode: str = "eval"
     ) -> None:
         """Send an RTC bootstrap/replan request to the mapped rollout worker."""
         assert mode == "eval", "RTC requests are only supported in eval mode."
+        self._record_rtc_event(
+            "request",
+            request_type=rtc_request.request_type,
+            chunk_id=rtc_request.chunk_id,
+            executed_horizon=rtc_request.executed_horizon,
+            predicted_delay_steps=rtc_request.predicted_delay_steps,
+        )
         self.send_to(
             group_name=self.cfg.rollout.group_name,
             channel=rollout_channel,
@@ -228,7 +238,7 @@ class RTCEnvWorker(EnvWorker):
             rollout_channel: Channel used to send RTC requests to the rollout
                 worker.
         """
-        rtc_cfg = self.cfg.runner.get("rtc", {})
+        rtc_cfg = self.cfg.runner.get("async_inference", self.cfg.runner.get("rtc", {}))
         min_exec_horizon = int(rtc_cfg.get("min_exec_horizon", 2))
         initial_delay_steps = int(rtc_cfg.get("initial_delay_steps", 1))
         delay_buffer_size = int(rtc_cfg.get("delay_buffer_size", 8))
@@ -276,6 +286,16 @@ class RTCEnvWorker(EnvWorker):
             current_chunk_len = current_chunk_actions.shape[1]
             pending_rtc_response = None
             request_start_step = 0
+            self._record_rtc_event(
+                "adopt",
+                chunk_id=chunk_id,
+                request_type="bootstrap",
+                rollout_epoch=eval_rollout_epoch,
+                rollout_step=episode_step,
+                observed_delay_steps=0,
+                start_action_index=0,
+                chunk_length=current_chunk_len,
+            )
 
             max_eval_steps = self.cfg.env.eval.max_steps_per_rollout_epoch
             while episode_step < max_eval_steps:
@@ -291,6 +311,17 @@ class RTCEnvWorker(EnvWorker):
                     current_chunk_index = observed_delay_steps
                     pending_rtc_response = None
                     chunk_id = rtc_response.chunk_id
+                    self._record_rtc_event(
+                        "adopt",
+                        chunk_id=chunk_id,
+                        request_type="replan",
+                        rollout_epoch=eval_rollout_epoch,
+                        rollout_step=episode_step,
+                        request_start_step=request_start_step,
+                        observed_delay_steps=observed_delay_steps,
+                        start_action_index=current_chunk_index,
+                        chunk_length=current_chunk_len,
+                    )
 
                 if (
                     pending_rtc_response is None
@@ -319,6 +350,17 @@ class RTCEnvWorker(EnvWorker):
                     action_index = current_chunk_len - 1
 
                 env_action = current_chunk_actions[:, action_index]
+                self._record_rtc_event(
+                    "action",
+                    chunk_id=chunk_id,
+                    rollout_epoch=eval_rollout_epoch,
+                    rollout_step=episode_step,
+                    requested_action_index=current_chunk_index,
+                    action_index=action_index,
+                    chunk_length=current_chunk_len,
+                    chunk_exhausted=current_chunk_index >= current_chunk_len,
+                    replan_pending=pending_rtc_response is not None,
+                )
                 env_output, env_info = self._evaluate_rtc_action(env_action, stage_id)
 
                 for key, value in env_info.items():
@@ -339,10 +381,63 @@ class RTCEnvWorker(EnvWorker):
                         time.sleep(remaining)
 
                 if episode_done:
+                    if (
+                        self.cfg.env.eval.auto_reset
+                        and getattr(
+                            self.eval_env_list[stage_id],
+                            "manual_episode_control_only",
+                            False,
+                        )
+                        and episode_step < max_eval_steps
+                    ):
+                        # The env already reset; discard the old replan before bootstrap.
+                        if pending_rtc_response is not None:
+                            discarded = pending_rtc_response.wait()
+                            self._record_rtc_event(
+                                "discard",
+                                chunk_id=discarded.chunk_id,
+                                reason="episode_boundary",
+                            )
+                            pending_rtc_response = None
+                        delay_buffer = deque(
+                            [initial_delay_steps], maxlen=delay_buffer_size
+                        )
+                        chunk_id += 1
+                        self.send_rtc_request(
+                            rollout_channel,
+                            RTCRequest(
+                                obs=self._copy_rtc_obs(env_output.to_dict()["obs"]),
+                                request_type="bootstrap",
+                                executed_horizon=0,
+                                predicted_delay_steps=initial_delay_steps,
+                                chunk_id=chunk_id,
+                            ),
+                            mode="eval",
+                        )
+                        rtc_response = self.recv_rtc_response(
+                            input_channel, mode="eval", async_op=False
+                        )
+                        current_chunk_actions = self._prepare_rtc_actions(rtc_response)
+                        current_chunk_len = current_chunk_actions.shape[1]
+                        current_chunk_index = 0
+                        self._record_rtc_event(
+                            "adopt",
+                            chunk_id=chunk_id,
+                            request_type="bootstrap",
+                            rollout_epoch=eval_rollout_epoch,
+                            rollout_step=episode_step,
+                            observed_delay_steps=0,
+                            start_action_index=0,
+                            chunk_length=current_chunk_len,
+                        )
+                        continue
                     break
 
             if pending_rtc_response is not None:
-                pending_rtc_response.wait()
+                discarded = pending_rtc_response.wait()
+                self._record_rtc_event(
+                    "discard", chunk_id=discarded.chunk_id, reason="rollout_end"
+                )
                 pending_rtc_response = None
 
             if not episode_done:

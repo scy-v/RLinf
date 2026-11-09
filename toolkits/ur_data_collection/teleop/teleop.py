@@ -1,0 +1,487 @@
+# Copyright 2025 The RLinf Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# Copyright 2024 The HuggingFace Inc. team. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import logging
+import os
+import sys
+import threading
+import time
+from queue import Empty, Queue
+from typing import Any
+
+import numpy as np
+from lerobot.teleoperators.keyboard.configuration_keyboard import (
+    KeyboardTeleopConfig,
+)
+from lerobot.teleoperators.teleoperator import Teleoperator
+from lerobot.utils.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
+from scipy.spatial.transform import Rotation as R
+
+from rlinf.utils.logging import get_logger
+
+from .config_teleop import UR5eTeleopConfig
+
+logger = get_logger()
+
+PYNPUT_AVAILABLE = True
+try:
+    if ("DISPLAY" not in os.environ) and ("linux" in sys.platform):
+        logging.info("No DISPLAY set. Skipping pynput import.")
+        raise ImportError("pynput blocked intentionally due to no display.")
+
+    from pynput import keyboard
+except ImportError:
+    keyboard = None
+    PYNPUT_AVAILABLE = False
+except Exception as e:
+    keyboard = None
+    PYNPUT_AVAILABLE = False
+    logging.info(f"Could not import pynput: {e}")
+
+
+ACTION_KEYS = ("delta_x", "delta_y", "delta_z", "delta_rx", "delta_ry", "delta_rz")
+
+
+class KeyboardTeleop(Teleoperator):
+    """
+    Teleop class to use keyboard inputs for control.
+    """
+
+    config_class = KeyboardTeleopConfig
+    name = "keyboard"
+
+    def __init__(self, config: KeyboardTeleopConfig):
+        super().__init__(config)
+        self.config = config
+        self.robot_type = config.type
+
+        self.event_queue = Queue()
+        self.current_pressed = {}
+        self.listener = None
+        self.logs = {}
+        self.disconnect_on_esc = True
+        self._input_lock = threading.Lock()
+        self._input_enabled = True
+        self._physical_pressed = set()
+        self._blocked_keys = set()
+
+    @property
+    def action_features(self) -> dict:
+        return {
+            "dtype": "float32",
+            "shape": (len(self.arm),),
+            "names": {"motors": list(self.arm.motors)},
+        }
+
+    @property
+    def feedback_features(self) -> dict:
+        return {}
+
+    @property
+    def is_connected(self) -> bool:
+        return (
+            PYNPUT_AVAILABLE
+            and isinstance(self.listener, keyboard.Listener)
+            and self.listener.is_alive()
+        )
+
+    @property
+    def is_calibrated(self) -> bool:
+        pass
+
+    def connect(self) -> None:
+        if self.is_connected:
+            raise DeviceAlreadyConnectedError(
+                "Keyboard is already connected. Do not run `robot.connect()` twice."
+            )
+
+        if PYNPUT_AVAILABLE:
+            logging.info("pynput is available - enabling local keyboard listener.")
+            self.listener = keyboard.Listener(
+                on_press=self._on_press,
+                on_release=self._on_release,
+            )
+            self.listener.start()
+        else:
+            logging.info("pynput not available - skipping local keyboard listener.")
+            self.listener = None
+
+    def calibrate(self) -> None:
+        pass
+
+    def set_input_enabled(self, enabled: bool) -> None:
+        """Clear queued motion and require held keys to be released on phase changes."""
+        with self._input_lock:
+            self._input_enabled = enabled
+            self._blocked_keys = self._physical_pressed.copy()
+            self.current_pressed.clear()
+            while True:
+                try:
+                    self.event_queue.get_nowait()
+                except Empty:
+                    break
+
+    def _on_press(self, key):
+        with self._input_lock:
+            if key in self._physical_pressed:
+                return
+            self._physical_pressed.add(key)
+            if self._input_enabled and key not in self._blocked_keys:
+                self.event_queue.put((key, True))
+
+    def _on_release(self, key):
+        if key == keyboard.Key.esc and self.disconnect_on_esc:
+            logging.info("ESC pressed, disconnecting.")
+            self.disconnect()
+        with self._input_lock:
+            self._physical_pressed.discard(key)
+            self._blocked_keys.discard(key)
+            if self._input_enabled:
+                self.event_queue.put((key, False))
+
+    def _drain_pressed_keys(self):
+        with self._input_lock:
+            key_events = []
+            while not self.event_queue.empty():
+                key_char, is_pressed = self.event_queue.get_nowait()
+                was_pressed = self.current_pressed.get(key_char, False)
+                self.current_pressed[key_char] = is_pressed
+                key_events.append((key_char, is_pressed, was_pressed))
+            return key_events
+
+    def configure(self):
+        pass
+
+    def get_action(self) -> dict[str, Any]:
+        before_read_t = time.perf_counter()
+
+        if not self.is_connected:
+            raise DeviceNotConnectedError(
+                "KeyboardTeleop is not connected. You need to run `connect()` before `get_action()`."
+            )
+
+        self._drain_pressed_keys()
+
+        # Generate action based on current key states
+        action = {key for key, val in self.current_pressed.items() if val}
+        self.logs["read_pos_dt_s"] = time.perf_counter() - before_read_t
+
+        return dict.fromkeys(action, None)
+
+    def send_feedback(self, feedback: dict[str, Any]) -> None:
+        pass
+
+    def disconnect(self) -> None:
+        if not self.is_connected:
+            raise DeviceNotConnectedError(
+                "KeyboardTeleop is not connected. You need to run `robot.connect()` before `disconnect()`."
+            )
+        if self.listener is not None:
+            self.listener.stop()
+
+
+class UR5eTeleop(KeyboardTeleop):
+    """
+    Teleop class to use keyboard inputs for end effector control.
+    Designed to be used with the `So100FollowerEndEffector` robot.
+    """
+
+    config_class = UR5eTeleopConfig
+    name = "ur5e_keyboard_ee"
+
+    def __init__(self, config: UR5eTeleopConfig):
+        self.intervention_active = False
+        super().__init__(config)
+        self.config = config
+        self.default_step_size = config.step_size
+        self.default_rot_step_size = config.rot_step_size
+        self.alternate_step_size = config.alternate_step_size
+        self.alternate_rot_step_size = config.alternate_rot_step_size
+        self.use_alternate_step_size = False
+        self.step_size = self.default_step_size
+        self.rot_step_size = self.default_rot_step_size
+        self.reference_frame = config.reference_frame
+        self.control_frame_euler_deg = self._validate_control_frame_euler(
+            config.control_frame_euler_deg
+        )
+        self.control_to_base_rotation = R.from_euler(
+            "xyz", self.control_frame_euler_deg, degrees=True
+        ).as_matrix()
+        self.use_control_frame = not np.allclose(
+            self.control_frame_euler_deg, [0.0, 0.0, 0.0]
+        )
+        self.select_vector = self._validate_select_vector(config.select_vector)
+        self.robot = None
+        self.gripper_action = self._get_initial_gripper_action()
+
+    def set_robot(self, robot) -> None:
+        self.robot = robot
+
+    def _get_initial_gripper_action(self) -> float:
+        if self.config.init_gripper:
+            return 1.0
+
+        while True:
+            value = input("Please enter the initial gripper action (0 or 1): ").strip()
+            if value in {"0", "1"}:
+                return float(value)
+            logger.info("Invalid input. Please enter 0 or 1.")
+
+    def _toggle_step_size(self) -> None:
+        if self.alternate_step_size is None or self.alternate_rot_step_size is None:
+            return
+
+        self.use_alternate_step_size = not self.use_alternate_step_size
+        if self.use_alternate_step_size:
+            self.step_size = self.alternate_step_size
+            self.rot_step_size = self.alternate_rot_step_size
+            mode = "fine"
+        else:
+            self.step_size = self.default_step_size
+            self.rot_step_size = self.default_rot_step_size
+            mode = "default"
+
+        logging.info(
+            f"====== [TELEOP] Step size switched to {mode}: "
+            f"step_size={self.step_size}, rot_step_size={self.rot_step_size} ======"
+        )
+
+    def reset_step_size(self) -> None:
+        self.use_alternate_step_size = False
+        self.step_size = self.default_step_size
+        self.rot_step_size = self.default_rot_step_size
+
+    def _pose_to_matrix(self, tcp_pose: list[float]) -> np.ndarray:
+        transform = np.eye(4)
+        transform[:3, :3] = R.from_rotvec(tcp_pose[3:]).as_matrix()
+        transform[:3, 3] = np.array(tcp_pose[:3], dtype=float)
+        return transform
+
+    def _validate_select_vector(self, select_vector: list | None) -> list[float]:
+        if select_vector is None:
+            return [1.0] * len(ACTION_KEYS)
+        if len(select_vector) != len(ACTION_KEYS):
+            raise ValueError(
+                f"select_vector must contain 6 values, got {len(select_vector)}."
+            )
+        values = [float(value) for value in select_vector]
+        if any(value not in (0.0, 1.0) for value in values):
+            raise ValueError(
+                f"select_vector values must be 0 or 1, got {select_vector}."
+            )
+        return values
+
+    def _validate_control_frame_euler(self, euler_deg: list | None) -> list[float]:
+        if euler_deg is None:
+            return [0.0, 0.0, 0.0]
+        if len(euler_deg) != 3:
+            raise ValueError(
+                f"control_frame_euler_deg must contain 3 values, got {len(euler_deg)}."
+            )
+        return [float(value) for value in euler_deg]
+
+    def _apply_select_vector_mask(
+        self, action_values: dict[str, float]
+    ) -> dict[str, float]:
+        return {
+            key: float(action_values[key]) if self.select_vector[idx] == 1.0 else 0.0
+            for idx, key in enumerate(ACTION_KEYS)
+        }
+
+    def _control_delta_to_base(
+        self, action_values: dict[str, float]
+    ) -> dict[str, float]:
+        if not self.use_control_frame:
+            return action_values
+        control_to_base = self.control_to_base_rotation
+        delta_position_control = np.array(
+            [
+                action_values["delta_x"],
+                action_values["delta_y"],
+                action_values["delta_z"],
+            ],
+            dtype=float,
+        )
+        delta_rotation_control = R.from_euler(
+            "xyz",
+            [
+                action_values["delta_rx"],
+                action_values["delta_ry"],
+                action_values["delta_rz"],
+            ],
+        ).as_matrix()
+
+        delta_position_base = control_to_base @ delta_position_control
+        delta_rotation_base = (
+            control_to_base @ delta_rotation_control @ control_to_base.T
+        )
+        delta_euler_base = R.from_matrix(delta_rotation_base).as_euler("xyz")
+        return {
+            "delta_x": float(delta_position_base[0]),
+            "delta_y": float(delta_position_base[1]),
+            "delta_z": float(delta_position_base[2]),
+            "delta_rx": float(delta_euler_base[0]),
+            "delta_ry": float(delta_euler_base[1]),
+            "delta_rz": float(delta_euler_base[2]),
+        }
+
+    @property
+    def action_features(self) -> dict:
+        if self.config.use_gripper:
+            return {
+                "dtype": "float32",
+                "shape": (7,),
+                "names": {
+                    "delta_x": 0,
+                    "delta_y": 1,
+                    "delta_z": 2,
+                    "delta_rx": 3,
+                    "delta_ry": 4,
+                    "delta_rz": 5,
+                    "gripper_position": 6,
+                },
+            }
+        else:
+            return {
+                "dtype": "float32",
+                "shape": (6,),
+                "names": {
+                    "delta_x": 0,
+                    "delta_y": 1,
+                    "delta_z": 2,
+                    "delta_rx": 3,
+                    "delta_ry": 4,
+                    "delta_rz": 5,
+                },
+            }
+
+    def _to_reference_delta(self, action_values: dict[str, float]) -> dict[str, float]:
+        action_values = self._apply_select_vector_mask(action_values)
+        action_values = self._control_delta_to_base(action_values)
+        return self._reference_delta_from_base_delta(action_values)
+
+    def _reference_delta_from_base_delta(
+        self, action_values: dict[str, float]
+    ) -> dict[str, float]:
+        if self.reference_frame == "base":
+            return action_values
+        if self.reference_frame != "tcp":
+            raise ValueError(f"Unsupported reference_frame: {self.reference_frame}")
+        if not any(abs(value) > 0.0 for value in action_values.values()):
+            return action_values
+        if self.robot is None:
+            raise ValueError("TCP reference frame requires a robot object on teleop.")
+
+        current_transform = self._pose_to_matrix(self.robot.get_ee_pose())
+        current_rotation = current_transform[:3, :3]
+        delta_position_base = np.array(
+            [
+                action_values["delta_x"],
+                action_values["delta_y"],
+                action_values["delta_z"],
+            ],
+            dtype=float,
+        )
+        delta_rotation_base = R.from_euler(
+            "xyz",
+            [
+                action_values["delta_rx"],
+                action_values["delta_ry"],
+                action_values["delta_rz"],
+            ],
+        ).as_matrix()
+
+        delta_position_tcp = current_rotation.T @ delta_position_base
+        delta_rotation_tcp = current_rotation.T @ delta_rotation_base @ current_rotation
+        delta_euler_tcp = R.from_matrix(delta_rotation_tcp).as_euler("xyz")
+        return {
+            "delta_x": float(delta_position_tcp[0]),
+            "delta_y": float(delta_position_tcp[1]),
+            "delta_z": float(delta_position_tcp[2]),
+            "delta_rx": float(delta_euler_tcp[0]),
+            "delta_ry": float(delta_euler_tcp[1]),
+            "delta_rz": float(delta_euler_tcp[2]),
+        }
+
+    def get_action(self) -> dict[str, Any]:
+        if not self.is_connected:
+            raise DeviceNotConnectedError(
+                "KeyboardTeleop is not connected. You need to run `connect()` before `get_action()`."
+            )
+
+        key_events = self._drain_pressed_keys()
+        slash_key = keyboard.KeyCode.from_char("/")
+        for key, is_pressed, was_pressed in key_events:
+            if key == slash_key and is_pressed and not was_pressed:
+                self._toggle_step_size()
+
+        action_values = dict.fromkeys(ACTION_KEYS, 0.0)
+
+        key_mapping = {
+            keyboard.KeyCode.from_char("s"): ("delta_x", 1.0, self.step_size),
+            keyboard.KeyCode.from_char("w"): ("delta_x", -1.0, self.step_size),
+            keyboard.KeyCode.from_char("d"): ("delta_y", 1.0, self.step_size),
+            keyboard.KeyCode.from_char("a"): ("delta_y", -1.0, self.step_size),
+            keyboard.KeyCode.from_char("q"): ("delta_z", 1.0, self.step_size),
+            keyboard.KeyCode.from_char("e"): ("delta_z", -1.0, self.step_size),
+            keyboard.KeyCode.from_char("r"): ("delta_rx", 1.0, self.rot_step_size),
+            keyboard.KeyCode.from_char("t"): ("delta_rx", -1.0, self.rot_step_size),
+            keyboard.KeyCode.from_char("g"): ("delta_ry", 1.0, self.rot_step_size),
+            keyboard.KeyCode.from_char("f"): ("delta_ry", -1.0, self.rot_step_size),
+            keyboard.KeyCode.from_char("b"): ("delta_rz", 1.0, self.rot_step_size),
+            keyboard.KeyCode.from_char("v"): ("delta_rz", -1.0, self.rot_step_size),
+        }
+
+        intervention_keys = set(key_mapping)
+        if self.config.use_gripper:
+            intervention_keys.update(
+                (keyboard.KeyCode.from_char("o"), keyboard.KeyCode.from_char("l"))
+            )
+        # Capture the same key snapshot used to produce this action.
+        self.intervention_active = any(
+            self.current_pressed.get(key, False) for key in intervention_keys
+        )
+
+        # Generate action from sustained key states. This allows held keys and
+        # multi-axis combinations such as forward + left.
+        for key, val in self.current_pressed.items():
+            if key in key_mapping and val:
+                axis, sign, step = key_mapping[key]
+                action_values[axis] += sign * step
+            elif key == keyboard.KeyCode.from_char("o") and val:
+                self.gripper_action = 1  # O -> open, latched like conrft
+            elif key == keyboard.KeyCode.from_char("l") and val:
+                self.gripper_action = 0  # L -> close, latched like conrft
+
+        action_dict = self._to_reference_delta(action_values)
+
+        if self.config.use_gripper:
+            action_dict["gripper_position"] = self.gripper_action
+
+        return action_dict

@@ -280,52 +280,147 @@ def keyboard() -> types.ModuleType:
     keyboard is only incidental.
     """
     import os
+    import queue
+    import threading
     import time
 
-    codes = types.SimpleNamespace(EV_KEY=1, KEY_A=30, KEY_B=48, KEY_C=46, KEY_Q=16)
-    by_name = {"a": codes.KEY_A, "b": codes.KEY_B, "c": codes.KEY_C, "q": codes.KEY_Q}
-    # The listener maps a code back to its name through bytype.
-    codes.bytype = {
-        codes.EV_KEY: {code: f"KEY_{n.upper()}" for n, code in by_name.items()}
+    codes = types.SimpleNamespace(
+        EV_KEY=1,
+        KEY_A=30,
+        KEY_B=48,
+        KEY_C=46,
+        KEY_Q=16,
+        KEY_ENTER=28,
+        KEY_KPENTER=96,
+        KEY_SPACE=57,
+        KEY_F8=66,
+        KEY_DOT=52,
+        KEY_SLASH=53,
+        KEY_LEFTBRACE=26,
+        KEY_Z=44,
+        KEY_S=31,
+        KEY_W=17,
+        KEY_D=32,
+        KEY_E=18,
+        KEY_R=19,
+        KEY_T=20,
+        KEY_G=34,
+        KEY_F=33,
+        KEY_V=47,
+        KEY_L=38,
+        KEY_O=24,
+    )
+    by_name = {
+        name: getattr(codes, f"KEY_{name.upper()}")
+        for name in (
+            "a",
+            "b",
+            "c",
+            "q",
+            "enter",
+            "kpenter",
+            "space",
+            "f8",
+            "dot",
+            "slash",
+            "leftbrace",
+            "z",
+            "s",
+            "w",
+            "d",
+            "e",
+            "r",
+            "t",
+            "g",
+            "f",
+            "v",
+            "l",
+            "o",
+        )
     }
+    codes.bytype = {
+        codes.EV_KEY: {code: f"KEY_{name.upper()}" for name, code in by_name.items()}
+    }
+    devices = []
 
     class Device:
         def __init__(self, path: str) -> None:
             self.name = "fake keyboard"
             self.path = path
             self.closed = False
-
-        def capabilities(self, verbose: bool = False) -> dict[int, list[int]]:
-            # Every key the listener requires, so it accepts this as a keyboard.
-            return {codes.EV_KEY: [codes.KEY_A, codes.KEY_B, codes.KEY_C, codes.KEY_Q]}
-
-        def read_loop(self):
+            self._read_fd, self._write_fd = os.pipe()
+            self._batches = queue.Queue()
+            self._stop = threading.Event()
+            self._producer = None
+            devices.append(self)
             keys = [
-                by_name[name.strip().lower()]
+                name.strip().lower()
                 for name in os.environ.get("RLINF_FAKE_KEYS", "").split(",")
                 if name.strip().lower() in by_name
             ]
-            if not keys:
-                # No script: block rather than spin, as a quiet keyboard does.
-                while not self.closed:
-                    time.sleep(0.05)
-                return
-            # A consumer may read the held key rather than the press edge, so
-            # each key is held for a beat before it is released.
+            if keys:
+                self._producer = threading.Thread(
+                    target=self._script, args=(keys,), daemon=True
+                )
+                self._producer.start()
+
+        def capabilities(self, verbose: bool = False) -> dict[int, list[int]]:
+            return {codes.EV_KEY: list(by_name.values())}
+
+        def fileno(self) -> int:
+            return self._read_fd
+
+        def emit(self, *presses: tuple[str, int]) -> threading.Event:
+            """Queue kernel-style edges; the returned event signals delivery."""
+            delivered = threading.Event()
+            events = []
+            for name, value in presses:
+                timestamp = time.time()
+                events.append(
+                    types.SimpleNamespace(
+                        type=codes.EV_KEY,
+                        code=by_name[name],
+                        value=value,
+                        timestamp=lambda timestamp=timestamp: timestamp,
+                    )
+                )
+            self._batches.put((events, delivered))
+            os.write(self._write_fd, b"k")
+            return delivered
+
+        def read(self):
+            os.read(self._read_fd, 1)
+            events, delivered = self._batches.get_nowait()
+            yield from events
+            delivered.set()
+
+        def _script(self, keys):
             dwell = float(os.environ.get("RLINF_FAKE_KEY_DWELL", "0.3"))
-            while not self.closed:
-                for code in keys:
-                    yield types.SimpleNamespace(type=codes.EV_KEY, code=code, value=1)
-                    time.sleep(dwell)
-                    yield types.SimpleNamespace(type=codes.EV_KEY, code=code, value=0)
-                    time.sleep(0.02)
+            while not self._stop.is_set():
+                for name in keys:
+                    if self._stop.is_set():
+                        return
+                    self.emit((name, 1))
+                    if self._stop.wait(dwell):
+                        return
+                    self.emit((name, 0))
+                    if self._stop.wait(0.02):
+                        return
 
         def close(self) -> None:
+            if self.closed:
+                return
+            self._stop.set()
+            if self._producer is not None:
+                self._producer.join()
+            os.close(self._read_fd)
+            os.close(self._write_fd)
             self.closed = True
 
     return module(
         "evdev",
         InputDevice=Device,
+        devices=devices,
         list_devices=lambda: ["/dev/input/event-fake"],
         ecodes=codes,
     )
@@ -344,3 +439,46 @@ def modules(**_: Any) -> dict[str, types.ModuleType]:
     made.update(gello())
     made.update(glove())
     return made
+
+
+def x11_keyboard_display():
+    """Return a fake Xlib display factory with independently controlled focus."""
+    import os
+
+    state = types.SimpleNamespace(active=42, failed=False, connections=[])
+
+    class Window:
+        def __init__(self, window_id):
+            self.id = window_id
+
+        def get_attributes(self):
+            return types.SimpleNamespace()
+
+        def get_full_property(self, name, property_type):
+            if state.failed:
+                raise OSError("X server disconnected")
+            values = {
+                "_NET_ACTIVE_WINDOW": [state.active],
+                "_NET_CLIENT_LIST": [42],
+                "_NET_WM_PID": [os.getpid()],
+            }
+            return types.SimpleNamespace(value=values[name])
+
+    class Display:
+        def __init__(self):
+            self.closed = False
+            state.connections.append(self)
+
+        def screen(self):
+            return types.SimpleNamespace(root=Window(0))
+
+        def intern_atom(self, name):
+            return name
+
+        def create_resource_object(self, kind, window_id):
+            return Window(window_id)
+
+        def close(self):
+            self.closed = True
+
+    return module("Xlib.display", Display=Display), state

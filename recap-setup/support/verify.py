@@ -10,6 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import cv2
 import torch
 from openpi.models.tokenizer import PaligemmaTokenizer
 
@@ -46,6 +47,13 @@ for name in (
 
 assert Path(rlinf.__file__).resolve().is_relative_to(repo / "rlinf")
 assert Path(sys.prefix).resolve() == repo / ".venv"
+report["opencv_gui"] = next(
+    line.strip() for line in cv2.getBuildInformation().splitlines() if "GUI:" in line
+)
+assert report["opencv_gui"].split(":", 1)[1].strip() not in ("", "NONE"), (
+    f"Expected OpenCV GUI support, got {report['opencv_gui']}; "
+    "run bash recap-setup/support/install-ur-runtime.sh"
+)
 report["cuda_available"] = torch.cuda.is_available()
 report["gpu_count"] = torch.cuda.device_count()
 if report["cuda_available"]:

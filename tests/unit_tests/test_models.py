@@ -1540,3 +1540,125 @@ def test_cosmos3_sglang_response_keeps_every_env_in_input_order():
     assert actions.shape == (2, 16, 7)
     assert torch.all(actions[0, :, 6] == -0.5)
     assert torch.all(actions[1, :, 6] == 0.5)
+
+
+def test_openpi_rtc_full_compilation_preserves_replanning(tmp_path):
+    """Opt-in UR checkpoint check for RTC parity and graph reuse across delays."""
+    import json
+    import os
+
+    from rlinf.data.schema.embodied_types import RTCRequest
+    from rlinf.models.embodiment.openpi.sampling.rtc_guidance import RTCGuidanceContext
+    from rlinf.workers.env.ur5e_eval_worker import URRTCRolloutWorker
+
+    config_path = os.environ.get("RLINF_RTC_COMPILE_TEST_CONFIG")
+    if not config_path or not Worker.torch_platform.is_available():
+        pytest.skip("Requires CUDA and RLINF_RTC_COMPILE_TEST_CONFIG with UR assets")
+    cfg = OmegaConf.load(config_path)
+    torch.set_num_threads(4)
+    torch.manual_seed(42)
+    model = get_model(cfg.rollout.model).eval().requires_grad_(False).to("cuda")
+    obs = {
+        "main_images": torch.randint(256, (1, 224, 224, 3), dtype=torch.uint8),
+        "wrist_images": torch.randint(256, (1, 224, 224, 3), dtype=torch.uint8),
+        "states": torch.zeros(1, 19),
+        "task_descriptions": ["Insert the black rack into the blue slot"],
+    }
+    with torch.inference_mode():
+        noise = torch.randn(1, 20, 32, device="cuda")
+        _, bootstrap = model.predict_action_batch(obs, noise=noise)
+        previous = bootstrap["model_actions"].cpu().clone()
+        contexts = [
+            RTCGuidanceContext(previous, e, d)
+            for e, d in [(2, 1), (2, 2), (3, 3), (4, 4), (20, 2), (0, 0)]
+        ]
+        baseline = [
+            model.predict_action_batch(obs, noise=noise, rtc_context=c)[0].clone()
+            for c in contexts
+        ]
+        model.enable_rtc_torch_compile()
+        model.enable_rtc_torch_compile()
+        with pytest.raises(ValueError, match="cannot switch"):
+            model.enable_rtc_torch_compile("default")
+        errors = []
+        graphs_before = torch._dynamo.utils.counters["stats"]["unique_graphs"]
+        graphs = None
+        for context, expected in zip(contexts, baseline):
+            torch.compiler.cudagraph_mark_step_begin()
+            actual = model.predict_action_batch(obs, noise=noise, rtc_context=context)[
+                0
+            ].clone()
+            torch.testing.assert_close(
+                actual[..., :6], expected[..., :6], rtol=0.02, atol=0.002
+            )
+            threshold = cfg.env.eval.override_cfg.gripper_close_threshold
+            torch.testing.assert_close(
+                actual[..., 6] > threshold, expected[..., 6] > threshold
+            )
+            assert torch.isfinite(actual).all()
+            errors.append(float((actual - expected).abs().max()))
+            count = torch._dynamo.utils.counters["stats"]["unique_graphs"]
+            if graphs is None:
+                graphs = count
+                assert graphs == graphs_before + 1, (
+                    "RTC computation must form one graph"
+                )
+            assert count == graphs, "Changing RTC delays must reuse the compiled graph"
+        model.sample_actions = torch.compile(model.sample_actions, mode="max-autotune")
+        # Exercise the production warmup and bootstrap/replan cache lifecycle.
+        from contextlib import nullcontext
+
+        from rlinf.scheduler import AcceleratorType
+        from rlinf.utils.logging import get_logger
+
+        worker = object.__new__(URRTCRolloutWorker)
+        worker.cfg, worker.hf_model = cfg, model
+        worker._rtc_eval_model_actions = None
+        worker.inject_delay_ms = worker.fixed_delay_steps = (
+            worker.eval_chunk_pause_seconds
+        ) = 0
+        worker._accelerator_type = AcceleratorType.NO_ACCEL
+        worker.worker_timer = lambda *args, **kwargs: nullcontext()
+        worker.log_info = get_logger().info
+        worker._predict_rtc(RTCRequest(obs=obs, request_type="warmup"))
+        assert worker._rtc_eval_model_actions is None
+        for kind, executed, delay in [
+            ("bootstrap", 0, 1),
+            ("replan", 2, 2),
+            ("replan", 3, 3),
+            ("bootstrap", 0, 1),
+        ]:
+            response = worker._predict_rtc(
+                RTCRequest(
+                    obs=obs,
+                    request_type=kind,
+                    executed_horizon=executed,
+                    predicted_delay_steps=delay,
+                )
+            )
+            assert response.guidance_applied == (kind == "replan")
+            assert response.actions.shape == (1, 10, 7)
+            assert torch.isfinite(response.actions).all()
+    (tmp_path / "rtc_compile_parity.json").write_text(
+        json.dumps(
+            {"action_max_abs_errors": errors, "graph_count_after_warmup": graphs},
+            indent=2,
+        )
+    )
+
+
+@pytest.mark.parametrize("zip_serialization", [False, True])
+def test_openpi_full_checkpoint_load_preserves_weights(tmp_path, zip_serialization):
+    from rlinf.models.embodiment.openpi.checkpoint import load_full_weights
+
+    original = torch.nn.Linear(3, 2)
+    checkpoint = tmp_path / "full_weights.pt"
+    torch.save(
+        original.state_dict(),
+        checkpoint,
+        _use_new_zipfile_serialization=zip_serialization,
+    )
+    restored = torch.nn.Linear(3, 2)
+    load_full_weights(restored, checkpoint, expect_rlt=False)
+    for name, value in original.state_dict().items():
+        torch.testing.assert_close(restored.state_dict()[name], value)
