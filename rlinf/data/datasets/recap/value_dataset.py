@@ -199,7 +199,12 @@ class ReturnNormalizer(DataTransformFn):
 
 
 class ValueDataset(Dataset):
-    """Flat dataset for value model SFT."""
+    """Image/text value supervision with optional disjoint episode splits.
+
+    With ``validation_fraction > 0``, train and val select complementary
+    episodes using ``episode_seed``. Percentage sampling applies after splitting.
+    Robot state and actions are not inputs to the value model.
+    """
 
     def __init__(
         self,
@@ -217,11 +222,12 @@ class ValueDataset(Dataset):
         episode_percentage: Optional[float] = None,
         shuffle_episodes: bool = False,
         episode_seed: int = 42,
+        validation_fraction: float = 0.0,
+        split: str = "train",
         **kwargs,
     ):
         _known_unused = {
             "gamma",
-            "split",
             "repo_id",
             "norm_stats_dir",
             "asset_id",
@@ -233,6 +239,12 @@ class ValueDataset(Dataset):
             logger.warning(f"ValueDataset ignoring unexpected kwargs: {unexpected}")
 
         self.max_samples = max_samples
+        if not 0 <= validation_fraction < 1:
+            raise ValueError(
+                f"Expected validation_fraction in [0, 1), got {validation_fraction}."
+            )
+        if validation_fraction and split not in ("train", "val"):
+            raise ValueError(f"Expected split 'train' or 'val', got {split!r}.")
         local_path = Path(dataset_path).absolute()
 
         self.dataset_meta = LeRobotDatasetMetadata(local_path.name, root=local_path)
@@ -265,19 +277,32 @@ class ValueDataset(Dataset):
             )
 
         self._indices = None
+        total = self.dataset_meta.total_episodes
+        selected = list(range(total))
+        if validation_fraction:
+            if total < 2:
+                raise ValueError(
+                    f"Expected at least two episodes for train/val splitting, got {total}."
+                )
+            shuffled = np.random.default_rng(episode_seed).permutation(total)
+            num_val = max(1, int(total * validation_fraction))
+            selected = sorted(
+                (shuffled[:num_val] if split == "val" else shuffled[num_val:]).tolist()
+            )
         if episode_percentage is not None and episode_percentage < 100:
             if episode_percentage <= 0:
                 raise ValueError(
                     f"episode_percentage must be > 0, got {episode_percentage}"
                 )
-            total = self.dataset_meta.total_episodes
-            num = max(1, int(total * episode_percentage / 100.0))
-            all_eps = list(range(total))
+            num = max(1, int(len(selected) * episode_percentage / 100.0))
             if shuffle_episodes:
                 rng = np.random.default_rng(episode_seed)
-                selected = set(rng.choice(all_eps, size=num, replace=False).tolist())
+                selected = sorted(
+                    rng.choice(selected, size=num, replace=False).tolist()
+                )
             else:
-                selected = set(all_eps[:num])
+                selected = selected[:num]
+        if len(selected) != total:
             ep_starts, ep_ends = episode_boundaries(self._base)
             self._indices = [
                 i for ep in sorted(selected) for i in range(ep_starts[ep], ep_ends[ep])
@@ -310,6 +335,9 @@ class ValueDataset(Dataset):
         model_type_lower = model_type.lower()
         model_type_enum = _MODEL_TYPE_MAP[model_type_lower]
         robot = robot_type.lower()
+
+        if robot == "ur5e":
+            return URValueInputs(default_prompt=default_prompt)
 
         transforms_list = []
         repack_keys = _REPACK_KEYS.get(robot)
@@ -388,6 +416,29 @@ class ValueDataset(Dataset):
         if isinstance(masks, dict) and masks:
             result["image_masks"] = masks
         return result
+
+
+@dataclass(frozen=True)
+class URValueInputs(DataTransformFn):
+    """Map UR cameras and task text without consuming state or action fields."""
+
+    default_prompt: str | None = None
+
+    def __call__(self, data: dict[str, Any]) -> dict[str, Any]:
+        from rlinf.models.embodiment.openpi.dataconfig.ur_dataconfig import (
+            parse_ur_image,
+        )
+
+        return {
+            "image": {
+                "base_0_rgb": parse_ur_image(data["observation.images.exterior_image"]),
+                "left_wrist_0_rgb": parse_ur_image(
+                    data["observation.images.wrist_image"]
+                ),
+            },
+            "image_mask": {"base_0_rgb": np.True_, "left_wrist_0_rgb": np.True_},
+            "prompt": data.get("prompt", self.default_prompt or "perform the task"),
+        }
 
 
 class ValueDataLoaderImpl(BaseDataLoaderImpl):

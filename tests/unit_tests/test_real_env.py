@@ -5832,7 +5832,8 @@ def _press_keys(device, *keys):
     "async_enabled,rtc_enabled",
     [(False, False), (True, False), (True, True), (False, True)],
 )
-def test_ur5e_eval_config_compose(monkeypatch, async_enabled, rtc_enabled):
+@pytest.mark.parametrize("model_type", ["openpi", "cfg_model"])
+def test_ur5e_eval_config_compose(monkeypatch, async_enabled, rtc_enabled, model_type):
     from hydra import compose, initialize_config_dir
 
     root = Path(__file__).resolve().parents[2]
@@ -5845,10 +5846,15 @@ def test_ur5e_eval_config_compose(monkeypatch, async_enabled, rtc_enabled):
             overrides=[
                 f"runner.async_inference.enabled={str(async_enabled).lower()}",
                 f"rollout.model.openpi.rtc_enabled={str(rtc_enabled).lower()}",
+                f"rollout.model.model_type={model_type}",
             ],
         )
     from evaluations.realworld.eval_ur5e import prepare_inference_config
 
+    if model_type == "cfg_model" and rtc_enabled:
+        with pytest.raises(ValueError, match="CFG inference does not support RTC"):
+            prepare_inference_config(cfg)
+        return
     if rtc_enabled and not async_enabled:
         with pytest.raises(ValueError, match="RTC guidance requires"):
             prepare_inference_config(cfg)
@@ -5860,7 +5866,7 @@ def test_ur5e_eval_config_compose(monkeypatch, async_enabled, rtc_enabled):
     assert "rtde_frequency" not in impedance
     assert impedance.frequency == 100.0
     assert impedance.start_paused
-    assert cfg.rollout.model.model_type == "openpi"
+    assert cfg.rollout.model.model_type == model_type
     assert cfg.rollout.model.pi05
     assert cfg.rollout.model.openpi.task == "eval"
     assert cfg.rollout.model.openpi.rtc_enabled == rtc_enabled
@@ -6491,3 +6497,53 @@ def test_ur5e_inference_rejects_rlt_model(backend, monkeypatch):
         validate = model_config_from_yaml
     with pytest.raises(ValueError, match="use_rlt=false"):
         validate(cfg)
+
+
+@pytest.mark.parametrize("backend", ["native", "vla_precision"])
+@pytest.mark.parametrize("positive_only", [False, True])
+def test_ur_cfg_inference_configuration(backend, positive_only):
+    import copy
+
+    from omegaconf import OmegaConf
+
+    if backend == "native":
+        from evaluations.realworld.eval_ur5e import prepare_inference_config
+
+        cfg = OmegaConf.load(
+            _ROOT / "evaluations/realworld/realworld_ur5e_eval_pi05_sft.yaml"
+        )
+        model = cfg.rollout.model
+
+        def validate():
+            return prepare_inference_config(cfg)
+    else:
+        from evaluations.realworld.vla_precision_ur.policy import model_config_from_yaml
+
+        cfg = OmegaConf.to_container(
+            OmegaConf.load(_ROOT / "evaluations/realworld/vla_precision_ur.yaml")
+        )
+        model = OmegaConf.create(cfg["model"]["network"])
+
+        def validate():
+            cfg["model"]["network"] = OmegaConf.to_container(model)
+            return model_config_from_yaml(cfg)
+
+    model.model_type = "cfg_model"
+    model.openpi.positive_only_conditional = positive_only
+    before = copy.deepcopy(model)
+    validate()
+    assert model == before
+    model.openpi.guidance_type = "negative"
+    if positive_only:
+        with pytest.raises(ValueError, match="Negative guidance"):
+            validate()
+    else:
+        validate()
+    model.openpi.guidance_type = "positive"
+    model.openpi.cfgrl_guidance_scale = float("nan")
+    with pytest.raises(ValueError, match="finite"):
+        validate()
+    model.openpi.cfgrl_guidance_scale = 1.0
+    model.openpi.rtc_enabled = True
+    with pytest.raises(ValueError, match="RTC"):
+        validate()

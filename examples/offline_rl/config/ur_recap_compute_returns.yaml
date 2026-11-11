@@ -4,8 +4,7 @@ data:
   train_data_paths:
     - dataset_path: /home/suchenyu/.cache/huggingface/lerobot/scylearning/insert_black_rack_into_blue_slot_20260916_v01
       type: sft
-    # Set the exact timestamped dataset path printed by the collector.
-    - dataset_path: ???
+    - dataset_path: /home/suchenyu/RLinf-recap/logs/ur_recap_rollout/round_001/20261109-190405-901088
       type: rollout
   dataset_type: rollout
   gamma: 1.0

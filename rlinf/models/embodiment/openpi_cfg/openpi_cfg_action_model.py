@@ -293,12 +293,12 @@ class OpenPi0ForCFGActionPrediction(BasePolicy, PI0Pytorch):
             if first_process:
                 sample["prompt"] = obs["prompt"][i]
                 positive_guidance_prompt = obs["positive_guidance_prompt"][i]
-                positive_guidance_dict = self._tokenize_transform(
-                    {"prompt": positive_guidance_prompt}
+                positive_guidance_dict = self._input_transform(
+                    {**sample, "prompt": positive_guidance_prompt}
                 )
                 negative_guidance_prompt = obs["negative_guidance_prompt"][i]
-                negative_guidance_dict = self._tokenize_transform(
-                    {"prompt": negative_guidance_prompt}
+                negative_guidance_dict = self._input_transform(
+                    {**sample, "prompt": negative_guidance_prompt}
                 )
             else:
                 sample["prompt"] = "xxxx"
@@ -652,13 +652,18 @@ class OpenPi0ForCFGActionPrediction(BasePolicy, PI0Pytorch):
         mode: Literal["train", "eval"] = "train",
         compute_values=True,
         return_obs=True,
+        noise: torch.Tensor | None = None,
+        rtc_context=None,
     ) -> tuple[np.ndarray, dict[str, Any]]:
+        if rtc_context is not None:
+            raise ValueError("CFG inference does not support RTC guidance.")
         to_process_obs = self.obs_processor(env_obs)
         processed_obs = self.input_transform(to_process_obs, transpose=False)
         processed_obs = self.precision_processor(processed_obs)
         observation = Observation.from_dict(processed_obs)
         outputs = self.sample_actions(
             observation,
+            noise=noise,
         )
         actions = self.output_transform(
             {"actions": outputs["actions"], "state": observation.state}

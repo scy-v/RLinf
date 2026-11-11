@@ -17,6 +17,28 @@ import torch
 from omegaconf import DictConfig
 
 
+def validate_inference_config(cfg: DictConfig) -> None:
+    """Validate CFG options used by the UR inference entry points."""
+    import math
+
+    options = cfg.openpi
+    if options.get("rtc_enabled", False):
+        raise ValueError("CFG inference does not support RTC guidance.")
+    guidance = options.get("guidance_type", "positive")
+    if guidance not in ("positive", "negative", "no_guide"):
+        raise ValueError(f"Unsupported CFG guidance_type: {guidance!r}.")
+    if options.get("positive_only_conditional", False) and guidance == "negative":
+        raise ValueError("Negative guidance requires positive_only_conditional=false.")
+    scale = options.get("cfgrl_guidance_scale", 1.0)
+    if not math.isfinite(scale):
+        raise ValueError(f"Expected a finite CFG guidance scale, got {scale}.")
+    if not 1 <= options.action_chunk <= options.action_horizon:
+        raise ValueError(
+            "Expected openpi.action_chunk between 1 and action_horizon "
+            f"{options.action_horizon}, got {options.action_chunk}."
+        )
+
+
 def get_model(cfg: DictConfig, torch_dtype=None):
     import glob
 
@@ -32,13 +54,19 @@ def get_model(cfg: DictConfig, torch_dtype=None):
     )
 
     config_name = getattr(cfg.openpi, "config_name", None)
-    actor_train_config = get_openpi_config(config_name)
+    actor_train_config = get_openpi_config(
+        config_name, data_kwargs=cfg.get("openpi_data", None)
+    )
     actor_model_config = actor_train_config.model
     actor_model_config = OpenPi0Config(**actor_model_config.__dict__)
     override_config_kwargs = cfg.openpi
     if override_config_kwargs is not None:
         for key, val in override_config_kwargs.items():
             actor_model_config.__dict__[key] = val
+    actor_model_config.__dict__["num_steps"] = cfg.openpi.get(
+        "num_steps", cfg.get("num_steps", actor_model_config.num_steps)
+    )
+    actor_model_config.__post_init__()
     checkpoint_dir = download.maybe_download(str(cfg.model_path))
 
     full_weights_path = os.path.join(
@@ -54,12 +82,29 @@ def get_model(cfg: DictConfig, torch_dtype=None):
     if actor_model_config.train_expert_only:
         model.freeze_vlm()
 
-    if os.path.exists(full_weights_path):
-        model_state_dict = torch.load(full_weights_path, map_location="cpu")
-        model.load_state_dict(model_state_dict, strict=False)
-    elif os.path.exists(actor_full_weights_path):
-        model_state_dict = torch.load(actor_full_weights_path, map_location="cpu")
-        model.load_state_dict(model_state_dict, strict=False)
+    full_checkpoint = os.path.exists(full_weights_path) or os.path.exists(
+        actor_full_weights_path
+    )
+    if full_checkpoint:
+        # Establish mixed precision before copying trained FP32-sensitive weights.
+        model.paligemma_with_expert.to_bfloat16_for_selected_params("bfloat16")
+        weights_path = (
+            full_weights_path
+            if os.path.exists(full_weights_path)
+            else actor_full_weights_path
+        )
+        model_state_dict = torch.load(
+            weights_path, map_location="cpu", weights_only=True
+        )
+        paligemma = model.paligemma_with_expert.paligemma
+        # FSDP checkpoints can store distinct embedding and output-head weights.
+        # Untie before loading so the output head cannot overwrite the embedding.
+        if paligemma.lm_head.weight is paligemma.get_input_embeddings().weight:
+            paligemma.lm_head.weight = torch.nn.Parameter(
+                paligemma.lm_head.weight.detach().clone(),
+                requires_grad=paligemma.lm_head.weight.requires_grad,
+            )
+        model.load_state_dict(model_state_dict, strict=True)
     else:
         weight_paths = sorted(glob.glob(os.path.join(checkpoint_dir, "*.safetensors")))
         if not weight_paths:
@@ -67,13 +112,18 @@ def get_model(cfg: DictConfig, torch_dtype=None):
         for weight_path in weight_paths:
             safetensors.torch.load_model(model, weight_path, strict=False)
 
-    model.paligemma_with_expert.to_bfloat16_for_selected_params("bfloat16")
+    if not full_checkpoint:
+        model.paligemma_with_expert.to_bfloat16_for_selected_params("bfloat16")
     data_config = actor_train_config.data.create(
         actor_train_config.assets_dirs, actor_model_config
     )
     if data_config.asset_id is None:
         raise ValueError("Asset id is required to load norm stats.")
-    norm_stats = _checkpoints.load_norm_stats(checkpoint_dir, data_config.asset_id)
+    data_overrides = cfg.get("openpi_data", None)
+    if data_overrides and data_overrides.get("norm_stats_path"):
+        norm_stats = data_config.norm_stats
+    else:
+        norm_stats = _checkpoints.load_norm_stats(checkpoint_dir, data_config.asset_id)
 
     repack_transforms = transforms.Group()
     default_prompt = None

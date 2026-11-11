@@ -181,6 +181,9 @@ jobs:
               - *shared
               - 'toolkits/ur_data_collection/**'
               - 'examples/offline_rl/advantage_labeling/recap/process/compute_returns.py'
+              - 'examples/offline_rl/advantage_labeling/recap/process/compute_advantages.py'
+              - 'rlinf/models/embodiment/value_model/recap/checkpoint_utils.py'
+              - 'rlinf/models/embodiment/openpi_cfg/**'
               - 'evaluations/realworld/**'
               - 'examples/embodiment/config/env/realworld_ur5e_sft_env.yaml'
               - 'rlinf/workers/env/ur5e_eval_worker.py'

@@ -60,7 +60,7 @@ Step 1 使用 [ur_recap_compute_returns.yaml](../../examples/offline_rl/config/u
 
 本次补齐 v3 任务文本索引、跨 parquet 的完整 episode 回报计算，以及单元素布尔数组读取；附加回报文件不会被误声明成原始 parquet 的 feature。训练固定长度 action chunk 由数据加载器从逐帧动作组装，episode 尾部按加载器规则补齐并返回 padding mask，采集端不伪造未来动作。
 
-当前完成第一阶段模型 rollout 与 Step 1 对接。Step 2–4 的 UR 状态／图像映射、训练配置和人工干预样本的 advantage 使用方式需在后续阶段单独接入；写入 `intervene_flag` 本身不会使现有 Step 3 自动将干预样本标为正 advantage。
+当前已完成第一阶段模型 rollout、Step 1 对接和 Step 2 的 UR 图像／任务文本训练适配，入口见[训练命令](../../recap-setup/训练命令.md)。Step 3–4 的 UR 数据映射与人工干预样本 advantage 处理仍待接入；写入 `intervene_flag` 本身不会使现有 Step 3 自动将干预样本标为正 advantage。
 
 ## 验证
 

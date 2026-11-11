@@ -3673,3 +3673,254 @@ def test_openpi_normalization_env_selection_and_terminal_windows(
             },
         )
         loaded.data.create(loaded.assets_dirs, loaded.model)
+
+
+@pytest.fixture
+def ur_value_dataset_path(tmp_path):
+    """Write real LeRobot images and distinct per-frame value targets."""
+    pytest.importorskip("openpi")
+    lerobot = pytest.importorskip("lerobot.datasets.lerobot_dataset")
+    if lerobot.CODEBASE_VERSION != "v3.0":
+        pytest.skip("UR value data uses LeRobot v3.")
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    root = tmp_path / "ur_value"
+    features = {
+        "intervene_flag": {"dtype": "bool", "shape": (1,), "names": None},
+        "observation.state": {"dtype": "float32", "shape": (48,), "names": None},
+        "action": {"dtype": "float32", "shape": (7,), "names": None},
+    }
+    for camera in ("exterior_image", "wrist_image"):
+        features[f"observation.images.{camera}"] = {
+            "dtype": "image",
+            "shape": (16, 16, 3),
+            "names": ["height", "width", "channels"],
+        }
+    dataset = lerobot.LeRobotDataset.create(
+        "test/ur_value", root=root, fps=15, robot_type="ur5e", features=features
+    )
+    rows = []
+    for ep in range(4):
+        for frame in range(3):
+            add_frame_to_dataset(
+                dataset,
+                {
+                    "intervene_flag": np.array([frame == 1], dtype=bool),
+                    "observation.state": np.zeros(48, dtype=np.float32),
+                    "action": np.zeros(7, dtype=np.float32),
+                    "observation.images.exterior_image": np.full(
+                        (16, 16, 3), 32 + ep, dtype=np.uint8
+                    ),
+                    "observation.images.wrist_image": np.full(
+                        (16, 16, 3), 160 + ep, dtype=np.uint8
+                    ),
+                    "task": "Insert the black rack into the blue slot",
+                },
+            )
+            rows.append(
+                {
+                    "episode_index": ep,
+                    "frame_index": frame,
+                    "return": -ep * 10 - frame,
+                    "reward": -1.0,
+                }
+            )
+        dataset.save_episode()
+    dataset.finalize()
+    pq.write_table(pa.Table.from_pylist(rows), root / "meta/returns_test.parquet")
+    return root
+
+
+def test_recap_value_ur_images_targets_and_episode_split(ur_value_dataset_path):
+    from rlinf.data.datasets.recap.value_dataset import ValueDataset
+
+    common = {
+        "dataset_path": str(ur_value_dataset_path),
+        "robot_type": "ur5e",
+        "model_type": "pi05",
+        "action_horizon": 1,
+        "tag": "test",
+        "return_min": -100,
+        "return_max": 0,
+        "episode_seed": 42,
+    }
+    full = ValueDataset(**common)
+    train = ValueDataset(**common, validation_fraction=0.25, split="train")
+    val = ValueDataset(**common, validation_fraction=0.25, split="val")
+    repeat = ValueDataset(**common, validation_fraction=0.25, split="val")
+    assert (len(full), len(train), len(val)) == (12, 9, 3)
+
+    def read_values(dataset):
+        values = []
+        for sample in dataset:
+            value = sample["target_values"]
+            ep = round(-value * 100) // 10
+            assert sample["prompt"] == "Insert the black rack into the blue slot"
+            assert sample["actions"] is None
+            assert "state" not in sample
+            assert sample["image_masks"] == {
+                "base_0_rgb": True,
+                "left_wrist_0_rgb": True,
+            }
+            for name, pixel in (
+                ("base_0_rgb", 32 + ep),
+                ("left_wrist_0_rgb", 160 + ep),
+            ):
+                image = sample["images"][name]
+                assert image.shape == (16, 16, 3)
+                assert image.dtype == np.uint8
+                np.testing.assert_array_equal(image, np.full_like(image, pixel))
+            values.append(value)
+        return values
+
+    train_values, val_values = read_values(train), read_values(val)
+    assert set(train_values).isdisjoint(val_values)
+    assert sorted(train_values + val_values) == sorted(read_values(full))
+    assert val_values == read_values(repeat)
+    train_episodes = {round(-x * 100) // 10 for x in train_values}
+    val_episodes = {round(-x * 100) // 10 for x in val_values}
+    assert train_episodes.isdisjoint(val_episodes)
+
+    subset = ValueDataset(**common, episode_percentage=50)
+    assert read_values(subset) == read_values(full)[:6]
+
+
+@pytest.mark.parametrize(
+    "fraction,split", [(-0.1, "train"), (1.0, "val"), (0.1, "test")]
+)
+def test_recap_value_rejects_invalid_split(tmp_path, fraction, split):
+    pytest.importorskip("openpi")
+    pytest.importorskip("lerobot.datasets.lerobot_dataset")
+    from rlinf.data.datasets.recap.value_dataset import ValueDataset
+
+    with pytest.raises(ValueError, match="Expected"):
+        ValueDataset(
+            str(tmp_path), "ur5e", "pi05", validation_fraction=fraction, split=split
+        )
+
+
+def test_recap_ur_inference_matches_value_training(ur_value_dataset_path):
+    from openpi.transforms import compose
+
+    from examples.offline_rl.advantage_labeling.recap.process.compute_advantages import (
+        ValueInferenceDataset,
+        advantage_collate_fn,
+        build_obs,
+        load_lerobot_dataset,
+    )
+    from rlinf.data.datasets.recap.value_dataset import ValueDataset
+    from rlinf.models.embodiment.value_model.recap.checkpoint_utils import (
+        build_input_transforms,
+    )
+
+    dataset, tasks, _, returns = load_lerobot_dataset(ur_value_dataset_path, "test")
+    transforms = compose(build_input_transforms("ur5e", "pi05", 7, None, None, True))
+    inference = ValueInferenceDataset(
+        dataset, "ur5e", tasks, input_transform=transforms, returns_sidecar=returns
+    )
+    training_transform = ValueDataset._build_transform("ur5e", "pi05", 7, None)
+    for index in (0, 2, 3, 11):
+        item = inference[index]
+        sample = dict(dataset[index])
+        sample["prompt"] = tasks[int(sample["task_index"])]
+        train_obs = training_transform(sample)
+        assert item["obs"]["prompt"] == train_obs["prompt"]
+        for camera in train_obs["image"]:
+            np.testing.assert_array_equal(
+                item["obs"]["image"][camera], train_obs["image"][camera]
+            )
+        assert "state" not in item["obs"]
+        assert (
+            item["true_return"]
+            == returns[item["episode_index"]]["return"][item["frame_index"]]
+        )
+        obs, meta = advantage_collate_fn([item])
+        assert obs[0] is item["obs"]
+        assert meta[0]["intervene_flag"] is False
+    flagged = ValueInferenceDataset(
+        dataset,
+        "ur5e",
+        tasks,
+        returns_sidecar=returns,
+        intervention_key="intervene_flag",
+    )
+    _, flags = advantage_collate_fn([flagged[i] for i in range(3)])
+    assert [x["intervene_flag"] for x in flags] == [False, True, False]
+    # Exercise the v3 task table fallback without a pre-injected task string.
+    raw = dict(dataset[0])
+    raw.pop("task", None)
+    assert build_obs(raw, "ur5e", tasks)["prompt"] == tasks[0]
+    missing = ValueInferenceDataset(
+        dataset,
+        "ur5e",
+        tasks,
+        returns_sidecar=returns,
+        intervention_key="missing_flag",
+    )
+    with pytest.raises(ValueError, match="Expected intervention field"):
+        missing[0]
+
+
+def test_recap_interventions_override_only_boolean_labels(tmp_path):
+    pytest.importorskip("openpi")
+    import pandas as pd
+
+    from examples.offline_rl.advantage_labeling.recap.process.compute_advantages import (
+        save_advantages_to_dataset,
+    )
+
+    frame = pd.DataFrame(
+        {
+            "episode_index": [0, 0, 0, 0],
+            "frame_index": [0, 1, 2, 3],
+            "advantage": [-0.9, -0.8, 0.0, 0.2],
+            "return": [-300.0, -299.0, -298.0, -297.0],
+            "intervene_flag": [False, True, False, False],
+        }
+    )
+    save_advantages_to_dataset(tmp_path, frame, 0.0, "rollout", tag="test")
+    saved = pd.read_parquet(tmp_path / "meta/advantages_test.parquet")
+    assert saved.advantage.tolist() == [False, True, True, True]
+    np.testing.assert_array_equal(saved.advantage_continuous, frame.advantage)
+    np.testing.assert_array_equal(saved["return"], frame["return"])
+    save_advantages_to_dataset(
+        tmp_path, frame.drop(columns="intervene_flag"), 0.0, "rollout", tag="legacy"
+    )
+    assert pd.read_parquet(
+        tmp_path / "meta/advantages_legacy.parquet"
+    ).advantage.tolist() == [False, False, True, True]
+    save_advantages_to_dataset(tmp_path, frame, 0.0, "sft", tag="sft")
+    assert pd.read_parquet(tmp_path / "meta/advantages_sft.parquet").advantage.all()
+
+
+def test_cfg_positive_and_negative_routing():
+    pytest.importorskip("openpi")
+    from rlinf.models.embodiment.openpi_cfg.openpi_cfg_action_model import (
+        compute_cfg_routing_masks,
+    )
+
+    labels = torch.tensor([True, True, False, False])
+    random_values = torch.tensor([0.2, 0.4, 0.2, 0.4])
+    both = compute_cfg_routing_masks(
+        labels,
+        positive_only_conditional=False,
+        unconditional_prob=0.3,
+        random_values=random_values,
+    )
+    assert both["positive_conditional_mask"].tolist() == [False, True, False, False]
+    assert both["negative_conditional_mask"].tolist() == [False, False, False, True]
+    assert both["negative_unconditional_mask"].tolist() == [False, False, True, False]
+    positive_only = compute_cfg_routing_masks(
+        labels,
+        positive_only_conditional=True,
+        unconditional_prob=0.3,
+        random_values=random_values,
+    )
+    assert not positive_only["negative_conditional_mask"].any()
+    assert positive_only["negative_unconditional_mask"].tolist() == [
+        False,
+        False,
+        True,
+        True,
+    ]

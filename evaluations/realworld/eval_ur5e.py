@@ -36,6 +36,13 @@ from rlinf.workers.env.ur5e_eval_worker import (
 
 def prepare_inference_config(cfg: DictConfig) -> DictConfig:
     """Validate pure PI05 inference and its scheduling configuration."""
+    model = cfg.rollout.model
+    if model.model_type not in ("openpi", "cfg_model"):
+        raise ValueError(f"Expected openpi or cfg_model, got {model.model_type!r}.")
+    if model.model_type == "cfg_model":
+        from rlinf.models.embodiment.openpi_cfg import validate_inference_config
+
+        validate_inference_config(model)
     async_enabled = cfg.runner.async_inference.enabled
     if "rtc" in cfg.runner:
         raise ValueError(

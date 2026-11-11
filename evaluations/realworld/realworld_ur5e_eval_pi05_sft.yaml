@@ -1,4 +1,4 @@
-# Pure PI05 SFT inference for the UR5e RECAP baseline.
+# UR5e inference: openpi for SFT, cfg_model for RECAP Step 4.
 # false: preserve existing keyboard behavior; true: launching terminal only.
 # true requires a local X11 terminal and python-xlib; focus is window-level, not tab-level.
 keyboard_terminal_only: false
@@ -98,14 +98,15 @@ rollout:
   torch_num_threads: 4
   sampler_compile_mode: max-autotune
   model:
-    model_type: openpi
-    model_path: /home/suchenyu/RLinf-recap/logs/20261024-00:12:51-ur_recap_sft_openpi_pi05/ur_recap_sft_openpi_pi05/checkpoints/global_step_5000/actor
+    # openpi: SFT; cfg_model: RECAP Step 4 (select its checkpoint below).
+    model_type: cfg_model
+    model_path: /home/suchenyu/RLinf-recap/logs/cfg_rl/20261111-020456-ur_recap_cfg_false/ur_recap_cfg_false/checkpoints/global_step_5000/actor
     precision: bf16
     is_lora: false
     num_action_chunks: ${.openpi.action_chunk}
     action_dim: 7
     add_value_head: false
-    num_steps: 4
+    num_steps: 10
     openpi_data:
       repo_id: scylearning/insert_black_rack_into_blue_slot_20260916_v01
       norm_stats_path: /home/suchenyu/RLinf-recap/evaluations/realworld/vla_precision_ur/assets/norm_stats.json
@@ -130,6 +131,9 @@ rollout:
       - 18
       - 19
     openpi:
+      # Used only by cfg_model.
+      guidance_type: positive  # positive: 正优势；negative: 负优势（仅 false 轮）；no_guide: 无优势条件
+      cfgrl_guidance_scale: 1.0
       task: eval
       # Guidance requires async_inference.enabled; false uses ordinary sampling.
       rtc_enabled: false

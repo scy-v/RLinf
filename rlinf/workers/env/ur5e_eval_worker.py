@@ -167,7 +167,19 @@ class URRolloutTiming:
 
     @torch.inference_mode()
     def _predict_rollout_actions(self, env_obs: dict, **kwargs: Any) -> tuple:
-        return super()._predict_rollout_actions(env_obs, **kwargs)
+        actions, result = super()._predict_rollout_actions(env_obs, **kwargs)
+        if self.cfg.rollout.model.model_type == "cfg_model":
+            actions = actions[:, : self.cfg.rollout.model.openpi.action_chunk]
+        return actions, result
+
+    def _predict_rtc(self, request: RTCRequest) -> Any:
+        """Limit CFG predictions to the configured UR execution chunk."""
+        response = super()._predict_rtc(request)
+        if self.cfg.rollout.model.model_type == "cfg_model":
+            response.actions = response.actions[
+                :, : self.cfg.rollout.model.openpi.action_chunk
+            ]
+        return response
 
 
 def evaluation_complete(env: Any) -> bool:

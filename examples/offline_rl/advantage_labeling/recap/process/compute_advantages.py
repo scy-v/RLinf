@@ -27,7 +27,6 @@ Usage:
 """
 
 import gc
-import json
 import logging
 import os
 
@@ -79,8 +78,12 @@ from rlinf.data.datasets.recap.utils import (
     decode_image_struct_batch,
     load_return_stats_from_dataset,
     load_returns_sidecar,
+    load_task_descriptions,
 )
-from rlinf.data.storage.lerobot import episode_boundaries  # noqa: E402
+from rlinf.data.storage.lerobot import (
+    episode_boundaries,
+    resolve_lerobot_dataset_root,
+)
 from rlinf.models.embodiment.value_model.recap.modeling_critic import ValueCriticModel
 
 logger = logging.getLogger(__name__)
@@ -88,6 +91,11 @@ logger = logging.getLogger(__name__)
 
 # Maps LeRobot dataset keys to value model observation format
 KEY_MAPPINGS = {
+    "ur5e": {
+        "observation.images.exterior_image": "observation.images.exterior_image",
+        "observation.images.wrist_image": "observation.images.wrist_image",
+        "task": "prompt",
+    },
     "franka": {
         # Multi-cam format (front_cam + wrist_cam)
         "observation.images.front_cam": "observation/images/front_cam",
@@ -255,7 +263,9 @@ def load_lerobot_dataset(
     Returns:
         Tuple of (dataset, tasks_dict, metadata, returns_sidecar)
     """
-    meta = LeRobotDatasetMetadata(str(dataset_path))
+    meta = LeRobotDatasetMetadata(
+        str(dataset_path), root=resolve_lerobot_dataset_root(str(dataset_path))
+    )
 
     logger.info(f"Dataset features: {list(meta.features.keys())}")
 
@@ -289,19 +299,12 @@ def load_lerobot_dataset(
 
     dataset = LeRobotDataset(
         str(dataset_path),
+        root=resolve_lerobot_dataset_root(str(dataset_path)),
         download_videos=False,
     )
     dataset.hf_dataset.set_transform(decode_image_struct_batch)
 
-    tasks = {}
-    tasks_path = dataset_path / "meta" / "tasks.jsonl"
-    if tasks_path.exists():
-        with open(tasks_path, "r") as f:
-            for line in f:
-                entry = json.loads(line.strip())
-                task_idx = entry.get("task_index", len(tasks))
-                task_desc = entry.get("task", "")
-                tasks[task_idx] = task_desc
+    tasks = load_task_descriptions(dataset_path)
 
     logger.info(
         f"Loaded dataset: {len(dataset)} samples, {meta.total_episodes} episodes"
@@ -365,6 +368,8 @@ class ValueInferenceDataset(torch.utils.data.Dataset):
     Builds observation at the current timestep only. The caller can later
     reuse V(o_t) values by index lookup to obtain V(o_{t+N}) without
     a second forward pass.
+    An explicit intervention_key requires one boolean per frame; absent
+    configuration preserves threshold-only labeling for rollout data.
     """
 
     def __init__(
@@ -375,6 +380,7 @@ class ValueInferenceDataset(torch.utils.data.Dataset):
         input_transform=None,
         prepare_observation_cpu=None,
         returns_sidecar: dict[int, dict[str, np.ndarray]] | None = None,
+        intervention_key: str | None = None,
     ):
         self.dataset = lerobot_dataset
         self.robot_type = robot_type
@@ -382,6 +388,7 @@ class ValueInferenceDataset(torch.utils.data.Dataset):
         self.input_transform = input_transform
         self.prepare_observation_cpu = prepare_observation_cpu
         self.returns_sidecar = returns_sidecar
+        self.intervention_key = intervention_key
 
     def __len__(self):
         return len(self.dataset)
@@ -390,6 +397,20 @@ class ValueInferenceDataset(torch.utils.data.Dataset):
         sample = self.dataset[idx]
         ep_idx = int(to_scalar(sample["episode_index"]))
         frame_idx = int(to_scalar(sample["frame_index"]))
+
+        intervened = False
+        if self.intervention_key is not None:
+            if self.intervention_key not in sample:
+                raise ValueError(
+                    f"Expected intervention field {self.intervention_key!r} in "
+                    f"episode={ep_idx}, frame={frame_idx}."
+                )
+            flag = to_numpy(sample[self.intervention_key]).reshape(-1)
+            if flag.size != 1 or flag[0] not in (0, 1):
+                raise ValueError(
+                    f"Expected one boolean intervention flag, got {flag!r}."
+                )
+            intervened = bool(flag[0])
 
         obs = build_obs(sample, self.robot_type, self.tasks)
 
@@ -430,6 +451,7 @@ class ValueInferenceDataset(torch.utils.data.Dataset):
             "frame_index": frame_idx,
             "true_return": true_return,
             "reward": reward,
+            "intervene_flag": intervened,
         }
 
 
@@ -453,6 +475,7 @@ def advantage_collate_fn(
             "frame_index": item["frame_index"],
             "true_return": item["true_return"],
             "reward": item["reward"],
+            "intervene_flag": item["intervene_flag"],
         }
         for item in batch
     ]
@@ -569,6 +592,7 @@ def compute_advantages_for_dataset(
         "reward_sum": [],
         "reward_sum_raw": [],
         "num_valid_rewards": [],
+        "intervene_flag": [],
     }
 
     v_curr_stats = RunningStats("V(o_t)")
@@ -632,6 +656,7 @@ def compute_advantages_for_dataset(
         input_transform=value_model._input_transform if cpu_prep_in_workers else None,
         prepare_observation_cpu=worker_cpu_prep if cpu_prep_in_workers else None,
         returns_sidecar=returns_sidecar,
+        intervention_key=dataset_cfg.get("intervention_key"),
     )
     extended_indices = list(range(shard_start, extended_end))
     extended_dataset = torch.utils.data.Subset(advantage_dataset, extended_indices)
@@ -657,6 +682,7 @@ def compute_advantages_for_dataset(
     meta_frame_idx = np.full(extended_size, -1, dtype=np.int64)
     meta_return = np.full(extended_size, np.nan, dtype=np.float64)
     meta_reward = np.full(extended_size, np.nan, dtype=np.float64)
+    meta_intervened = np.zeros(extended_size, dtype=bool)
     filled_mask = np.zeros(extended_size, dtype=bool)
 
     def process_value_batch(obs_list: list[dict], meta_list: list[dict]):
@@ -685,6 +711,7 @@ def compute_advantages_for_dataset(
             meta_frame_idx[local_idx] = int(meta_info["frame_index"])
             meta_return[local_idx] = float(meta_info["true_return"])
             meta_reward[local_idx] = float(meta_info["reward"])
+            meta_intervened[local_idx] = bool(meta_info["intervene_flag"])
             filled_mask[local_idx] = True
 
     # Prefetch next batch while GPU processes current batch
@@ -826,6 +853,7 @@ def compute_advantages_for_dataset(
         results["reward_sum"].append(reward_sum)
         results["reward_sum_raw"].append(reward_sum_raw)
         results["num_valid_rewards"].append(num_valid)
+        results["intervene_flag"].append(bool(meta_intervened[i]))
 
         if (i + 1) % flush_every_samples == 0:
             flush_results_to_disk()
@@ -911,6 +939,9 @@ def save_advantages_to_dataset(
             save_df["advantage"] = apply_boolean_label(
                 save_df["advantage_continuous"], threshold, inclusive=True
             )
+
+        if "intervene_flag" in save_df:
+            save_df["advantage"] |= save_df["intervene_flag"].astype(bool)
 
         adv_filename = f"advantages_{tag}.parquet" if tag else "advantages.parquet"
         save_df.to_parquet(meta_dir / adv_filename, index=False)
@@ -1002,7 +1033,10 @@ def compute_advantages(cfg: DictConfig) -> None:
         max_samples = cfg.advantage.get("max_samples", None)
         grand_total = 0
         for ds_cfg in cfg.data.train_data_paths:
-            ds_meta = LeRobotDatasetMetadata(str(ds_cfg.dataset_path))
+            ds_meta = LeRobotDatasetMetadata(
+                str(ds_cfg.dataset_path),
+                root=resolve_lerobot_dataset_root(str(ds_cfg.dataset_path)),
+            )
             n = ds_meta.total_frames
             if max_samples is not None:
                 n = min(n, max_samples)

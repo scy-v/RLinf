@@ -22,7 +22,8 @@ from openpi.training.config import DataConfig, DataConfigFactory, ModelTransform
 DEFAULT_OBS_INDICES = tuple(range(1, 20))
 
 
-def _parse_ur_image(image: np.ndarray) -> np.ndarray:
+def parse_ur_image(image: np.ndarray) -> np.ndarray:
+    """Convert a LeRobot UR image to HWC uint8 for OpenPI preprocessing."""
     image = np.asarray(image)
     if np.issubdtype(image.dtype, np.floating):
         image = (255 * image).astype(np.uint8)
@@ -43,8 +44,8 @@ class URInputs(transforms.DataTransformFn):
             raise ValueError(
                 f"Expected at most {self.action_dim} state dimensions, got {state.shape[-1]}"
             )
-        base = _parse_ur_image(data["observation/image"])
-        wrist = _parse_ur_image(data["observation/wrist_image"])
+        base = parse_ur_image(data["observation/image"])
+        wrist = parse_ur_image(data["observation/wrist_image"])
         result = {
             "state": state,
             "image": {

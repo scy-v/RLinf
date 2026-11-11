@@ -110,13 +110,14 @@ cameras:
   width: 640
   height: 480
 model:
-  checkpoint_dir: /home/suchenyu/RLinf-recap/logs/20261024-00:12:51-ur_recap_sft_openpi_pi05/ur_recap_sft_openpi_pi05/checkpoints/global_step_5000/actor
+  checkpoint_dir: /home/suchenyu/RLinf-recap/logs/cfg_rl/20261111-020456-ur_recap_cfg_false/ur_recap_cfg_false/checkpoints/global_step_5000/actor
   norm_stats_path: /home/suchenyu/RLinf-recap/evaluations/realworld/vla_precision_ur/assets/norm_stats.json
   device: cuda:0
   torch_num_threads: 4
-  sample_steps: 4
+  sample_steps: 10
   network:
-    model_type: openpi
+    # openpi: SFT; cfg_model: RECAP Step 4 (select its checkpoint below).
+    model_type: cfg_model
     precision: bf16
     pi05: true
     is_lora: false
@@ -146,6 +147,9 @@ model:
       - 18
       - 19
     openpi:
+      # Used only by cfg_model.
+      guidance_type: positive  # positive: 正优势；negative: 负优势（仅 false 轮）；no_guide: 无优势条件
+      cfgrl_guidance_scale: 1.0
       task: eval
       config_name: pi05_ur_state
       embed_dtype: bf16

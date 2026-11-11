@@ -45,7 +45,7 @@ actor:
     precision: fp32
     model_type: "openpi"
     is_lora: False
-    model_path: "/home/suchenyu/RLinf-recap/recap-setup/outputs/pi05_base_openpi"
+    model_path: "/home/suchenyu/RLinf-recap/logs/pretrained/pi05_base_openpi"
     num_action_chunks: 20
     action_dim: 7
     add_value_head: False

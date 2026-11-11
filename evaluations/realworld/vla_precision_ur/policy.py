@@ -125,6 +125,12 @@ def model_config_from_yaml(config: dict[str, Any]) -> Any:
         Path(model["norm_stats_path"]).expanduser()
     )
     cfg = OmegaConf.create(network)
+    if cfg.model_type not in ("openpi", "cfg_model"):
+        raise ValueError(f"Expected openpi or cfg_model, got {cfg.model_type!r}.")
+    if cfg.model_type == "cfg_model":
+        from rlinf.models.embodiment.openpi_cfg import validate_inference_config
+
+        validate_inference_config(cfg)
     chunk_size = int(cfg.openpi.get("action_chunk", cfg.num_action_chunks))
     prediction_steps = int(cfg.openpi.action_horizon)
     if not 1 <= chunk_size <= prediction_steps:
@@ -138,8 +144,9 @@ def model_config_from_yaml(config: dict[str, Any]) -> Any:
 class RLinfPolicy:
     """Return RLinf's decoded action chunk to the standalone UR backend."""
 
-    def __init__(self, model: torch.nn.Module):
+    def __init__(self, model: torch.nn.Module, action_chunk: int | None = None):
         self.model = model
+        self.action_chunk = action_chunk
 
     @torch.inference_mode()
     def infer(self, obs: dict, *, noise: np.ndarray | None = None) -> dict:
@@ -160,13 +167,17 @@ class RLinfPolicy:
             noise = np.asarray(noise)
             if noise.ndim == 2:
                 noise = noise[None]
-            noise_tensor = torch.as_tensor(noise, device=self.model.device)
+            noise_tensor = torch.as_tensor(
+                noise, device=next(self.model.parameters()).device
+            )
         started = time.perf_counter()
         actions, _ = self.model.predict_action_batch(
             env_obs, mode="eval", noise=noise_tensor
         )
         with startup_section("inference.to_cpu"):
-            actions = actions[0].detach().to(device="cpu", dtype=torch.float32).numpy()
+            if isinstance(actions, torch.Tensor):
+                actions = actions.detach().to(device="cpu", dtype=torch.float32).numpy()
+            actions = np.asarray(actions[0], dtype=np.float32)[: self.action_chunk]
         return {
             "actions": actions,
             "controller": "vla",
@@ -195,7 +206,8 @@ def create_policy(
 def _create_policy(config: dict[str, Any]) -> Any:
     """Use RLinf's model factory and default evaluation input/output processing."""
     with startup_section("policy.imports"):
-        from rlinf.models.embodiment.openpi import get_model
+        from rlinf.models.embodiment.openpi import get_model as get_sft_model
+        from rlinf.models.embodiment.openpi_cfg import get_model as get_cfg_model
 
     with startup_section("policy.config"):
         cfg = model_config_from_yaml(config)
@@ -204,12 +216,12 @@ def _create_policy(config: dict[str, Any]) -> Any:
         "Loading RLinf checkpoint for standalone UR inference: %s",
         cfg.model_path,
     )
-    model = get_model(cfg)
+    model = (get_cfg_model if cfg.model_type == "cfg_model" else get_sft_model)(cfg)
     with startup_section("model.to_device"):
         model = model.to(str(config["model"].get("device", "cuda:0"))).eval()
     with startup_section("model.compile_setup"):
         _configure_sampler_compile(model, _torch_compile_setting(config))
-    return RLinfPolicy(model)
+    return RLinfPolicy(model, action_chunk=int(cfg.openpi.action_chunk))
 
 
 def check_model(config: dict[str, Any]) -> None:
@@ -228,7 +240,11 @@ def _check_policy(config: dict[str, Any], policy: RLinfPolicy) -> None:
         "observation/wrist_image": rng.integers(0, 256, (224, 224, 3), dtype=np.uint8),
         "prompt": config["task"]["description"],
     }
-    noise = rng.normal(size=(model.action_horizon, model.action_dim)).astype(np.float32)
+    model_cfg = model_config_from_yaml(config)
+    horizon = int(model_cfg.openpi.action_horizon)
+    noise = rng.normal(size=(horizon, model_cfg.openpi.model_action_dim)).astype(
+        np.float32
+    )
     standalone_actions = warmup_policy(
         policy,
         obs,
@@ -244,15 +260,17 @@ def _check_policy(config: dict[str, Any], policy: RLinfPolicy) -> None:
         original_actions, _ = model.predict_action_batch(
             env_obs,
             mode="eval",
-            noise=torch.from_numpy(noise[None]).to(model.device),
+            noise=torch.from_numpy(noise[None]).to(next(model.parameters()).device),
         )
-    actual = original_actions[0].detach().cpu().numpy()
+    if isinstance(original_actions, torch.Tensor):
+        original_actions = original_actions.detach().float().cpu().numpy()
+    actual = original_actions[0, : model_cfg.openpi.action_chunk]
     np.testing.assert_allclose(actual, standalone_actions, rtol=1e-5, atol=1e-6)
     if not np.isfinite(standalone_actions).all():
         raise ValueError("Expected finite inference actions.")
     get_logger().info(
         "RLinf Policy GPU check passed: action chunk shape=%s, prediction horizon=%s, max abs diff=%.8g; no hardware connected",
         standalone_actions.shape,
-        model.action_horizon,
+        horizon,
         float(np.max(np.abs(actual - standalone_actions))),
     )

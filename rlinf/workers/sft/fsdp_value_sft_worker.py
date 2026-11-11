@@ -296,6 +296,7 @@ class FSDPValueSftWorker(FSDPModelManager, Worker):
             "return_max": global_return_max,
             "normalize_to_minus_one_zero": shared["normalize_to_minus_one_zero"],
             "action_dim": shared["action_dim"],
+            "validation_fraction": data_cfg.get("validation_fraction", 0.0),
         }
 
         datasets_with_weights = []
@@ -422,6 +423,8 @@ class FSDPValueSftWorker(FSDPModelManager, Worker):
                 default_prompt=eval_entry.get("default_prompt", None),
                 max_samples=eval_max_samples,
                 tag=data_cfg.get("tag", None),
+                validation_fraction=data_cfg.get("validation_fraction", 0.0),
+                episode_seed=eval_entry.get("episode_seed", 42),
             )
             eval_sampler = None
             if torch.distributed.is_initialized():
