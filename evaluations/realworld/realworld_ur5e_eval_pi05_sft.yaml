@@ -100,7 +100,7 @@ rollout:
   model:
     # openpi: SFT; cfg_model: RECAP Step 4 (select its checkpoint below).
     model_type: cfg_model
-    model_path: /home/suchenyu/RLinf-recap/logs/cfg_rl/20261111-020456-ur_recap_cfg_false/ur_recap_cfg_false/checkpoints/global_step_5000/actor
+    model_path: /home/suchenyu/RLinf-recap/logs/cfg_rl/20261111-020456-ur_recap_cfg_true/ur_recap_cfg_true/checkpoints/global_step_5000/actor
     precision: bf16
     is_lora: false
     num_action_chunks: ${.openpi.action_chunk}
