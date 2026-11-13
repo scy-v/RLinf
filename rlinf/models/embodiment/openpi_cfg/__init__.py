@@ -82,29 +82,12 @@ def get_model(cfg: DictConfig, torch_dtype=None):
     if actor_model_config.train_expert_only:
         model.freeze_vlm()
 
-    full_checkpoint = os.path.exists(full_weights_path) or os.path.exists(
-        actor_full_weights_path
-    )
-    if full_checkpoint:
-        # Establish mixed precision before copying trained FP32-sensitive weights.
-        model.paligemma_with_expert.to_bfloat16_for_selected_params("bfloat16")
-        weights_path = (
-            full_weights_path
-            if os.path.exists(full_weights_path)
-            else actor_full_weights_path
-        )
-        model_state_dict = torch.load(
-            weights_path, map_location="cpu", weights_only=True
-        )
-        paligemma = model.paligemma_with_expert.paligemma
-        # FSDP checkpoints can store distinct embedding and output-head weights.
-        # Untie before loading so the output head cannot overwrite the embedding.
-        if paligemma.lm_head.weight is paligemma.get_input_embeddings().weight:
-            paligemma.lm_head.weight = torch.nn.Parameter(
-                paligemma.lm_head.weight.detach().clone(),
-                requires_grad=paligemma.lm_head.weight.requires_grad,
-            )
-        model.load_state_dict(model_state_dict, strict=True)
+    if os.path.exists(full_weights_path):
+        model_state_dict = torch.load(full_weights_path, map_location="cpu")
+        model.load_state_dict(model_state_dict, strict=False)
+    elif os.path.exists(actor_full_weights_path):
+        model_state_dict = torch.load(actor_full_weights_path, map_location="cpu")
+        model.load_state_dict(model_state_dict, strict=False)
     else:
         weight_paths = sorted(glob.glob(os.path.join(checkpoint_dir, "*.safetensors")))
         if not weight_paths:
@@ -112,8 +95,7 @@ def get_model(cfg: DictConfig, torch_dtype=None):
         for weight_path in weight_paths:
             safetensors.torch.load_model(model, weight_path, strict=False)
 
-    if not full_checkpoint:
-        model.paligemma_with_expert.to_bfloat16_for_selected_params("bfloat16")
+    model.paligemma_with_expert.to_bfloat16_for_selected_params("bfloat16")
     data_config = actor_train_config.data.create(
         actor_train_config.assets_dirs, actor_model_config
     )
