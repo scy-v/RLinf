@@ -30,7 +30,7 @@ for mode in false true; do
         actor.model.openpi.unconditional_prob="$dropout" \
         runner.max_steps=20000 \
         actor.optim.total_training_steps=20000 \
-        actor.optim.lr_warmup_steps=1000 \
+        actor.optim.lr_warmup_steps=5000 \
         runner.save_interval=2500 \
         ++runner.resume_dir=null \
         runner.logger.log_path="$output" \

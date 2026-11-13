@@ -3894,6 +3894,61 @@ def test_recap_interventions_override_only_boolean_labels(tmp_path):
     assert pd.read_parquet(tmp_path / "meta/advantages_sft.parquet").advantage.all()
 
 
+@pytest.mark.parametrize(
+    "data_config",
+    [
+        {"num_workers": 0},
+        {"num_workers": 2},
+        {"num_workers": 2, "persistent_workers": False},
+    ],
+)
+def test_cfg_dataloader_resamples_each_epoch(data_config):
+    pytest.importorskip("openpi")
+    from rlinf.data.datasets.recap.cfg_model import (
+        CFGDataLoaderImpl,
+        CfgMixtureDataset,
+    )
+    from rlinf.workers.sft.fsdp_cfg_worker import FSDPCfgWorker
+
+    samples = [
+        {
+            "image": {},
+            "image_mask": {},
+            "state": np.array([index], dtype=np.float32),
+            "actions": np.array([[index]], dtype=np.float32),
+            "advantage": index % 3 == 0,
+        }
+        for index in range(64)
+    ]
+    dataset = CfgMixtureDataset([(samples[:32], 1.0), (samples[32:], 1.0)], seed=42)
+    worker = object.__new__(FSDPCfgWorker)
+    worker.cfg = OmegaConf.create({"data": data_config})
+    torch_loader = worker._create_torch_dataloader(
+        dataset,
+        SimpleNamespace(batch_size=8, num_workers=0),
+        openpi_data_loader=None,
+        shuffle=False,
+    )
+    if torch_loader.num_workers:
+        torch_loader.timeout = 30
+    loader = CFGDataLoaderImpl(None, torch_loader)
+
+    epochs = []
+    for epoch in (0, 1, 0):
+        loader.set_epoch(epoch)
+        indices = []
+        for observation, actions, advantage in loader:
+            frame_indices = observation.state[:, 0].to(torch.int64)
+            torch.testing.assert_close(actions[:, 0, 0], observation.state[:, 0])
+            torch.testing.assert_close(advantage, frame_indices % 3 == 0)
+            indices.extend(frame_indices.tolist())
+        epochs.append(indices)
+
+    assert len(epochs[0]) == len(dataset)
+    assert epochs[0] != epochs[1]
+    assert epochs[0] == epochs[2]
+
+
 def test_cfg_positive_and_negative_routing():
     pytest.importorskip("openpi")
     from rlinf.models.embodiment.openpi_cfg.openpi_cfg_action_model import (

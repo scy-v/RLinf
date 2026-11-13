@@ -334,6 +334,8 @@ class FSDPCfgWorker(FSDPSftWorker):
         # Use data config overrides if available, otherwise fall back to OpenPI defaults.
         data_cfg = self.cfg.get("data", {})
         num_workers = int(data_cfg.get("num_workers", config.num_workers))
+        # Recreate workers by default so their dataset copies receive the new epoch.
+        persistent_workers = bool(data_cfg.get("persistent_workers", False))
         return torch.utils.data.DataLoader(
             dataset,
             batch_size=local_batch_size,
@@ -343,7 +345,7 @@ class FSDPCfgWorker(FSDPSftWorker):
             num_workers=num_workers,
             pin_memory=True,
             prefetch_factor=4 if num_workers > 0 else None,
-            persistent_workers=num_workers > 0,
+            persistent_workers=num_workers > 0 and persistent_workers,
         )
 
     def run_training(self):
